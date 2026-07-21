@@ -1,0 +1,20 @@
+[
+  {
+    "question": "What was Uber's total revenue in 2025?",
+    "ground_truth": "Uber's total revenue in 2025 was $52,017 million.",
+    "source_pages": [60],
+    "question_type": "direct_lookup"
+  },
+  {
+    "question": "Why did Uber Freight revenue decline?",
+    "ground_truth": "Freight revenue decreased $42 million, or 1%, primarily due to a decline in revenue per load and lower volumes.",
+    "source_pages": [58],
+    "question_type": "reasoning"
+  },
+  {
+    "question": "What was Uber's net income in 1995?",
+    "ground_truth": "This information is not available in the document. Uber was not public and the filing does not cover 1995.",
+    "source_pages": [],
+    "question_type": "trap"
+  }
+]
