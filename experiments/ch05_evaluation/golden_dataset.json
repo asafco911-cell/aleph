@@ -2,7 +2,7 @@
   {
     "question": "What was Uber's total revenue in 2025?",
     "ground_truth": "Uber's total revenue in 2025 was $52,017 million.",
-    "source_pages": [60],
+    "source_pages": [58],
     "question_type": "direct_lookup"
   },
   {
@@ -16,5 +16,80 @@
     "ground_truth": "This information is not available in the document. Uber was not public and the filing does not cover 1995.",
     "source_pages": [],
     "question_type": "trap"
-  }
+  },
+  {
+    "question": "What was Uber's Mobility segment revenue in 2025?",
+    "ground_truth": "Mobility revenue in 2025 was $29,670 million.",
+    "source_pages": [58],
+    "question_type": "direct_lookup",
+    "_search_hint": "Mobility"
+  },
+  {
+    "question": "What was Uber's Adjusted EBITDA in 2025?",
+    "ground_truth": "Adjusted EBITDA was $8.7 billion, growing $2.2 billion year-over-year.",
+    "source_pages": [51],
+    "question_type": "direct_lookup",
+    "_search_hint": "Adjusted EBITDA"
+  },
+  {
+    "question": "How much revenue did Uber generate in the United States and Canada in 2025?",
+    "ground_truth": "Revenue from the United States and Canada in 2025 was $26,469 million.",
+    "source_pages": [116],
+    "question_type": "direct_lookup",
+    "_search_hint": "United States and Canada"
+  },
+  {
+    "question": "What drove the increase in Uber's Mobility revenue in 2025?",
+    "ground_truth": "Mobility Gross Bookings grew19% year-over-year, on a constant currency basis, primarily due to an increase in Mobility Trip volumes.",
+    "source_pages": [50],
+    "question_type": "reasoning",
+    "_search_hint": "Mobility revenue increased"
+  },
+  {
+   "question": "What are the main risks Uber identifies regarding driver classification?",
+   "ground_truth": "Uber identifies the risk that Drivers could be classified as employees, workers, or quasi-employees instead of independent contractors, which would adversely affect its business, financial condition, and results of operations. It faces numerous legal proceedings globally, including class and collective actions, arbitration claims, and government investigations claiming Drivers should be treated as employees. Uber argues Drivers are independent contractors because they choose whether, when, and where to provide services and may use competing platforms, but acknowledges it may not succeed in defending this classification. Adverse rulings have already occurred internationally, including French Supreme Court decisions reclassifying UberX Drivers as employees, a Swiss ruling for social security purposes, a Netherlands ruling under a collective bargaining agreement, and Mexican legislation passed in December 2024.",
+   "source_pages": [10, 12, 13, 49],
+   "question_type": "reasoning",
+   "_search_hint": "independent contractors"
+  },
+  {
+    "question": "How does Uber define and calculate Adjusted EBITDA, and why does management use it?",
+    "ground_truth": "We define Adjusted EBITDA as net income (loss), excluding (i) income (loss) from discontinued operations, net of income taxes, (ii) net income (loss)attributable to non-controlling interests, net of tax, (iii) provision for (benefit from) income taxes, (iv) income (loss) from equity method investments, (v) interestexpense, (vi) interest income, (vii) other income (expense), net, (viii) depreciation and amortization, (ix) stock-based compensation expense, (x) certain legal, non-income tax, and regulatory reserve changes and settlements, (xi) goodwill and asset impairments/loss on sale of assets",
+    "source_pages": [60],
+    "question_type": "reasoning",
+    "_search_hint": "we define Adjusted EBITDA"
+  },
+  {
+    "question": "Which geographic region contributed more revenue in 2025, EMEA or Asia Pacific?",
+    "ground_truth": "EMEA contributed more revenue than Asia Pacific in 2025: EMEA generated $16,364 million versus APAC's $5,857 million.",
+    "source_pages": [116],
+    "question_type": "comparative",
+    "_search_hint": "Asia Pacific"
+  },
+  {
+    "question": "What was Lyft's total revenue in 2025?",
+    "ground_truth": "This information is not available in the document.",
+    "source_pages": [],
+    "question_type": "trap",
+    "_search_hint": "no search needed - different company"
+  },
+  {
+    "question": "How many drivers did Uber employ as full-time salaried staff in 2025?",
+    "ground_truth": "This information is not available in the document.",
+    "source_pages": [],
+    "question_type": "trap",
+    "_search_hint": "no search needed - drivers are not employees"
+  },
+ {
+   "question": "Did Uber's Freight segment perform better on revenue or on Adjusted EBITDA in 2025?",
+   "ground_truth": "Freight performed better on Adjusted EBITDA. Freight revenue decreased $42 million, or 1%, while Freight Adjusted EBITDA improved $41 million, or 55%.",
+   "source_pages": [58],
+   "question_type": "comparative"
+ },
+ {
+   "question": "How did Mobility revenue growth compare to Delivery revenue growth in 2025?",
+   "ground_truth": "Mobility and Delivery both grew, with Mobility revenue rising from $25,087 million to $29,670 million (18%) and Delivery revenue rising from $13,750 million to $17,248 million (25%). Delivery grew faster in percentage terms.",
+   "source_pages": [58],
+   "question_type": "comparative"
+ }
 ]
