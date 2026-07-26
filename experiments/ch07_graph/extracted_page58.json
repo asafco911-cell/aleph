@@ -1,0 +1,274 @@
+{
+  "nodes": [
+    {
+      "id": "Uber",
+      "type": "Company"
+    },
+    {
+      "id": "Mobility",
+      "type": "Segment"
+    },
+    {
+      "id": "Delivery",
+      "type": "Segment"
+    },
+    {
+      "id": "Freight",
+      "type": "Segment"
+    },
+    {
+      "id": "Revenue",
+      "type": "Metric"
+    },
+    {
+      "id": "Adjusted EBITDA",
+      "type": "Metric"
+    },
+    {
+      "id": "Gross Bookings",
+      "type": "Metric"
+    },
+    {
+      "id": "Trip volumes",
+      "type": "Metric"
+    },
+    {
+      "id": "Driver payments and incentives",
+      "type": "Metric"
+    },
+    {
+      "id": "Insurance expense",
+      "type": "Metric"
+    },
+    {
+      "id": "Network costs",
+      "type": "Metric"
+    },
+    {
+      "id": "Credit card processing costs",
+      "type": "Metric"
+    },
+    {
+      "id": "Advertising and marketing",
+      "type": "Metric"
+    },
+    {
+      "id": "2024",
+      "type": "Period"
+    },
+    {
+      "id": "2025",
+      "type": "Period"
+    }
+  ],
+  "edges": [
+    {
+      "source": "Uber",
+      "relation": "HAS_SEGMENT",
+      "target": "Mobility",
+      "period": null,
+      "value": null,
+      "unit": null
+    },
+    {
+      "source": "Uber",
+      "relation": "HAS_SEGMENT",
+      "target": "Delivery",
+      "period": null,
+      "value": null,
+      "unit": null
+    },
+    {
+      "source": "Uber",
+      "relation": "HAS_SEGMENT",
+      "target": "Freight",
+      "period": null,
+      "value": null,
+      "unit": null
+    },
+    {
+      "source": "Uber",
+      "relation": "REPORTED",
+      "target": "Revenue",
+      "period": "2024",
+      "value": 43978.0,
+      "unit": "USD millions"
+    },
+    {
+      "source": "Uber",
+      "relation": "REPORTED",
+      "target": "Revenue",
+      "period": "2025",
+      "value": 52017.0,
+      "unit": "USD millions"
+    },
+    {
+      "source": "Uber",
+      "relation": "REPORTED",
+      "target": "Adjusted EBITDA",
+      "period": "2024",
+      "value": 6484.0,
+      "unit": "USD millions"
+    },
+    {
+      "source": "Uber",
+      "relation": "REPORTED",
+      "target": "Adjusted EBITDA",
+      "period": "2025",
+      "value": 8730.0,
+      "unit": "USD millions"
+    },
+    {
+      "source": "Mobility",
+      "relation": "REPORTED",
+      "target": "Revenue",
+      "period": "2024",
+      "value": 25087.0,
+      "unit": "USD millions"
+    },
+    {
+      "source": "Mobility",
+      "relation": "REPORTED",
+      "target": "Revenue",
+      "period": "2025",
+      "value": 29670.0,
+      "unit": "USD millions"
+    },
+    {
+      "source": "Mobility",
+      "relation": "REPORTED",
+      "target": "Adjusted EBITDA",
+      "period": "2024",
+      "value": 6497.0,
+      "unit": "USD millions"
+    },
+    {
+      "source": "Mobility",
+      "relation": "REPORTED",
+      "target": "Adjusted EBITDA",
+      "period": "2025",
+      "value": 7899.0,
+      "unit": "USD millions"
+    },
+    {
+      "source": "Mobility",
+      "relation": "REPORTED",
+      "target": "Gross Bookings",
+      "period": "2024 to 2025",
+      "value": 17.0,
+      "unit": "percent"
+    },
+    {
+      "source": "Mobility",
+      "relation": "REPORTED",
+      "target": "Driver payments and incentives",
+      "period": "2024 to 2025",
+      "value": 1600.0,
+      "unit": "USD millions"
+    },
+    {
+      "source": "Mobility",
+      "relation": "REPORTED",
+      "target": "Insurance expense",
+      "period": "2024 to 2025",
+      "value": 851.0,
+      "unit": "USD millions"
+    },
+    {
+      "source": "Mobility",
+      "relation": "REPORTED",
+      "target": "Network costs",
+      "period": "2024 to 2025",
+      "value": 224.0,
+      "unit": "USD millions"
+    },
+    {
+      "source": "Mobility",
+      "relation": "REPORTED",
+      "target": "Credit card processing costs",
+      "period": "2024 to 2025",
+      "value": 164.0,
+      "unit": "USD millions"
+    },
+    {
+      "source": "Mobility",
+      "relation": "REPORTED",
+      "target": "Advertising and marketing",
+      "period": "2024 to 2025",
+      "value": 105.0,
+      "unit": "USD millions"
+    },
+    {
+      "source": "Delivery",
+      "relation": "REPORTED",
+      "target": "Revenue",
+      "period": "2024",
+      "value": 13750.0,
+      "unit": "USD millions"
+    },
+    {
+      "source": "Delivery",
+      "relation": "REPORTED",
+      "target": "Revenue",
+      "period": "2025",
+      "value": 17248.0,
+      "unit": "USD millions"
+    },
+    {
+      "source": "Delivery",
+      "relation": "REPORTED",
+      "target": "Adjusted EBITDA",
+      "period": "2024",
+      "value": 2471.0,
+      "unit": "USD millions"
+    },
+    {
+      "source": "Delivery",
+      "relation": "REPORTED",
+      "target": "Adjusted EBITDA",
+      "period": "2025",
+      "value": 3572.0,
+      "unit": "USD millions"
+    },
+    {
+      "source": "Delivery",
+      "relation": "REPORTED",
+      "target": "Gross Bookings",
+      "period": "2024 to 2025",
+      "value": 22.0,
+      "unit": "percent"
+    },
+    {
+      "source": "Freight",
+      "relation": "REPORTED",
+      "target": "Revenue",
+      "period": "2024",
+      "value": 5141.0,
+      "unit": "USD millions"
+    },
+    {
+      "source": "Freight",
+      "relation": "REPORTED",
+      "target": "Revenue",
+      "period": "2025",
+      "value": 5099.0,
+      "unit": "USD millions"
+    },
+    {
+      "source": "Freight",
+      "relation": "REPORTED",
+      "target": "Adjusted EBITDA",
+      "period": "2024",
+      "value": -74.0,
+      "unit": "USD millions"
+    },
+    {
+      "source": "Freight",
+      "relation": "REPORTED",
+      "target": "Adjusted EBITDA",
+      "period": "2025",
+      "value": -33.0,
+      "unit": "USD millions"
+    }
+  ]
+}
