@@ -41,3 +41,11 @@ the issue count stops falling between rounds.
 Some edges carry period "2024" (point), others "2024 to 2025" (range).
 A query filtering period == "2025" silently misses the ranges.
 Fix: add period_type, or split into period_start / period_end.
+
+**#7 Language forensics needs two filings (Ch10)**
+Currently compared two sections of the SAME 10-K, which only proves the
+mechanism works - the output has no forensic meaning. Real tone/omission
+analysis requires the 2024 and 2025 10-K, extracting the SAME section
+(Item 7 MD&A) from each.
+Note: forensic tools always return numbers. Validity of the comparison is
+the analyst's responsibility, not the tool's.
