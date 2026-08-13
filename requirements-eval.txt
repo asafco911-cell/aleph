@@ -1,0 +1,6 @@
+anthropic
+python-dotenv
+pypdf
+chromadb
+sentence-transformers
+rank-bm25
