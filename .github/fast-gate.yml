@@ -1,0 +1,25 @@
+name: Fast Gate
+
+# Runs on every push and PR - free, deterministic, no API calls
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  fast-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install minimal dependencies
+        # Only what the deterministic tests need - no torch, no chromadb
+        run: pip install pypdf
+
+      - name: Run CI fast gate
+        run: python experiments/ch13_cicd/run_ci_checks.py
