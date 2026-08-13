@@ -1,0 +1,33 @@
+name: Evaluation Gate
+
+# Expensive - runs only on PRs to main, or when manually triggered
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Restore the cache so unchanged prompts cost nothing (Ch12)
+      - name: Restore evaluation cache
+        uses: actions/cache@v4
+        with:
+          path: experiments/ch12_production/aleph_cache.db
+          key: aleph-eval-cache-${{ hashFiles('experiments/ch05_evaluation/golden_dataset.json') }}
+          restore-keys: aleph-eval-cache-
+
+      - name: Run evaluation against golden dataset
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python experiments/ch05_evaluation/02_ab_test.py
