@@ -1,0 +1,54 @@
+{
+  "UBER_FY2025": {
+    "file_name": "uber_10k.pdf",
+    "ticker": "UBER",
+    "company": "Uber Technologies, Inc.",
+    "verified_figures": {
+      "total_revenue": "52,017",
+      "mobility_revenue": "29,670",
+      "delivery_revenue": "17,248",
+      "freight_revenue": "5,099"
+    },
+    "verification_source": "ch05 manual, ch07 graph, ch08 agent team"
+  },
+  "UBER_FY2024": {
+    "file_name": "uber_10k_fy2024.pdf",
+    "ticker": "UBER",
+    "company": "Uber Technologies, Inc.",
+    "verified_figures": {
+      "total_revenue": "43,978",
+      "mobility_revenue": "25,087",
+      "delivery_revenue": "13,750",
+      "freight_revenue": "5,141"
+    },
+    "verification_source": "ch05 manual, ch07 graph, ch08 agent team"
+  },
+  "LYFT_FY2025": {
+    "file_name": "lyft_10k_fy2025.pdf",
+    "ticker": "LYFT",
+    "company": "Lyft, Inc.",
+    "verified_figures": {},
+    "verification_source": "none yet"
+  },
+  "LYFT_FY2024": {
+    "file_name": "lyft_10k_fy2024.pdf",
+    "ticker": "LYFT",
+    "company": "Lyft, Inc.",
+    "verified_figures": {},
+    "verification_source": "none yet"
+  },
+  "DASH_FY2025": {
+    "file_name": "dash_10k_fy2025.pdf",
+    "ticker": "DASH",
+    "company": "DoorDash, Inc.",
+    "verified_figures": {},
+    "verification_source": "none yet"
+  },
+  "DASH_FY2024": {
+    "file_name": "dash_10k_fy2024.pdf",
+    "ticker": "DASH",
+    "company": "DoorDash, Inc.",
+    "verified_figures": {},
+    "verification_source": "none yet"
+  }
+}

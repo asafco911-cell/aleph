@@ -1,56 +1,1438 @@
 [
   {
-    "file_name": "dash_10k_fy2024.pdf",
-    "sha256": "57ee0a61ef4a7d72f7e335fad0e95347c53d81a361df8b4bdcc83c13d259e624",
-    "size_bytes": 1394570,
-    "n_pages": 142,
-    "form_type": "10-K",
-    "fiscal_year_end": "2024-December-31",
-    "fiscal_year": 2024
-  },
-  {
-    "file_name": "dash_10k_fy2025.pdf",
-    "sha256": "9c25e4edbf057b38b8aa0abe6d33513ee83ebd892672fc29eda42594de59f7de",
-    "size_bytes": 1545444,
-    "n_pages": 153,
-    "form_type": "10-K",
-    "fiscal_year_end": "2025-December-31",
-    "fiscal_year": 2025
-  },
-  {
-    "file_name": "lyft_10k_fy2024.pdf",
-    "sha256": "d71c688050046303c091906340bf09618f5122feb38e4650e37de3c23ebd842e",
-    "size_bytes": 6402067,
-    "n_pages": 168,
-    "form_type": "10-K",
-    "fiscal_year_end": "2024-December-31",
-    "fiscal_year": 2024
-  },
-  {
-    "file_name": "lyft_10k_fy2025.pdf",
-    "sha256": "b092c0fff438fead68ae6b7937d7422025a90a7e77fdc93c15d679478682d152",
-    "size_bytes": 6410882,
-    "n_pages": 170,
-    "form_type": "10-K",
-    "fiscal_year_end": "2025-December-31",
-    "fiscal_year": 2025
-  },
-  {
+    "doc_id": "UBER_FY2025",
     "file_name": "uber_10k.pdf",
+    "ticker": "UBER",
+    "company": "Uber Technologies, Inc.",
     "sha256": "6e4603267ea61dc39a9a6c63e2b261660854db4fc04fd3b7fa1c719aaf732051",
     "size_bytes": 1777858,
     "n_pages": 149,
     "form_type": "10-K",
     "fiscal_year_end": "2025-December-31",
-    "fiscal_year": 2025
+    "fiscal_year": 2025,
+    "toc_page": 3,
+    "page_offset_deltas": [
+      2
+    ],
+    "sections": [
+      {
+        "item": "1",
+        "title": "Business",
+        "printed_page": 4,
+        "pdf_page": 6,
+        "char_offset": 7,
+        "end_page": 11,
+        "end_item": "1A"
+      },
+      {
+        "item": "1A",
+        "title": "Risk Factors",
+        "printed_page": 9,
+        "pdf_page": 11,
+        "char_offset": 3594,
+        "end_page": 47,
+        "end_item": "1B"
+      },
+      {
+        "item": "1B",
+        "title": "Unresolved Staff Comments",
+        "printed_page": 45,
+        "pdf_page": 47,
+        "char_offset": 99,
+        "end_page": 47,
+        "end_item": "1C"
+      },
+      {
+        "item": "1C",
+        "title": "Cybersecurity",
+        "printed_page": 45,
+        "pdf_page": 47,
+        "char_offset": 150,
+        "end_page": 48,
+        "end_item": "2"
+      },
+      {
+        "item": "2",
+        "title": "Properties",
+        "printed_page": 46,
+        "pdf_page": 48,
+        "char_offset": 997,
+        "end_page": 48,
+        "end_item": "3"
+      },
+      {
+        "item": "3",
+        "title": "Legal Proceedings",
+        "printed_page": 46,
+        "pdf_page": 48,
+        "char_offset": 1491,
+        "end_page": 48,
+        "end_item": "4"
+      },
+      {
+        "item": "4",
+        "title": "Mine Safety Disclosures",
+        "printed_page": 46,
+        "pdf_page": 48,
+        "char_offset": 3918,
+        "end_page": 48,
+        "end_item": "5"
+      },
+      {
+        "item": "5",
+        "title": "Market for Registrant's Common Equity, Related Stockholder Matters and Issuer Purchases of Equity Securities",
+        "printed_page": 46,
+        "pdf_page": 48,
+        "char_offset": 3974,
+        "end_page": 50,
+        "end_item": "6"
+      },
+      {
+        "item": "6",
+        "title": "[Reserved]",
+        "printed_page": 48,
+        "pdf_page": 50,
+        "char_offset": 0,
+        "end_page": 50,
+        "end_item": "7"
+      },
+      {
+        "item": "7",
+        "title": "Management's Discussion and Analysis of Financial Condition and Results of Operations",
+        "printed_page": 48,
+        "pdf_page": 50,
+        "char_offset": 19,
+        "end_page": 69,
+        "end_item": "7A"
+      },
+      {
+        "item": "7A",
+        "title": "Quantitative and Qualitative Disclosures About Market Risk",
+        "printed_page": 67,
+        "pdf_page": 69,
+        "char_offset": 0,
+        "end_page": 70,
+        "end_item": "8"
+      },
+      {
+        "item": "8",
+        "title": "Financial Statements and Supplementary Data",
+        "printed_page": 68,
+        "pdf_page": 70,
+        "char_offset": 0,
+        "end_page": 124,
+        "end_item": "9"
+      },
+      {
+        "item": "9",
+        "title": "Changes in and Disagreements with Accountants on Accounting and Financial Disclosure",
+        "printed_page": 122,
+        "pdf_page": 124,
+        "char_offset": 3129,
+        "end_page": 125,
+        "end_item": "9A"
+      },
+      {
+        "item": "9A",
+        "title": "Controls and Procedures",
+        "printed_page": 123,
+        "pdf_page": 125,
+        "char_offset": 0,
+        "end_page": 125,
+        "end_item": "9B"
+      },
+      {
+        "item": "9B",
+        "title": "Other Information",
+        "printed_page": 123,
+        "pdf_page": 125,
+        "char_offset": 3443,
+        "end_page": 125,
+        "end_item": "9C"
+      },
+      {
+        "item": "9C",
+        "title": "Disclosure Regarding Foreign Jurisdictions that Prevent Inspections",
+        "printed_page": 123,
+        "pdf_page": 125,
+        "char_offset": 4014,
+        "end_page": 125,
+        "end_item": "10"
+      },
+      {
+        "item": "10",
+        "title": "Directors, Executive Officers and Corporate Governance",
+        "printed_page": 123,
+        "pdf_page": 125,
+        "char_offset": 4116,
+        "end_page": 126,
+        "end_item": "11"
+      },
+      {
+        "item": "11",
+        "title": "Executive Compensation",
+        "printed_page": 124,
+        "pdf_page": 126,
+        "char_offset": 173,
+        "end_page": 126,
+        "end_item": "12"
+      },
+      {
+        "item": "12",
+        "title": "Security Ownership of Certain Beneficial Owners and Management and Related Stockholder Matters",
+        "printed_page": 124,
+        "pdf_page": 126,
+        "char_offset": 455,
+        "end_page": 126,
+        "end_item": "13"
+      },
+      {
+        "item": "13",
+        "title": "Certain Relationships and Related Transactions, and Director Independence",
+        "printed_page": 124,
+        "pdf_page": 126,
+        "char_offset": 829,
+        "end_page": 126,
+        "end_item": "14"
+      },
+      {
+        "item": "14",
+        "title": "Principal Accounting Fees and Services",
+        "printed_page": 124,
+        "pdf_page": 126,
+        "char_offset": 1186,
+        "end_page": 126,
+        "end_item": "15"
+      },
+      {
+        "item": "15",
+        "title": "Exhibits and Financial Statement Schedules",
+        "printed_page": 124,
+        "pdf_page": 126,
+        "char_offset": 1468,
+        "end_page": 126,
+        "end_item": "16"
+      },
+      {
+        "item": "16",
+        "title": "Form 10-K Summary",
+        "printed_page": 124,
+        "pdf_page": 126,
+        "char_offset": 2298,
+        "end_page": 149,
+        "end_item": null
+      }
+    ],
+    "verified_figures": {
+      "total_revenue": {
+        "value": "52,017",
+        "pages": [
+          51,
+          55,
+          56,
+          59,
+          75,
+          116,
+          117
+        ]
+      },
+      "mobility_revenue": {
+        "value": "29,670",
+        "pages": [
+          59,
+          116
+        ]
+      },
+      "delivery_revenue": {
+        "value": "17,248",
+        "pages": [
+          59,
+          116
+        ]
+      },
+      "freight_revenue": {
+        "value": "5,099",
+        "pages": [
+          59,
+          116
+        ]
+      }
+    },
+    "verification_source": "ch05 manual, ch07 graph, ch08 agent team"
   },
   {
+    "doc_id": "UBER_FY2024",
     "file_name": "uber_10k_fy2024.pdf",
+    "ticker": "UBER",
+    "company": "Uber Technologies, Inc.",
     "sha256": "ab5f074a0afc29ad8b0ab365a83e4bc6dc5781feacc16c2062ada10ffb759920",
     "size_bytes": 1802097,
     "n_pages": 156,
     "form_type": "10-K",
     "fiscal_year_end": "2024-December-31",
-    "fiscal_year": 2024
+    "fiscal_year": 2024,
+    "toc_page": 3,
+    "page_offset_deltas": [
+      2
+    ],
+    "sections": [
+      {
+        "item": "1",
+        "title": "Business",
+        "printed_page": 4,
+        "pdf_page": 6,
+        "char_offset": 7,
+        "end_page": 11,
+        "end_item": "1A"
+      },
+      {
+        "item": "1A",
+        "title": "Risk Factors",
+        "printed_page": 9,
+        "pdf_page": 11,
+        "char_offset": 2795,
+        "end_page": 47,
+        "end_item": "1B"
+      },
+      {
+        "item": "1B",
+        "title": "Unresolved Staff Comments",
+        "printed_page": 45,
+        "pdf_page": 47,
+        "char_offset": 1769,
+        "end_page": 47,
+        "end_item": "1C"
+      },
+      {
+        "item": "1C",
+        "title": "Cybersecurity",
+        "printed_page": 45,
+        "pdf_page": 47,
+        "char_offset": 1820,
+        "end_page": 48,
+        "end_item": "2"
+      },
+      {
+        "item": "2",
+        "title": "Properties",
+        "printed_page": 46,
+        "pdf_page": 48,
+        "char_offset": 2382,
+        "end_page": 48,
+        "end_item": "3"
+      },
+      {
+        "item": "3",
+        "title": "Legal Proceedings",
+        "printed_page": 46,
+        "pdf_page": 48,
+        "char_offset": 2876,
+        "end_page": 49,
+        "end_item": "4"
+      },
+      {
+        "item": "4",
+        "title": "Mine Safety Disclosures",
+        "printed_page": 47,
+        "pdf_page": 49,
+        "char_offset": 1487,
+        "end_page": 49,
+        "end_item": "5"
+      },
+      {
+        "item": "5",
+        "title": "Market for Registrant's Common Equity, Related Stockholder Matters and Issuer Purchases of Equity Securities",
+        "printed_page": 47,
+        "pdf_page": 49,
+        "char_offset": 1543,
+        "end_page": 50,
+        "end_item": "6"
+      },
+      {
+        "item": "6",
+        "title": "[Reserved]",
+        "printed_page": 48,
+        "pdf_page": 50,
+        "char_offset": 1182,
+        "end_page": 50,
+        "end_item": "7"
+      },
+      {
+        "item": "7",
+        "title": "Management's Discussion and Analysis of Financial Condition and Results of Operations",
+        "printed_page": 48,
+        "pdf_page": 50,
+        "char_offset": 1201,
+        "end_page": 70,
+        "end_item": "7A"
+      },
+      {
+        "item": "7A",
+        "title": "Quantitative and Qualitative Disclosures About Market Risk",
+        "printed_page": 68,
+        "pdf_page": 70,
+        "char_offset": 4679,
+        "end_page": 72,
+        "end_item": "8"
+      },
+      {
+        "item": "8",
+        "title": "Financial Statements and Supplementary Data",
+        "printed_page": 70,
+        "pdf_page": 72,
+        "char_offset": 0,
+        "end_page": 130,
+        "end_item": "9"
+      },
+      {
+        "item": "9",
+        "title": "Changes in and Disagreements with Accountants on Accounting and Financial Disclosure",
+        "printed_page": 128,
+        "pdf_page": 130,
+        "char_offset": 2032,
+        "end_page": 130,
+        "end_item": "9A"
+      },
+      {
+        "item": "9A",
+        "title": "Controls and Procedures",
+        "printed_page": 128,
+        "pdf_page": 130,
+        "char_offset": 2131,
+        "end_page": 131,
+        "end_item": "9B"
+      },
+      {
+        "item": "9B",
+        "title": "Other Information",
+        "printed_page": 129,
+        "pdf_page": 131,
+        "char_offset": 1473,
+        "end_page": 131,
+        "end_item": "9C"
+      },
+      {
+        "item": "9C",
+        "title": "Disclosure Regarding Foreign Jurisdictions that Prevent Inspections",
+        "printed_page": 129,
+        "pdf_page": 131,
+        "char_offset": 2322,
+        "end_page": 131,
+        "end_item": "10"
+      },
+      {
+        "item": "10",
+        "title": "Directors, Executive Officers and Corporate Governance",
+        "printed_page": 129,
+        "pdf_page": 131,
+        "char_offset": 2424,
+        "end_page": 131,
+        "end_item": "11"
+      },
+      {
+        "item": "11",
+        "title": "Executive Compensation",
+        "printed_page": 129,
+        "pdf_page": 131,
+        "char_offset": 3563,
+        "end_page": 131,
+        "end_item": "12"
+      },
+      {
+        "item": "12",
+        "title": "Security Ownership of Certain Beneficial Owners and Management and Related Stockholder Matters",
+        "printed_page": 129,
+        "pdf_page": 131,
+        "char_offset": 3847,
+        "end_page": 131,
+        "end_item": "13"
+      },
+      {
+        "item": "13",
+        "title": "Certain Relationships and Related Transactions, and Director Independence",
+        "printed_page": 129,
+        "pdf_page": 131,
+        "char_offset": 4214,
+        "end_page": 131,
+        "end_item": "14"
+      },
+      {
+        "item": "14",
+        "title": "Principal Accounting Fees and Services",
+        "printed_page": 129,
+        "pdf_page": 131,
+        "char_offset": 4573,
+        "end_page": 132,
+        "end_item": "15"
+      },
+      {
+        "item": "15",
+        "title": "Exhibits and Financial Statement Schedules",
+        "printed_page": 130,
+        "pdf_page": 132,
+        "char_offset": 234,
+        "end_page": 132,
+        "end_item": "16"
+      },
+      {
+        "item": "16",
+        "title": "Form 10-K Summary",
+        "printed_page": 130,
+        "pdf_page": 132,
+        "char_offset": 1064,
+        "end_page": 156,
+        "end_item": null
+      }
+    ],
+    "verified_figures": {
+      "total_revenue": {
+        "value": "43,978",
+        "pages": [
+          51,
+          55,
+          56,
+          59,
+          77,
+          96,
+          122,
+          123
+        ]
+      },
+      "mobility_revenue": {
+        "value": "25,087",
+        "pages": [
+          59,
+          96,
+          122
+        ]
+      },
+      "delivery_revenue": {
+        "value": "13,750",
+        "pages": [
+          59,
+          96,
+          122
+        ]
+      },
+      "freight_revenue": {
+        "value": "5,141",
+        "pages": [
+          59,
+          96,
+          122
+        ]
+      }
+    },
+    "verification_source": "ch05 manual, ch07 graph, ch08 agent team"
+  },
+  {
+    "doc_id": "LYFT_FY2025",
+    "file_name": "lyft_10k_fy2025.pdf",
+    "ticker": "LYFT",
+    "company": "Lyft, Inc.",
+    "sha256": "b092c0fff438fead68ae6b7937d7422025a90a7e77fdc93c15d679478682d152",
+    "size_bytes": 6410882,
+    "n_pages": 170,
+    "form_type": "10-K",
+    "fiscal_year_end": "2025-December-31",
+    "fiscal_year": 2025,
+    "toc_page": 2,
+    "page_offset_deltas": [
+      0
+    ],
+    "sections": [
+      {
+        "item": "1",
+        "title": "Business",
+        "printed_page": 5,
+        "pdf_page": 5,
+        "char_offset": 7,
+        "end_page": 11,
+        "end_item": "1A"
+      },
+      {
+        "item": "1A",
+        "title": "Risk Factors",
+        "printed_page": 11,
+        "pdf_page": 11,
+        "char_offset": 0,
+        "end_page": 47,
+        "end_item": "1B"
+      },
+      {
+        "item": "1B",
+        "title": "Unresolved Staff Comments",
+        "printed_page": 47,
+        "pdf_page": 47,
+        "char_offset": 2672,
+        "end_page": 47,
+        "end_item": "1C"
+      },
+      {
+        "item": "1C",
+        "title": "Cybersecurity",
+        "printed_page": 47,
+        "pdf_page": 47,
+        "char_offset": 2714,
+        "end_page": 48,
+        "end_item": "2"
+      },
+      {
+        "item": "2",
+        "title": "Properties",
+        "printed_page": 48,
+        "pdf_page": 48,
+        "char_offset": 2334,
+        "end_page": 48,
+        "end_item": "3"
+      },
+      {
+        "item": "3",
+        "title": "Legal Proceedings",
+        "printed_page": 48,
+        "pdf_page": 48,
+        "char_offset": 2840,
+        "end_page": 48,
+        "end_item": "4"
+      },
+      {
+        "item": "4",
+        "title": "Mine Safety Disclosures",
+        "printed_page": 48,
+        "pdf_page": 48,
+        "char_offset": 3014,
+        "end_page": 49,
+        "end_item": "5"
+      },
+      {
+        "item": "5",
+        "title": "Market for Registrant's Common Equity, Related Stockholder Matters and Issuer Purchases of Equity Securities",
+        "printed_page": 49,
+        "pdf_page": 49,
+        "char_offset": 8,
+        "end_page": 50,
+        "end_item": "6"
+      },
+      {
+        "item": "6",
+        "title": "[Reserved]",
+        "printed_page": 50,
+        "pdf_page": 50,
+        "char_offset": 1476,
+        "end_page": 51,
+        "end_item": "7"
+      },
+      {
+        "item": "7",
+        "title": "Management's Discussion and Analysis of Financial Condition and Results of Operations",
+        "printed_page": 51,
+        "pdf_page": 51,
+        "char_offset": 0,
+        "end_page": 64,
+        "end_item": "7A"
+      },
+      {
+        "item": "7A",
+        "title": "Quantitative and Qualitative Disclosures About Market Risk",
+        "printed_page": 64,
+        "pdf_page": 64,
+        "char_offset": 1808,
+        "end_page": 65,
+        "end_item": "8"
+      },
+      {
+        "item": "8",
+        "title": "Financial Statements and Supplementary Data",
+        "printed_page": 65,
+        "pdf_page": 65,
+        "char_offset": 0,
+        "end_page": 114,
+        "end_item": "9"
+      },
+      {
+        "item": "9",
+        "title": "Changes in and Disagreements With Accountants on Accounting and Financial Disclosure",
+        "printed_page": 114,
+        "pdf_page": 114,
+        "char_offset": 0,
+        "end_page": 114,
+        "end_item": "9A"
+      },
+      {
+        "item": "9A",
+        "title": "Controls and Procedures",
+        "printed_page": 114,
+        "pdf_page": 114,
+        "char_offset": 100,
+        "end_page": 114,
+        "end_item": "9B"
+      },
+      {
+        "item": "9B",
+        "title": "Other Information",
+        "printed_page": 114,
+        "pdf_page": 114,
+        "char_offset": 4161,
+        "end_page": 115,
+        "end_item": "9C"
+      },
+      {
+        "item": "9C",
+        "title": "Disclosure Regarding Foreign Jurisdictions that Prevent Inspections",
+        "printed_page": 115,
+        "pdf_page": 115,
+        "char_offset": 509,
+        "end_page": 116,
+        "end_item": "10"
+      },
+      {
+        "item": "10",
+        "title": "Directors, Executive Officers and Corporate Governance",
+        "printed_page": 116,
+        "pdf_page": 116,
+        "char_offset": 9,
+        "end_page": 116,
+        "end_item": "11"
+      },
+      {
+        "item": "11",
+        "title": "Executive Compensation",
+        "printed_page": 116,
+        "pdf_page": 116,
+        "char_offset": 402,
+        "end_page": 116,
+        "end_item": "12"
+      },
+      {
+        "item": "12",
+        "title": "Security Ownership of Certain Beneficial Owners and Management and Related Stockholder Matters",
+        "printed_page": 116,
+        "pdf_page": 116,
+        "char_offset": 661,
+        "end_page": 116,
+        "end_item": "13"
+      },
+      {
+        "item": "13",
+        "title": "Certain Relationships and Related Transactions, and Director Independence",
+        "printed_page": 116,
+        "pdf_page": 116,
+        "char_offset": 992,
+        "end_page": 116,
+        "end_item": "14"
+      },
+      {
+        "item": "14",
+        "title": "Principal Accounting Fees and Services",
+        "printed_page": 116,
+        "pdf_page": 116,
+        "char_offset": 1302,
+        "end_page": 117,
+        "end_item": "15"
+      },
+      {
+        "item": "15",
+        "title": "Exhibits, Financial Statement Schedules",
+        "printed_page": 117,
+        "pdf_page": 117,
+        "char_offset": 8,
+        "end_page": 120,
+        "end_item": "16"
+      },
+      {
+        "item": "16",
+        "title": "Form 10-K Summary",
+        "printed_page": 120,
+        "pdf_page": 120,
+        "char_offset": 248,
+        "end_page": 170,
+        "end_item": null
+      }
+    ],
+    "verified_figures": {},
+    "verification_source": "none yet"
+  },
+  {
+    "doc_id": "LYFT_FY2024",
+    "file_name": "lyft_10k_fy2024.pdf",
+    "ticker": "LYFT",
+    "company": "Lyft, Inc.",
+    "sha256": "d71c688050046303c091906340bf09618f5122feb38e4650e37de3c23ebd842e",
+    "size_bytes": 6402067,
+    "n_pages": 168,
+    "form_type": "10-K",
+    "fiscal_year_end": "2024-December-31",
+    "fiscal_year": 2024,
+    "toc_page": 2,
+    "page_offset_deltas": [
+      0
+    ],
+    "sections": [
+      {
+        "item": "1",
+        "title": "Business",
+        "printed_page": 5,
+        "pdf_page": 5,
+        "char_offset": 7,
+        "end_page": 12,
+        "end_item": "1A"
+      },
+      {
+        "item": "1A",
+        "title": "Risk Factors",
+        "printed_page": 12,
+        "pdf_page": 12,
+        "char_offset": 0,
+        "end_page": 50,
+        "end_item": "1B"
+      },
+      {
+        "item": "1B",
+        "title": "Unresolved Staff Comments",
+        "printed_page": 50,
+        "pdf_page": 50,
+        "char_offset": 2681,
+        "end_page": 50,
+        "end_item": "1C"
+      },
+      {
+        "item": "1C",
+        "title": "Cybersecurity",
+        "printed_page": 50,
+        "pdf_page": 50,
+        "char_offset": 2723,
+        "end_page": 51,
+        "end_item": "2"
+      },
+      {
+        "item": "2",
+        "title": "Properties",
+        "printed_page": 51,
+        "pdf_page": 51,
+        "char_offset": 2334,
+        "end_page": 51,
+        "end_item": "3"
+      },
+      {
+        "item": "3",
+        "title": "Legal Proceedings",
+        "printed_page": 51,
+        "pdf_page": 51,
+        "char_offset": 2973,
+        "end_page": 51,
+        "end_item": "4"
+      },
+      {
+        "item": "4",
+        "title": "Mine Safety Disclosures",
+        "printed_page": 51,
+        "pdf_page": 51,
+        "char_offset": 3147,
+        "end_page": 52,
+        "end_item": "5"
+      },
+      {
+        "item": "5",
+        "title": "Market for Registrant's Common Equity, Related Stockholder Matters and Issuer Purchases of Equity Securities",
+        "printed_page": 52,
+        "pdf_page": 52,
+        "char_offset": 8,
+        "end_page": 53,
+        "end_item": "6"
+      },
+      {
+        "item": "6",
+        "title": "[Reserved]",
+        "printed_page": 53,
+        "pdf_page": 53,
+        "char_offset": 329,
+        "end_page": 54,
+        "end_item": "7"
+      },
+      {
+        "item": "7",
+        "title": "Management's Discussion and Analysis of Financial Condition and Results of Operations",
+        "printed_page": 54,
+        "pdf_page": 54,
+        "char_offset": 0,
+        "end_page": 69,
+        "end_item": "7A"
+      },
+      {
+        "item": "7A",
+        "title": "Quantitative and Qualitative Disclosures About Market Risk",
+        "printed_page": 69,
+        "pdf_page": 69,
+        "char_offset": 1433,
+        "end_page": 70,
+        "end_item": "8"
+      },
+      {
+        "item": "8",
+        "title": "Financial Statements and Supplementary Data",
+        "printed_page": 70,
+        "pdf_page": 70,
+        "char_offset": 0,
+        "end_page": 119,
+        "end_item": "9"
+      },
+      {
+        "item": "9",
+        "title": "Changes in and Disagreements With Accountants on Accounting and Financial Disclosure",
+        "printed_page": 119,
+        "pdf_page": 119,
+        "char_offset": 0,
+        "end_page": 119,
+        "end_item": "9A"
+      },
+      {
+        "item": "9A",
+        "title": "Controls and Procedures",
+        "printed_page": 119,
+        "pdf_page": 119,
+        "char_offset": 100,
+        "end_page": 119,
+        "end_item": "9B"
+      },
+      {
+        "item": "9B",
+        "title": "Other Information",
+        "printed_page": 119,
+        "pdf_page": 119,
+        "char_offset": 4162,
+        "end_page": 120,
+        "end_item": "9C"
+      },
+      {
+        "item": "9C",
+        "title": "Disclosure Regarding Foreign Jurisdictions that Prevent Inspections",
+        "printed_page": 120,
+        "pdf_page": 120,
+        "char_offset": 387,
+        "end_page": 121,
+        "end_item": "10"
+      },
+      {
+        "item": "10",
+        "title": "Directors, Executive Officers and Corporate Governance",
+        "printed_page": 121,
+        "pdf_page": 121,
+        "char_offset": 9,
+        "end_page": 121,
+        "end_item": "11"
+      },
+      {
+        "item": "11",
+        "title": "Executive Compensation",
+        "printed_page": 121,
+        "pdf_page": 121,
+        "char_offset": 402,
+        "end_page": 121,
+        "end_item": "12"
+      },
+      {
+        "item": "12",
+        "title": "Security Ownership of Certain Beneficial Owners and Management and Related Stockholder Matters",
+        "printed_page": 121,
+        "pdf_page": 121,
+        "char_offset": 661,
+        "end_page": 121,
+        "end_item": "13"
+      },
+      {
+        "item": "13",
+        "title": "Certain Relationships and Related Transactions, and Director Independence",
+        "printed_page": 121,
+        "pdf_page": 121,
+        "char_offset": 992,
+        "end_page": 121,
+        "end_item": "14"
+      },
+      {
+        "item": "14",
+        "title": "Principal Accounting Fees and Services",
+        "printed_page": 121,
+        "pdf_page": 121,
+        "char_offset": 1302,
+        "end_page": 122,
+        "end_item": "15"
+      },
+      {
+        "item": "15",
+        "title": "Exhibits, Financial Statement Schedules",
+        "printed_page": 122,
+        "pdf_page": 122,
+        "char_offset": 8,
+        "end_page": 125,
+        "end_item": "16"
+      },
+      {
+        "item": "16",
+        "title": "Form 10-K Summary",
+        "printed_page": 125,
+        "pdf_page": 125,
+        "char_offset": 706,
+        "end_page": 168,
+        "end_item": null
+      }
+    ],
+    "verified_figures": {},
+    "verification_source": "none yet"
+  },
+  {
+    "doc_id": "DASH_FY2025",
+    "file_name": "dash_10k_fy2025.pdf",
+    "ticker": "DASH",
+    "company": "DoorDash, Inc.",
+    "sha256": "9c25e4edbf057b38b8aa0abe6d33513ee83ebd892672fc29eda42594de59f7de",
+    "size_bytes": 1545444,
+    "n_pages": 153,
+    "form_type": "10-K",
+    "fiscal_year_end": "2025-December-31",
+    "fiscal_year": 2025,
+    "toc_page": 3,
+    "page_offset_deltas": [
+      0,
+      3
+    ],
+    "sections": [
+      {
+        "item": "1",
+        "title": "Business",
+        "printed_page": 6,
+        "pdf_page": 6,
+        "char_offset": 25,
+        "end_page": 10,
+        "end_item": "1A"
+      },
+      {
+        "item": "1A",
+        "title": "Risk Factors",
+        "printed_page": 10,
+        "pdf_page": 10,
+        "char_offset": 18,
+        "end_page": 48,
+        "end_item": "1B"
+      },
+      {
+        "item": "1B",
+        "title": "Unresolved Staff Comments",
+        "printed_page": 48,
+        "pdf_page": 48,
+        "char_offset": 3972,
+        "end_page": 48,
+        "end_item": "1C"
+      },
+      {
+        "item": "1C",
+        "title": "Cybersecurity",
+        "printed_page": 48,
+        "pdf_page": 48,
+        "char_offset": 4023,
+        "end_page": 50,
+        "end_item": "2"
+      },
+      {
+        "item": "2",
+        "title": "Properties",
+        "printed_page": 50,
+        "pdf_page": 50,
+        "char_offset": 617,
+        "end_page": 50,
+        "end_item": "3"
+      },
+      {
+        "item": "3",
+        "title": "Legal Proceedings",
+        "printed_page": 50,
+        "pdf_page": 50,
+        "char_offset": 1267,
+        "end_page": 51,
+        "end_item": "4"
+      },
+      {
+        "item": "4",
+        "title": "Mine Safety Disclosures",
+        "printed_page": 51,
+        "pdf_page": 51,
+        "char_offset": 4716,
+        "end_page": 52,
+        "end_item": "5"
+      },
+      {
+        "item": "5",
+        "title": "Market for Registrant's Common Equity, Related Stockholder Matters and Issuer Purchases of Equity Securities",
+        "printed_page": 52,
+        "pdf_page": 52,
+        "char_offset": 26,
+        "end_page": 53,
+        "end_item": "6"
+      },
+      {
+        "item": "6",
+        "title": "[Reserved]",
+        "printed_page": 53,
+        "pdf_page": 53,
+        "char_offset": 1095,
+        "end_page": 53,
+        "end_item": "7"
+      },
+      {
+        "item": "7",
+        "title": "Management's Discussion and Analysis of Financial Condition and Results of Operations",
+        "printed_page": 53,
+        "pdf_page": 53,
+        "char_offset": 1114,
+        "end_page": 69,
+        "end_item": "7A"
+      },
+      {
+        "item": "7A",
+        "title": "Quantitative and Qualitative Disclosures About Market Risk",
+        "printed_page": 69,
+        "pdf_page": 69,
+        "char_offset": 2397,
+        "end_page": 71,
+        "end_item": "8"
+      },
+      {
+        "item": "8",
+        "title": "Financial Statements and Supplementary Data",
+        "printed_page": 71,
+        "pdf_page": 71,
+        "char_offset": 18,
+        "end_page": 117,
+        "end_item": "9"
+      },
+      {
+        "item": "9",
+        "title": "Changes in and Disagreements With Accountants on Accounting and Financial Disclosure",
+        "printed_page": 114,
+        "pdf_page": 117,
+        "char_offset": 18,
+        "end_page": 117,
+        "end_item": "9A"
+      },
+      {
+        "item": "9A",
+        "title": "Controls and Procedures",
+        "printed_page": 114,
+        "pdf_page": 117,
+        "char_offset": 117,
+        "end_page": 118,
+        "end_item": "9B"
+      },
+      {
+        "item": "9B",
+        "title": "Other Information",
+        "printed_page": 115,
+        "pdf_page": 118,
+        "char_offset": 317,
+        "end_page": 118,
+        "end_item": "9C"
+      },
+      {
+        "item": "9C",
+        "title": "Disclosure Regarding Foreign Jurisdictions that Prevent Inspections",
+        "printed_page": 115,
+        "pdf_page": 118,
+        "char_offset": 1181,
+        "end_page": 119,
+        "end_item": "10"
+      },
+      {
+        "item": "10",
+        "title": "Directors, Executive Officers and Corporate Governance",
+        "printed_page": 116,
+        "pdf_page": 119,
+        "char_offset": 27,
+        "end_page": 119,
+        "end_item": "11"
+      },
+      {
+        "item": "11",
+        "title": "Executive Compensation",
+        "printed_page": 116,
+        "pdf_page": 119,
+        "char_offset": 466,
+        "end_page": 119,
+        "end_item": "12"
+      },
+      {
+        "item": "12",
+        "title": "Security Ownership of Certain Beneficial Owner and Management and Related Stockholder Matters",
+        "printed_page": 116,
+        "pdf_page": 119,
+        "char_offset": 726,
+        "end_page": 119,
+        "end_item": "13"
+      },
+      {
+        "item": "13",
+        "title": "Certain Relationships and Related Transactions, and Director Independence",
+        "printed_page": 116,
+        "pdf_page": 119,
+        "char_offset": 1058,
+        "end_page": 119,
+        "end_item": "14"
+      },
+      {
+        "item": "14",
+        "title": "Principal Accountant Fees and Services",
+        "printed_page": 116,
+        "pdf_page": 119,
+        "char_offset": 1369,
+        "end_page": 120,
+        "end_item": "15"
+      },
+      {
+        "item": "15",
+        "title": "Exhibits and Financial Statement Schedules",
+        "printed_page": 117,
+        "pdf_page": 120,
+        "char_offset": 26,
+        "end_page": 122,
+        "end_item": "16"
+      },
+      {
+        "item": "16",
+        "title": "Form 10-K Summary",
+        "printed_page": 119,
+        "pdf_page": 122,
+        "char_offset": 1482,
+        "end_page": 153,
+        "end_item": null
+      }
+    ],
+    "verified_figures": {},
+    "verification_source": "none yet"
+  },
+  {
+    "doc_id": "DASH_FY2024",
+    "file_name": "dash_10k_fy2024.pdf",
+    "ticker": "DASH",
+    "company": "DoorDash, Inc.",
+    "sha256": "57ee0a61ef4a7d72f7e335fad0e95347c53d81a361df8b4bdcc83c13d259e624",
+    "size_bytes": 1394570,
+    "n_pages": 142,
+    "form_type": "10-K",
+    "fiscal_year_end": "2024-December-31",
+    "fiscal_year": 2024,
+    "toc_page": 3,
+    "page_offset_deltas": [
+      0,
+      1
+    ],
+    "sections": [
+      {
+        "item": "1",
+        "title": "Business",
+        "printed_page": 6,
+        "pdf_page": 6,
+        "char_offset": 25,
+        "end_page": 10,
+        "end_item": "1A"
+      },
+      {
+        "item": "1A",
+        "title": "Risk Factors",
+        "printed_page": 10,
+        "pdf_page": 10,
+        "char_offset": 18,
+        "end_page": 49,
+        "end_item": "1B"
+      },
+      {
+        "item": "1B",
+        "title": "Unresolved Staff Comments",
+        "printed_page": 49,
+        "pdf_page": 49,
+        "char_offset": 1422,
+        "end_page": 49,
+        "end_item": "1C"
+      },
+      {
+        "item": "1C",
+        "title": "Cybersecurity",
+        "printed_page": 49,
+        "pdf_page": 49,
+        "char_offset": 1473,
+        "end_page": 50,
+        "end_item": "2"
+      },
+      {
+        "item": "2",
+        "title": "Properties",
+        "printed_page": 50,
+        "pdf_page": 50,
+        "char_offset": 4619,
+        "end_page": 51,
+        "end_item": "3"
+      },
+      {
+        "item": "3",
+        "title": "Legal Proceedings",
+        "printed_page": 51,
+        "pdf_page": 51,
+        "char_offset": 18,
+        "end_page": 52,
+        "end_item": "4"
+      },
+      {
+        "item": "4",
+        "title": "Mine Safety Disclosures",
+        "printed_page": 52,
+        "pdf_page": 52,
+        "char_offset": 4624,
+        "end_page": 53,
+        "end_item": "5"
+      },
+      {
+        "item": "5",
+        "title": "Market for Registrant's Common Equity, Related Stockholder Matters and Issuer Purchases of Equity Securities",
+        "printed_page": 53,
+        "pdf_page": 53,
+        "char_offset": 26,
+        "end_page": 54,
+        "end_item": "6"
+      },
+      {
+        "item": "6",
+        "title": "[Reserved]",
+        "printed_page": 54,
+        "pdf_page": 54,
+        "char_offset": 1077,
+        "end_page": 54,
+        "end_item": "7"
+      },
+      {
+        "item": "7",
+        "title": "Management's Discussion and Analysis of Financial Condition and Results of Operations",
+        "printed_page": 54,
+        "pdf_page": 54,
+        "char_offset": 1096,
+        "end_page": 69,
+        "end_item": "7A"
+      },
+      {
+        "item": "7A",
+        "title": "Quantitative and Qualitative Disclosures About Market Risk",
+        "printed_page": 69,
+        "pdf_page": 69,
+        "char_offset": 2419,
+        "end_page": 71,
+        "end_item": "8"
+      },
+      {
+        "item": "8",
+        "title": "Financial Statements and Supplementary Data",
+        "printed_page": 71,
+        "pdf_page": 71,
+        "char_offset": 18,
+        "end_page": 110,
+        "end_item": "9"
+      },
+      {
+        "item": "9",
+        "title": "Changes in and Disagreements With Accountants on Accounting and Financial Disclosure",
+        "printed_page": 109,
+        "pdf_page": 110,
+        "char_offset": 18,
+        "end_page": 110,
+        "end_item": "9A"
+      },
+      {
+        "item": "9A",
+        "title": "Controls and Procedures",
+        "printed_page": 109,
+        "pdf_page": 110,
+        "char_offset": 117,
+        "end_page": 111,
+        "end_item": "9B"
+      },
+      {
+        "item": "9B",
+        "title": "Other Information",
+        "printed_page": 110,
+        "pdf_page": 111,
+        "char_offset": 18,
+        "end_page": 111,
+        "end_item": "9C"
+      },
+      {
+        "item": "9C",
+        "title": "Disclosure Regarding Foreign Jurisdictions that Prevent Inspections",
+        "printed_page": 110,
+        "pdf_page": 111,
+        "char_offset": 1340,
+        "end_page": 112,
+        "end_item": "10"
+      },
+      {
+        "item": "10",
+        "title": "Directors, Executive Officers and Corporate Governance",
+        "printed_page": 111,
+        "pdf_page": 112,
+        "char_offset": 27,
+        "end_page": 112,
+        "end_item": "11"
+      },
+      {
+        "item": "11",
+        "title": "Executive Compensation",
+        "printed_page": 111,
+        "pdf_page": 112,
+        "char_offset": 466,
+        "end_page": 112,
+        "end_item": "12"
+      },
+      {
+        "item": "12",
+        "title": "Security Ownership of Certain Beneficial Owner and Management and Related Stockholder Matters",
+        "printed_page": 111,
+        "pdf_page": 112,
+        "char_offset": 726,
+        "end_page": 112,
+        "end_item": "13"
+      },
+      {
+        "item": "13",
+        "title": "Certain Relationships and Related Transactions, and Director Independence",
+        "printed_page": 111,
+        "pdf_page": 112,
+        "char_offset": 1058,
+        "end_page": 112,
+        "end_item": "14"
+      },
+      {
+        "item": "14",
+        "title": "Principal Accountant Fees and Services",
+        "printed_page": 111,
+        "pdf_page": 112,
+        "char_offset": 1369,
+        "end_page": 113,
+        "end_item": "15"
+      },
+      {
+        "item": "15",
+        "title": "Exhibits and Financial Statement Schedules",
+        "printed_page": 112,
+        "pdf_page": 113,
+        "char_offset": 26,
+        "end_page": 115,
+        "end_item": "16"
+      },
+      {
+        "item": "16",
+        "title": "Form 10-K Summary",
+        "printed_page": 114,
+        "pdf_page": 115,
+        "char_offset": 721,
+        "end_page": 142,
+        "end_item": null
+      }
+    ],
+    "verified_figures": {},
+    "verification_source": "none yet"
   }
 ]
