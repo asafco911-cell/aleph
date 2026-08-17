@@ -1,0 +1,56 @@
+[
+  {
+    "file_name": "dash_10k_fy2024.pdf",
+    "sha256": "57ee0a61ef4a7d72f7e335fad0e95347c53d81a361df8b4bdcc83c13d259e624",
+    "size_bytes": 1394570,
+    "n_pages": 142,
+    "form_type": "10-K",
+    "fiscal_year_end": "2024-December-31",
+    "fiscal_year": 2024
+  },
+  {
+    "file_name": "dash_10k_fy2025.pdf",
+    "sha256": "9c25e4edbf057b38b8aa0abe6d33513ee83ebd892672fc29eda42594de59f7de",
+    "size_bytes": 1545444,
+    "n_pages": 153,
+    "form_type": "10-K",
+    "fiscal_year_end": "2025-December-31",
+    "fiscal_year": 2025
+  },
+  {
+    "file_name": "lyft_10k_fy2024.pdf",
+    "sha256": "d71c688050046303c091906340bf09618f5122feb38e4650e37de3c23ebd842e",
+    "size_bytes": 6402067,
+    "n_pages": 168,
+    "form_type": "10-K",
+    "fiscal_year_end": "2024-December-31",
+    "fiscal_year": 2024
+  },
+  {
+    "file_name": "lyft_10k_fy2025.pdf",
+    "sha256": "b092c0fff438fead68ae6b7937d7422025a90a7e77fdc93c15d679478682d152",
+    "size_bytes": 6410882,
+    "n_pages": 170,
+    "form_type": "10-K",
+    "fiscal_year_end": "2025-December-31",
+    "fiscal_year": 2025
+  },
+  {
+    "file_name": "uber_10k.pdf",
+    "sha256": "6e4603267ea61dc39a9a6c63e2b261660854db4fc04fd3b7fa1c719aaf732051",
+    "size_bytes": 1777858,
+    "n_pages": 149,
+    "form_type": "10-K",
+    "fiscal_year_end": "2025-December-31",
+    "fiscal_year": 2025
+  },
+  {
+    "file_name": "uber_10k_fy2024.pdf",
+    "sha256": "ab5f074a0afc29ad8b0ab365a83e4bc6dc5781feacc16c2062ada10ffb759920",
+    "size_bytes": 1802097,
+    "n_pages": 156,
+    "form_type": "10-K",
+    "fiscal_year_end": "2024-December-31",
+    "fiscal_year": 2024
+  }
+]
