@@ -1,0 +1,1 @@
+"""Aleph: autonomous multi-document financial analyst."""
