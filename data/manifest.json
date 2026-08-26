@@ -1,5 +1,6 @@
 [
   {
+    "schema_version": 1,
     "doc_id": "UBER_FY2025",
     "file_name": "uber_10k.pdf",
     "ticker": "UBER",
@@ -8,8 +9,8 @@
     "size_bytes": 1777858,
     "n_pages": 149,
     "form_type": "10-K",
-    "fiscal_year_end": "2025-December-31",
     "fiscal_year": 2025,
+    "fiscal_year_end": "2025-December-31",
     "toc_page": 3,
     "page_offset_deltas": [
       2
@@ -29,7 +30,7 @@
         "title": "Risk Factors",
         "printed_page": 9,
         "pdf_page": 11,
-        "char_offset": 3594,
+        "char_offset": 3613,
         "end_page": 47,
         "end_item": "1B"
       },
@@ -56,7 +57,7 @@
         "title": "Properties",
         "printed_page": 46,
         "pdf_page": 48,
-        "char_offset": 997,
+        "char_offset": 1003,
         "end_page": 48,
         "end_item": "3"
       },
@@ -65,7 +66,7 @@
         "title": "Legal Proceedings",
         "printed_page": 46,
         "pdf_page": 48,
-        "char_offset": 1491,
+        "char_offset": 1499,
         "end_page": 48,
         "end_item": "4"
       },
@@ -74,7 +75,7 @@
         "title": "Mine Safety Disclosures",
         "printed_page": 46,
         "pdf_page": 48,
-        "char_offset": 3918,
+        "char_offset": 3938,
         "end_page": 48,
         "end_item": "5"
       },
@@ -83,7 +84,7 @@
         "title": "Market for Registrant's Common Equity, Related Stockholder Matters and Issuer Purchases of Equity Securities",
         "printed_page": 46,
         "pdf_page": 48,
-        "char_offset": 3974,
+        "char_offset": 3994,
         "end_page": 50,
         "end_item": "6"
       },
@@ -128,7 +129,7 @@
         "title": "Changes in and Disagreements with Accountants on Accounting and Financial Disclosure",
         "printed_page": 122,
         "pdf_page": 124,
-        "char_offset": 3129,
+        "char_offset": 3142,
         "end_page": 125,
         "end_item": "9A"
       },
@@ -146,7 +147,7 @@
         "title": "Other Information",
         "printed_page": 123,
         "pdf_page": 125,
-        "char_offset": 3443,
+        "char_offset": 3461,
         "end_page": 125,
         "end_item": "9C"
       },
@@ -155,7 +156,7 @@
         "title": "Disclosure Regarding Foreign Jurisdictions that Prevent Inspections",
         "printed_page": 123,
         "pdf_page": 125,
-        "char_offset": 4014,
+        "char_offset": 4035,
         "end_page": 125,
         "end_item": "10"
       },
@@ -164,7 +165,7 @@
         "title": "Directors, Executive Officers and Corporate Governance",
         "printed_page": 123,
         "pdf_page": 125,
-        "char_offset": 4116,
+        "char_offset": 4137,
         "end_page": 126,
         "end_item": "11"
       },
@@ -173,7 +174,7 @@
         "title": "Executive Compensation",
         "printed_page": 124,
         "pdf_page": 126,
-        "char_offset": 173,
+        "char_offset": 174,
         "end_page": 126,
         "end_item": "12"
       },
@@ -182,7 +183,7 @@
         "title": "Security Ownership of Certain Beneficial Owners and Management and Related Stockholder Matters",
         "printed_page": 124,
         "pdf_page": 126,
-        "char_offset": 455,
+        "char_offset": 457,
         "end_page": 126,
         "end_item": "13"
       },
@@ -191,7 +192,7 @@
         "title": "Certain Relationships and Related Transactions, and Director Independence",
         "printed_page": 124,
         "pdf_page": 126,
-        "char_offset": 829,
+        "char_offset": 832,
         "end_page": 126,
         "end_item": "14"
       },
@@ -200,7 +201,7 @@
         "title": "Principal Accounting Fees and Services",
         "printed_page": 124,
         "pdf_page": 126,
-        "char_offset": 1186,
+        "char_offset": 1190,
         "end_page": 126,
         "end_item": "15"
       },
@@ -209,7 +210,7 @@
         "title": "Exhibits and Financial Statement Schedules",
         "printed_page": 124,
         "pdf_page": 126,
-        "char_offset": 1468,
+        "char_offset": 1473,
         "end_page": 126,
         "end_item": "16"
       },
@@ -218,7 +219,7 @@
         "title": "Form 10-K Summary",
         "printed_page": 124,
         "pdf_page": 126,
-        "char_offset": 2298,
+        "char_offset": 2306,
         "end_page": 149,
         "end_item": null
       }
@@ -261,6 +262,7 @@
     "verification_source": "ch05 manual, ch07 graph, ch08 agent team"
   },
   {
+    "schema_version": 1,
     "doc_id": "UBER_FY2024",
     "file_name": "uber_10k_fy2024.pdf",
     "ticker": "UBER",
@@ -269,8 +271,8 @@
     "size_bytes": 1802097,
     "n_pages": 156,
     "form_type": "10-K",
-    "fiscal_year_end": "2024-December-31",
     "fiscal_year": 2024,
+    "fiscal_year_end": "2024-December-31",
     "toc_page": 3,
     "page_offset_deltas": [
       2
@@ -290,7 +292,7 @@
         "title": "Risk Factors",
         "printed_page": 9,
         "pdf_page": 11,
-        "char_offset": 2795,
+        "char_offset": 2810,
         "end_page": 47,
         "end_item": "1B"
       },
@@ -299,7 +301,7 @@
         "title": "Unresolved Staff Comments",
         "printed_page": 45,
         "pdf_page": 47,
-        "char_offset": 1769,
+        "char_offset": 1779,
         "end_page": 47,
         "end_item": "1C"
       },
@@ -308,7 +310,7 @@
         "title": "Cybersecurity",
         "printed_page": 45,
         "pdf_page": 47,
-        "char_offset": 1820,
+        "char_offset": 1830,
         "end_page": 48,
         "end_item": "2"
       },
@@ -317,7 +319,7 @@
         "title": "Properties",
         "printed_page": 46,
         "pdf_page": 48,
-        "char_offset": 2382,
+        "char_offset": 2396,
         "end_page": 48,
         "end_item": "3"
       },
@@ -326,7 +328,7 @@
         "title": "Legal Proceedings",
         "printed_page": 46,
         "pdf_page": 48,
-        "char_offset": 2876,
+        "char_offset": 2892,
         "end_page": 49,
         "end_item": "4"
       },
@@ -335,7 +337,7 @@
         "title": "Mine Safety Disclosures",
         "printed_page": 47,
         "pdf_page": 49,
-        "char_offset": 1487,
+        "char_offset": 1496,
         "end_page": 49,
         "end_item": "5"
       },
@@ -344,7 +346,7 @@
         "title": "Market for Registrant's Common Equity, Related Stockholder Matters and Issuer Purchases of Equity Securities",
         "printed_page": 47,
         "pdf_page": 49,
-        "char_offset": 1543,
+        "char_offset": 1552,
         "end_page": 50,
         "end_item": "6"
       },
@@ -353,7 +355,7 @@
         "title": "[Reserved]",
         "printed_page": 48,
         "pdf_page": 50,
-        "char_offset": 1182,
+        "char_offset": 1187,
         "end_page": 50,
         "end_item": "7"
       },
@@ -362,7 +364,7 @@
         "title": "Management's Discussion and Analysis of Financial Condition and Results of Operations",
         "printed_page": 48,
         "pdf_page": 50,
-        "char_offset": 1201,
+        "char_offset": 1206,
         "end_page": 70,
         "end_item": "7A"
       },
@@ -371,7 +373,7 @@
         "title": "Quantitative and Qualitative Disclosures About Market Risk",
         "printed_page": 68,
         "pdf_page": 70,
-        "char_offset": 4679,
+        "char_offset": 4705,
         "end_page": 72,
         "end_item": "8"
       },
@@ -389,7 +391,7 @@
         "title": "Changes in and Disagreements with Accountants on Accounting and Financial Disclosure",
         "printed_page": 128,
         "pdf_page": 130,
-        "char_offset": 2032,
+        "char_offset": 2040,
         "end_page": 130,
         "end_item": "9A"
       },
@@ -398,7 +400,7 @@
         "title": "Controls and Procedures",
         "printed_page": 128,
         "pdf_page": 130,
-        "char_offset": 2131,
+        "char_offset": 2139,
         "end_page": 131,
         "end_item": "9B"
       },
@@ -407,7 +409,7 @@
         "title": "Other Information",
         "printed_page": 129,
         "pdf_page": 131,
-        "char_offset": 1473,
+        "char_offset": 1481,
         "end_page": 131,
         "end_item": "9C"
       },
@@ -416,7 +418,7 @@
         "title": "Disclosure Regarding Foreign Jurisdictions that Prevent Inspections",
         "printed_page": 129,
         "pdf_page": 131,
-        "char_offset": 2322,
+        "char_offset": 2334,
         "end_page": 131,
         "end_item": "10"
       },
@@ -425,7 +427,7 @@
         "title": "Directors, Executive Officers and Corporate Governance",
         "printed_page": 129,
         "pdf_page": 131,
-        "char_offset": 2424,
+        "char_offset": 2436,
         "end_page": 131,
         "end_item": "11"
       },
@@ -434,7 +436,7 @@
         "title": "Executive Compensation",
         "printed_page": 129,
         "pdf_page": 131,
-        "char_offset": 3563,
+        "char_offset": 3581,
         "end_page": 131,
         "end_item": "12"
       },
@@ -443,7 +445,7 @@
         "title": "Security Ownership of Certain Beneficial Owners and Management and Related Stockholder Matters",
         "printed_page": 129,
         "pdf_page": 131,
-        "char_offset": 3847,
+        "char_offset": 3866,
         "end_page": 131,
         "end_item": "13"
       },
@@ -452,7 +454,7 @@
         "title": "Certain Relationships and Related Transactions, and Director Independence",
         "printed_page": 129,
         "pdf_page": 131,
-        "char_offset": 4214,
+        "char_offset": 4234,
         "end_page": 131,
         "end_item": "14"
       },
@@ -461,7 +463,7 @@
         "title": "Principal Accounting Fees and Services",
         "printed_page": 129,
         "pdf_page": 131,
-        "char_offset": 4573,
+        "char_offset": 4594,
         "end_page": 132,
         "end_item": "15"
       },
@@ -470,7 +472,7 @@
         "title": "Exhibits and Financial Statement Schedules",
         "printed_page": 130,
         "pdf_page": 132,
-        "char_offset": 234,
+        "char_offset": 235,
         "end_page": 132,
         "end_item": "16"
       },
@@ -479,7 +481,7 @@
         "title": "Form 10-K Summary",
         "printed_page": 130,
         "pdf_page": 132,
-        "char_offset": 1064,
+        "char_offset": 1068,
         "end_page": 156,
         "end_item": null
       }
@@ -526,6 +528,7 @@
     "verification_source": "ch05 manual, ch07 graph, ch08 agent team"
   },
   {
+    "schema_version": 1,
     "doc_id": "LYFT_FY2025",
     "file_name": "lyft_10k_fy2025.pdf",
     "ticker": "LYFT",
@@ -534,8 +537,8 @@
     "size_bytes": 6410882,
     "n_pages": 170,
     "form_type": "10-K",
-    "fiscal_year_end": "2025-December-31",
     "fiscal_year": 2025,
+    "fiscal_year_end": "2025-December-31",
     "toc_page": 2,
     "page_offset_deltas": [
       0
@@ -564,7 +567,7 @@
         "title": "Unresolved Staff Comments",
         "printed_page": 47,
         "pdf_page": 47,
-        "char_offset": 2672,
+        "char_offset": 2686,
         "end_page": 47,
         "end_item": "1C"
       },
@@ -573,7 +576,7 @@
         "title": "Cybersecurity",
         "printed_page": 47,
         "pdf_page": 47,
-        "char_offset": 2714,
+        "char_offset": 2728,
         "end_page": 48,
         "end_item": "2"
       },
@@ -582,7 +585,7 @@
         "title": "Properties",
         "printed_page": 48,
         "pdf_page": 48,
-        "char_offset": 2334,
+        "char_offset": 2345,
         "end_page": 48,
         "end_item": "3"
       },
@@ -591,7 +594,7 @@
         "title": "Legal Proceedings",
         "printed_page": 48,
         "pdf_page": 48,
-        "char_offset": 2840,
+        "char_offset": 2853,
         "end_page": 48,
         "end_item": "4"
       },
@@ -600,7 +603,7 @@
         "title": "Mine Safety Disclosures",
         "printed_page": 48,
         "pdf_page": 48,
-        "char_offset": 3014,
+        "char_offset": 3027,
         "end_page": 49,
         "end_item": "5"
       },
@@ -618,7 +621,7 @@
         "title": "[Reserved]",
         "printed_page": 50,
         "pdf_page": 50,
-        "char_offset": 1476,
+        "char_offset": 1485,
         "end_page": 51,
         "end_item": "7"
       },
@@ -636,7 +639,7 @@
         "title": "Quantitative and Qualitative Disclosures About Market Risk",
         "printed_page": 64,
         "pdf_page": 64,
-        "char_offset": 1808,
+        "char_offset": 1817,
         "end_page": 65,
         "end_item": "8"
       },
@@ -672,7 +675,7 @@
         "title": "Other Information",
         "printed_page": 114,
         "pdf_page": 114,
-        "char_offset": 4161,
+        "char_offset": 4181,
         "end_page": 115,
         "end_item": "9C"
       },
@@ -681,7 +684,7 @@
         "title": "Disclosure Regarding Foreign Jurisdictions that Prevent Inspections",
         "printed_page": 115,
         "pdf_page": 115,
-        "char_offset": 509,
+        "char_offset": 511,
         "end_page": 116,
         "end_item": "10"
       },
@@ -699,7 +702,7 @@
         "title": "Executive Compensation",
         "printed_page": 116,
         "pdf_page": 116,
-        "char_offset": 402,
+        "char_offset": 403,
         "end_page": 116,
         "end_item": "12"
       },
@@ -708,7 +711,7 @@
         "title": "Security Ownership of Certain Beneficial Owners and Management and Related Stockholder Matters",
         "printed_page": 116,
         "pdf_page": 116,
-        "char_offset": 661,
+        "char_offset": 663,
         "end_page": 116,
         "end_item": "13"
       },
@@ -717,7 +720,7 @@
         "title": "Certain Relationships and Related Transactions, and Director Independence",
         "printed_page": 116,
         "pdf_page": 116,
-        "char_offset": 992,
+        "char_offset": 995,
         "end_page": 116,
         "end_item": "14"
       },
@@ -726,7 +729,7 @@
         "title": "Principal Accounting Fees and Services",
         "printed_page": 116,
         "pdf_page": 116,
-        "char_offset": 1302,
+        "char_offset": 1306,
         "end_page": 117,
         "end_item": "15"
       },
@@ -744,7 +747,7 @@
         "title": "Form 10-K Summary",
         "printed_page": 120,
         "pdf_page": 120,
-        "char_offset": 248,
+        "char_offset": 249,
         "end_page": 170,
         "end_item": null
       }
@@ -753,6 +756,7 @@
     "verification_source": "none yet"
   },
   {
+    "schema_version": 1,
     "doc_id": "LYFT_FY2024",
     "file_name": "lyft_10k_fy2024.pdf",
     "ticker": "LYFT",
@@ -761,8 +765,8 @@
     "size_bytes": 6402067,
     "n_pages": 168,
     "form_type": "10-K",
-    "fiscal_year_end": "2024-December-31",
     "fiscal_year": 2024,
+    "fiscal_year_end": "2024-December-31",
     "toc_page": 2,
     "page_offset_deltas": [
       0
@@ -791,7 +795,7 @@
         "title": "Unresolved Staff Comments",
         "printed_page": 50,
         "pdf_page": 50,
-        "char_offset": 2681,
+        "char_offset": 2695,
         "end_page": 50,
         "end_item": "1C"
       },
@@ -800,7 +804,7 @@
         "title": "Cybersecurity",
         "printed_page": 50,
         "pdf_page": 50,
-        "char_offset": 2723,
+        "char_offset": 2737,
         "end_page": 51,
         "end_item": "2"
       },
@@ -809,7 +813,7 @@
         "title": "Properties",
         "printed_page": 51,
         "pdf_page": 51,
-        "char_offset": 2334,
+        "char_offset": 2345,
         "end_page": 51,
         "end_item": "3"
       },
@@ -818,7 +822,7 @@
         "title": "Legal Proceedings",
         "printed_page": 51,
         "pdf_page": 51,
-        "char_offset": 2973,
+        "char_offset": 2987,
         "end_page": 51,
         "end_item": "4"
       },
@@ -827,7 +831,7 @@
         "title": "Mine Safety Disclosures",
         "printed_page": 51,
         "pdf_page": 51,
-        "char_offset": 3147,
+        "char_offset": 3161,
         "end_page": 52,
         "end_item": "5"
       },
@@ -863,7 +867,7 @@
         "title": "Quantitative and Qualitative Disclosures About Market Risk",
         "printed_page": 69,
         "pdf_page": 69,
-        "char_offset": 1433,
+        "char_offset": 1440,
         "end_page": 70,
         "end_item": "8"
       },
@@ -899,7 +903,7 @@
         "title": "Other Information",
         "printed_page": 119,
         "pdf_page": 119,
-        "char_offset": 4162,
+        "char_offset": 4182,
         "end_page": 120,
         "end_item": "9C"
       },
@@ -908,7 +912,7 @@
         "title": "Disclosure Regarding Foreign Jurisdictions that Prevent Inspections",
         "printed_page": 120,
         "pdf_page": 120,
-        "char_offset": 387,
+        "char_offset": 388,
         "end_page": 121,
         "end_item": "10"
       },
@@ -926,7 +930,7 @@
         "title": "Executive Compensation",
         "printed_page": 121,
         "pdf_page": 121,
-        "char_offset": 402,
+        "char_offset": 403,
         "end_page": 121,
         "end_item": "12"
       },
@@ -935,7 +939,7 @@
         "title": "Security Ownership of Certain Beneficial Owners and Management and Related Stockholder Matters",
         "printed_page": 121,
         "pdf_page": 121,
-        "char_offset": 661,
+        "char_offset": 663,
         "end_page": 121,
         "end_item": "13"
       },
@@ -944,7 +948,7 @@
         "title": "Certain Relationships and Related Transactions, and Director Independence",
         "printed_page": 121,
         "pdf_page": 121,
-        "char_offset": 992,
+        "char_offset": 995,
         "end_page": 121,
         "end_item": "14"
       },
@@ -953,7 +957,7 @@
         "title": "Principal Accounting Fees and Services",
         "printed_page": 121,
         "pdf_page": 121,
-        "char_offset": 1302,
+        "char_offset": 1306,
         "end_page": 122,
         "end_item": "15"
       },
@@ -971,7 +975,7 @@
         "title": "Form 10-K Summary",
         "printed_page": 125,
         "pdf_page": 125,
-        "char_offset": 706,
+        "char_offset": 712,
         "end_page": 168,
         "end_item": null
       }
@@ -980,6 +984,7 @@
     "verification_source": "none yet"
   },
   {
+    "schema_version": 1,
     "doc_id": "DASH_FY2025",
     "file_name": "dash_10k_fy2025.pdf",
     "ticker": "DASH",
@@ -988,8 +993,8 @@
     "size_bytes": 1545444,
     "n_pages": 153,
     "form_type": "10-K",
-    "fiscal_year_end": "2025-December-31",
     "fiscal_year": 2025,
+    "fiscal_year_end": "2025-December-31",
     "toc_page": 3,
     "page_offset_deltas": [
       0,
@@ -1199,7 +1204,7 @@
         "title": "Form 10-K Summary",
         "printed_page": 119,
         "pdf_page": 122,
-        "char_offset": 1482,
+        "char_offset": 1491,
         "end_page": 153,
         "end_item": null
       }
@@ -1208,6 +1213,7 @@
     "verification_source": "none yet"
   },
   {
+    "schema_version": 1,
     "doc_id": "DASH_FY2024",
     "file_name": "dash_10k_fy2024.pdf",
     "ticker": "DASH",
@@ -1216,8 +1222,8 @@
     "size_bytes": 1394570,
     "n_pages": 142,
     "form_type": "10-K",
-    "fiscal_year_end": "2024-December-31",
     "fiscal_year": 2024,
+    "fiscal_year_end": "2024-December-31",
     "toc_page": 3,
     "page_offset_deltas": [
       0,
@@ -1427,7 +1433,7 @@
         "title": "Form 10-K Summary",
         "printed_page": 114,
         "pdf_page": 115,
-        "char_offset": 721,
+        "char_offset": 724,
         "end_page": 142,
         "end_item": null
       }

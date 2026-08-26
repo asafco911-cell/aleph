@@ -1,0 +1,1 @@
+"""Cross-cutting infrastructure: text normalisation, caching, resilience."""
