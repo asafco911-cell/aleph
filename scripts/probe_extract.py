@@ -1,11 +1,18 @@
-"""Extract facts from one target and report what passed the gates."""
+"""Extract facts from one target and report what passed the gates.
+
+Rejections print the offending quote: a gate failure is only actionable if you
+can see the text that triggered it. Quotes are recovered from the cache rather
+than re-requested, so diagnosis costs nothing.
+"""
 import json
 import sys
 from pathlib import Path
 
+import aleph
 from aleph.extraction import extract
-from aleph.extraction.extractor import resolve_target
-from aleph.extraction.gates import column_periods
+from aleph.extraction.extractor import DEFAULT_MODEL, PROMPT_VERSION, resolve_target
+from aleph.extraction.gates import resolve_axis
+from aleph.infra.cache import Cache
 from aleph.schemas import DocumentRecord
 
 doc_id, target = sys.argv[1], sys.argv[2]
@@ -18,7 +25,6 @@ record = next(
 )
 
 source_text, _ = resolve_target(record, target)
-print(f"columns detected: {column_periods(source_text)}")
 
 accepted, rejected, cache_hit = extract(record, target, question)
 print(f"{doc_id} {target}  cache_hit={cache_hit}")
@@ -29,5 +35,20 @@ for fact in accepted:
     print(f"  {fact.name:<44} {fact.value:>14,.1f} {fact.unit}  [{period}]")
     print(f"     p{fact.source.pages}  {fact.quote[:90]}")
 
-for failure in rejected:
-    print(f"\n  REJECTED [{failure.gate}] {failure.fact_name}: {failure.detail}")
+if rejected:
+    # Recover quotes from the same cache entry the extractor just used.
+    payload = Cache().get(Cache.key(
+        sha256=record.sha256,
+        prompt_version=PROMPT_VERSION,
+        model=DEFAULT_MODEL,
+        target=target,
+        question=question,
+    ))
+    quotes = {item["name"]: item["quote"] for item in payload["facts"]} if payload else {}
+
+    for failure in rejected:
+        print(f"\n  REJECTED [{failure.gate}] {failure.fact_name}")
+        print(f"     {failure.detail}")
+        quote = quotes.get(failure.fact_name)
+        if quote:
+            print(f"     quote: {quote[:160]}")

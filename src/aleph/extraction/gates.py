@@ -3,17 +3,31 @@
 The model is asked to copy, not to compute. Every gate here is Python checking
 that copying actually happened, because LLM verification is probabilistic and
 Python is not. A fact that fails any gate is rejected, never repaired.
+
+Column semantics are resolved LOCALLY, from the header lines immediately above
+the quoted row. Scanning a whole note for a year run was wrong: Uber's segment
+note carries a geography table with year columns and a segment table with label
+columns, and applying one axis to the other produces a real quote, a real
+number, and the wrong meaning.
 """
 import re
 from dataclasses import dataclass
 
-from ..infra.textnorm import normalise
+from ..infra.textnorm import normalise, normalise_lines
 from ..schemas.evidence import Fact
 
-RE_NUMBER = re.compile(r"\(?\d[\d,]*(?:\.\d+)?\)?")
-RE_COLUMN_YEARS = re.compile(
-    r"year(?:s)? ended [a-z]+ \d{1,2},?\s+((?:\d{4}\s+){1,5})", re.IGNORECASE
+RE_NUMBER = re.compile(r"\(?\$?\s?\d[\d,]*(?:\.\d+)?\)?")
+RE_YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
+
+# "Year Ended December 31, 2024" - one period governing the whole table.
+RE_PERIOD_LINE = re.compile(
+    r"^(?:year|years|three months|six months|nine months)\s+ended\b"
+    r".*?((?:19|20)\d{2})\s*$",
+    re.IGNORECASE,
 )
+
+HEADER_SEARCH_DEPTH = 6
+TOTAL_TOKENS = ("total", "consolidated")
 
 
 @dataclass
@@ -21,6 +35,27 @@ class Rejection:
     fact_name: str
     gate: str
     detail: str
+
+
+@dataclass
+class Axis:
+    """What the columns of the quoted row mean."""
+    kind: str  # "years" | "labels" | "unknown"
+    labels: list[str]
+    period: str | None = None  # Set when a period line governs the table.
+
+
+def _parse_number(token: str) -> float | None:
+    """Parse a filing-formatted number. Parentheses mean negative."""
+    negative = "(" in token
+    digits = re.sub(r"[^\d.]", "", token)
+    if not digits or digits == ".":
+        return None
+    try:
+        value = float(digits)
+    except ValueError:
+        return None
+    return -value if negative else value
 
 
 def _number_forms(value: float) -> set[str]:
@@ -42,17 +77,72 @@ def _number_forms(value: float) -> set[str]:
     return forms
 
 
-def column_periods(source_text: str) -> list[str]:
-    """Derive column ordering from the statement header.
+def row_cells(quote: str) -> list[float]:
+    """Numeric cells of a quoted row, in order."""
+    parsed = [_parse_number(token) for token in RE_NUMBER.findall(quote)]
+    return [value for value in parsed if value is not None]
 
-    Python derives this; the model never states it. Column-to-period mapping is
-    vertical information, and PDF text extraction destroys vertical structure -
-    the row survives, the column headers do not travel with it.
+
+def _find_line(lines: list[str], quote: str) -> int:
+    """Index of the source line the quote came from, or -1."""
+    target = normalise(quote)
+    for index, line in enumerate(lines):
+        if target and target in normalise(line):
+            return index
+    return -1
+
+
+def resolve_axis(source_text: str, quote: str, n_cells: int) -> Axis:
+    """Determine column meaning from the nearest headers ABOVE the quoted row.
+
+    Locality is the point: two tables in one note can carry different axes, so
+    the header governing a row is the one directly above it, never the first
+    one found anywhere in the region.
+
+    The window is scanned TWICE. A period line ("Year Ended December 31, 2024")
+    normally sits above the column header, so returning at the first structural
+    match would leave the period permanently unset and silently disable the
+    period cross-check.
     """
-    match = RE_COLUMN_YEARS.search(re.sub(r"\s+", " ", source_text))
-    if not match:
-        return []
-    return [f"FY{year}" for year in match.group(1).split()]
+    lines = normalise_lines(source_text, fold_case=False).split("\n")
+    row = _find_line(lines, quote)
+    if row < 0 or n_cells == 0:
+        return Axis("unknown", [])
+
+    start = max(0, row - HEADER_SEARCH_DEPTH)
+    window = [line.strip() for line in lines[start:row]][::-1]  # nearest first
+
+    period: str | None = None
+    for line in window:
+        match = RE_PERIOD_LINE.match(line)
+        if match:
+            period = f"FY{match.group(1)}"
+            break
+
+    for line in window:
+        if not line:
+            continue
+        years = RE_YEAR.findall(line)
+        others = [
+            token for token in RE_NUMBER.findall(line)
+            if not RE_YEAR.fullmatch(token.strip())
+        ]
+
+        # A run of years with nothing else is a year axis.
+        if len(years) >= 2 and not others:
+            return Axis("years", [f"FY{year}" for year in years], period)
+
+        # A line with no numbers is a label axis, if it has one label per cell.
+        # Word count is the only structure PDF extraction preserves here.
+        if not RE_NUMBER.search(line):
+            labels = line.split()
+            if len(labels) == n_cells:
+                return Axis("labels", labels, period)
+            # Multi-word labels cannot be split reliably; stop rather than guess.
+            if 0 < len(labels) < n_cells:
+                return Axis("unknown", labels, period)
+
+    return Axis("unknown", [], period)
 
 
 def check_has_source(fact: Fact) -> Rejection | None:
@@ -84,34 +174,88 @@ def check_value_in_quote(fact: Fact) -> Rejection | None:
                      f"value {fact.value} not present in quote: {fact.quote[:80]!r}")
 
 
-def check_column_alignment(fact: Fact, columns: list[str]) -> Rejection | None:
-    """The value's position in the row must match its period's column position.
+def check_cross_foot(fact: Fact, axis: Axis) -> Rejection | None:
+    """Components of a labelled row must sum to its stated total.
 
-    Without this, a row containing three years passes every other gate no
-    matter which number is assigned to which year: the quote is real, the
-    number is present, and the result is silently wrong.
+    Arithmetic needs no knowledge of what the labels mean, so this catches a
+    row read partially or merged with a neighbour even when the axis is
+    understood.
     """
-    if not columns or fact.period is None:
-        return None  # Not a multi-column row, or period unknown: not checkable.
-    if fact.period not in columns:
-        return Rejection(fact.name, "column_alignment",
-                         f"period {fact.period} not among columns {columns}")
+    if axis.kind != "labels":
+        return None
+    totals = [
+        index for index, label in enumerate(axis.labels)
+        if label.lower() in TOTAL_TOKENS
+    ]
+    if len(totals) != 1:
+        return None
 
-    numbers = RE_NUMBER.findall(fact.quote)
-    if len(numbers) < len(columns):
-        return None  # Fewer numbers than columns: not a full data row.
+    cells = row_cells(fact.quote)
+    if len(cells) != len(axis.labels):
+        return None
 
-    # Data columns are the trailing N numbers; any leading number belongs to
-    # the row label (e.g. "Note 13").
-    cells = numbers[-len(columns):]
-    expected = cells[columns.index(fact.period)]
-    flat = re.sub(r"\s+", "", expected)
-    if any(re.sub(r"\s+", "", form) == flat for form in _number_forms(fact.value)):
+    position = totals[0]
+    components = sum(cells[:position] + cells[position + 1:])
+    stated = cells[position]
+    if abs(components - stated) <= max(1.0, abs(stated) * 0.001):
+        return None
+    return Rejection(
+        fact.name, "cross_foot",
+        f"components sum to {components:,.0f} but stated total is {stated:,.0f} "
+        f"in row: {fact.quote[:90]}"
+    )
+
+
+def check_column_alignment(fact: Fact, axis: Axis) -> Rejection | None:
+    """The value's position in the row must match its column's position.
+
+    Refuses to accept what it cannot verify: an unverifiable multi-column fact
+    is exactly the failure this gate exists to catch.
+    """
+    cells = row_cells(fact.quote)
+    if len(cells) < 2:
+        return None  # Single value: position carries no information.
+
+    if axis.kind == "unknown" or len(axis.labels) != len(cells):
+        return Rejection(
+            fact.name, "columns_undetermined",
+            f"row has {len(cells)} cells; nearest header gave "
+            f"{axis.kind}={axis.labels or 'none'}; mapping cannot be verified"
+        )
+
+    if axis.kind == "years":
+        if fact.period is None:
+            return Rejection(fact.name, "column_alignment",
+                             f"period missing; columns are {axis.labels}")
+        if fact.period not in axis.labels:
+            return Rejection(fact.name, "column_alignment",
+                             f"period {fact.period} not among columns {axis.labels}")
+        index = axis.labels.index(fact.period)
+    else:
+        name = normalise(fact.name)
+        matches = [
+            position for position, label in enumerate(axis.labels)
+            if normalise(label) in name
+        ]
+        if len(matches) != 1:
+            return Rejection(
+                fact.name, "column_alignment",
+                f"name matches {len(matches)} of the column labels {axis.labels}"
+            )
+        index = matches[0]
+        if axis.period and fact.period and fact.period != axis.period:
+            return Rejection(
+                fact.name, "column_alignment",
+                f"row covers {axis.period} but fact claims {fact.period}"
+            )
+
+    expected = cells[index]
+    if abs(expected - fact.value) <= max(0.5, abs(expected) * 0.001):
         return None
     return Rejection(
         fact.name, "column_alignment",
-        f"{fact.period} is column {columns.index(fact.period) + 1} of "
-        f"{columns} -> expected {expected}, got {fact.value}"
+        f"column {index + 1} of {axis.labels} is {expected:,.0f}, "
+        f"got {fact.value:,.0f}"
     )
 
 
@@ -119,14 +263,15 @@ def validate(
     facts: list[Fact], source_text: str
 ) -> tuple[list[Fact], list[Rejection]]:
     """Split facts into accepted and rejected. Nothing is silently dropped."""
-    columns = column_periods(source_text)
     accepted, rejected = [], []
     for fact in facts:
+        axis = resolve_axis(source_text, fact.quote, len(row_cells(fact.quote)))
         failure = (
             check_has_source(fact)
             or check_quote_exists(fact, source_text)
             or check_value_in_quote(fact)
-            or check_column_alignment(fact, columns)
+            or check_cross_foot(fact, axis)
+            or check_column_alignment(fact, axis)
         )
         (rejected.append(failure) if failure else accepted.append(fact))
     return accepted, rejected

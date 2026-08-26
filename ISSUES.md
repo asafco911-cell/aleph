@@ -80,3 +80,21 @@ Fix (pending measurement): route all BM25 indexing and query text through
 `textnorm.normalise` before tokenisation.
 
 Status: open, unmeasured.
+
+## #12 Column detection is note-scoped, not table-scoped
+
+`column_periods` scans the entire source region for the longest year run. Note
+13 of Uber's 10-K contains a geography table with year columns AND a segment
+table with segment columns (mobility/delivery/freight/total) for a single year.
+Year columns detected from the first are applied to rows of the second.
+
+A segment row with exactly as many numbers as detected year columns produces a
+FALSE ACCEPT: correct quote, correct number, wrong meaning, no red flag. Rows
+with a differing count are caught by the columns_undetermined guard, which is
+incidental, not protective.
+
+Fix direction: scope column detection to the nearest preceding header above the
+quoted row rather than to the whole region. Alternative: cross-footing, since
+components must sum to their stated total.
+
+Status: open, unmeasured.

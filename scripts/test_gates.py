@@ -1,55 +1,66 @@
 """Prove each extraction gate rejects what it is supposed to reject.
 
-A gate that has only ever passed is an assumption, not a mechanism.
+A gate that has only ever passed is an assumption, not a mechanism. The
+fixture reproduces the real line structure measured in Uber's Note 13, so the
+test exercises the same code path production does.
 """
 import sys
 
-from aleph.extraction.gates import column_periods, validate
+from aleph.extraction.gates import resolve_axis, row_cells, validate
 from aleph.schemas.evidence import Fact, FactSource
 
-SOURCE = (
-    "Year ended December 31, 2022 2023 2024\n"
-    "Net cash provided by operating activities 642 3,585 7,137\n"
-    "Purchases of property and equipment (252) (223) (242)\n"
-)
-SRC = FactSource(doc_id="TEST_FY2024", kind="statement", ref="cash_flows", pages=[1])
-ROW = "Net cash provided by operating activities 642 3,585 7,137"
+SOURCE = "\n".join([
+    "Orphan row with no header above it 11 22 33",
+    "Income from operations 1,110",
+    "Year Ended December 31, 2024",
+    "Mobility Delivery Freight Total",
+    "Revenue $ 25,087 $ 13,750 $ 5,141 $ 43,978",
+    "Broken row $ 100 $ 200 $ 300 $ 999",
+])
+SRC = FactSource(doc_id="TEST_FY2024", kind="note", ref="13", pages=[1])
+ROW = "Revenue $ 25,087 $ 13,750 $ 5,141 $ 43,978"
+BROKEN = "Broken row $ 100 $ 200 $ 300 $ 999"
+ORPHAN = "Orphan row with no header above it 11 22 33"
+
+
+def fact(name, value, quote=ROW, period="FY2024", source=SRC):
+    return Fact(name=name, value=value, unit="USD millions",
+                quote=quote, period=period, source=source)
+
 
 CASES = [
-    ("correct mapping", None, Fact(
-        name="CFO FY2024", value=7137.0, unit="USD millions",
-        quote=ROW, period="FY2024", source=SRC)),
-    ("swapped columns", "column_alignment", Fact(
-        name="CFO FY2024 swapped", value=642.0, unit="USD millions",
-        quote=ROW, period="FY2024", source=SRC)),
-    ("unknown period", "column_alignment", Fact(
-        name="CFO FY2021", value=642.0, unit="USD millions",
-        quote=ROW, period="FY2021", source=SRC)),
-    ("fabricated quote", "quote_exists", Fact(
-        name="CFO invented", value=9999.0, unit="USD millions",
-        quote="Net cash provided by financing activities 9,999",
-        period="FY2024", source=SRC)),
-    ("value absent from quote", "value_in_quote", Fact(
-        name="CFO wrong value", value=5000.0, unit="USD millions",
-        quote=ROW, period="FY2024", source=SRC)),
-    ("missing provenance", "has_source", Fact(
-        name="CFO no source", value=7137.0, unit="USD millions",
-        quote=ROW, period="FY2024")),
+    ("correct label mapping", None, fact("Mobility revenue FY2024", 25087.0)),
+    ("correct total", None, fact("Total revenue FY2024", 43978.0)),
+    ("wrong column", "column_alignment", fact("Delivery revenue FY2024", 25087.0)),
+    ("period mismatch", "column_alignment",
+     fact("Mobility revenue FY2023", 25087.0, period="FY2023")),
+    ("ambiguous label", "column_alignment",
+     fact("Mobility and Delivery revenue FY2024", 25087.0)),
+    ("components do not sum", "cross_foot",
+     fact("Mobility broken FY2024", 100.0, quote=BROKEN)),
+    ("no header above row", "columns_undetermined",
+     fact("Orphan FY2024", 11.0, quote=ORPHAN)),
+    ("fabricated quote", "quote_exists",
+     fact("Invented FY2024", 9999.0, quote="Revenue $ 9,999 $ 1 $ 2 $ 3")),
+    ("value absent from quote", "value_in_quote",
+     fact("Mobility revenue FY2024", 5000.0)),
+    ("missing provenance", "has_source",
+     fact("Mobility revenue FY2024", 25087.0, source=None)),
 ]
 
-columns = column_periods(SOURCE)
-print(f"columns detected: {columns}")
-if columns != ["FY2022", "FY2023", "FY2024"]:
-    print("FAILED: column detection is wrong")
+axis = resolve_axis(SOURCE, ROW, len(row_cells(ROW)))
+print(f"axis: kind={axis.kind} labels={axis.labels} period={axis.period}")
+if axis.kind != "labels" or axis.period != "FY2024":
+    print("FAILED: axis resolution is wrong")
     sys.exit(1)
 
 failures = 0
-for label, expected_gate, fact in CASES:
-    accepted, rejected = validate([fact], SOURCE)
+for label, expected_gate, item in CASES:
+    _, rejected = validate([item], SOURCE)
     actual = rejected[0].gate if rejected else None
     ok = actual == expected_gate
     failures += not ok
     print(f"  {'ok  ' if ok else 'FAIL'} {label:<26} "
-          f"expected={expected_gate or 'accept':<17} actual={actual or 'accept'}")
+          f"expected={expected_gate or 'accept':<21} actual={actual or 'accept'}")
 
 sys.exit(1 if failures else 0)
