@@ -1,5 +1,21 @@
 """Claims bound to their source text. Produced by an LLM, so validated here."""
+from typing import Literal, Optional
+
 from pydantic import BaseModel, Field
+
+
+class FactSource(BaseModel):
+    """Where a fact came from, precisely enough to re-open the page.
+
+    The same metric name carries different definitions in different parts of a
+    filing: an effective tax rate in MD&A is not necessarily the one in the tax
+    note, and geographic revenue under ASC 280 need not match the operational
+    split. A number without its origin is not interpretable.
+    """
+    doc_id: str
+    kind: Literal["statement", "note", "section"]
+    ref: str = Field(description="Statement name, note number, or item id.")
+    pages: list[int]
 
 
 class GroundedClaim(BaseModel):
@@ -26,6 +42,14 @@ class Fact(BaseModel):
     value: float
     unit: str = Field(description="e.g. 'USD millions'")
     quote: str = Field(description="Exact sentence or table row copied VERBATIM from the source.")
+    period: Optional[str] = Field(
+        default=None,
+        description="Fiscal year this value belongs to, e.g. 'FY2024'.",
+    )
+    source: Optional[FactSource] = Field(
+        default=None,
+        description="Provenance. Required for anything the extraction pipeline produces.",
+    )
 
 
 class ExtractedFacts(BaseModel):

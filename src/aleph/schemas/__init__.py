@@ -12,15 +12,22 @@ from .agents import (
     Plan,
     PlanStep,
 )
-from .documents import SCHEMA_VERSION, DocumentRecord, SectionRange, VerifiedFigure
-from .evidence import ExtractedFacts, Fact, GroundedAnswer, GroundedClaim
+from .documents import (
+    SCHEMA_VERSION,
+    DocumentRecord,
+    NoteRange,
+    SectionRange,
+    StatementRange,
+    VerifiedFigure,
+)
+from .evidence import ExtractedFacts, Fact, FactSource, GroundedAnswer, GroundedClaim
 from .graph import Edge, GraphExtraction, Node
 from .validation import ReferenceError_, check_references
 
 __all__ = [
     "SCHEMA_VERSION",
-    "DocumentRecord", "SectionRange", "VerifiedFigure",
-    "GroundedClaim", "GroundedAnswer", "Fact", "ExtractedFacts",
+    "DocumentRecord", "SectionRange", "NoteRange", "StatementRange", "VerifiedFigure",
+    "GroundedClaim", "GroundedAnswer", "Fact", "FactSource", "ExtractedFacts",
     "Node", "Edge", "GraphExtraction",
     "PlanStep", "Plan", "Critique", "CriticReport",
     "Computation", "Claim", "Analysis", "InferenceVerdict", "InferenceReview",
