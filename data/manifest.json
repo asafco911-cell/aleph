@@ -1,6 +1,6 @@
 [
   {
-    "schema_version": 1,
+    "schema_version": 3,
     "doc_id": "UBER_FY2025",
     "file_name": "uber_10k.pdf",
     "ticker": "UBER",
@@ -259,10 +259,202 @@
         ]
       }
     },
-    "verification_source": "ch05 manual, ch07 graph, ch08 agent team"
+    "verification_source": "ch05 manual, ch07 graph, ch08 agent team",
+    "notes": [
+      {
+        "number": 1,
+        "title": "Description of Business and Summary of Significant Accounting Policies",
+        "pdf_page": 82,
+        "char_offset": 67,
+        "end_page": 94,
+        "end_number": 2
+      },
+      {
+        "number": 2,
+        "title": "Investments and Fair Value Measurement",
+        "pdf_page": 94,
+        "char_offset": 0,
+        "end_page": 98,
+        "end_number": 3
+      },
+      {
+        "number": 3,
+        "title": "Derivative and Hedging Instruments",
+        "pdf_page": 98,
+        "char_offset": 370,
+        "end_page": 98,
+        "end_number": 4
+      },
+      {
+        "number": 4,
+        "title": "Equity Method Investments",
+        "pdf_page": 98,
+        "char_offset": 1863,
+        "end_page": 99,
+        "end_number": 5
+      },
+      {
+        "number": 5,
+        "title": "Property and Equipment, Net",
+        "pdf_page": 99,
+        "char_offset": 21,
+        "end_page": 99,
+        "end_number": 6
+      },
+      {
+        "number": 6,
+        "title": "Leases",
+        "pdf_page": 99,
+        "char_offset": 892,
+        "end_page": 101,
+        "end_number": 7
+      },
+      {
+        "number": 7,
+        "title": "Goodwill and Intangible Assets",
+        "pdf_page": 101,
+        "char_offset": 1122,
+        "end_page": 102,
+        "end_number": 8
+      },
+      {
+        "number": 8,
+        "title": "Long-Term Debt and Credit Arrangements",
+        "pdf_page": 102,
+        "char_offset": 54,
+        "end_page": 106,
+        "end_number": 9
+      },
+      {
+        "number": 9,
+        "title": "Supplemental Financial Statement Information",
+        "pdf_page": 106,
+        "char_offset": 1289,
+        "end_page": 108,
+        "end_number": 10
+      },
+      {
+        "number": 10,
+        "title": "Stockholders' Equity",
+        "pdf_page": 108,
+        "char_offset": 1490,
+        "end_page": 110,
+        "end_number": 11
+      },
+      {
+        "number": 11,
+        "title": "Income Taxes",
+        "pdf_page": 110,
+        "char_offset": 1999,
+        "end_page": 114,
+        "end_number": 12
+      },
+      {
+        "number": 12,
+        "title": "Net Income Per Share",
+        "pdf_page": 114,
+        "char_offset": 640,
+        "end_page": 115,
+        "end_number": 13
+      },
+      {
+        "number": 13,
+        "title": "Segment Information and Geographic Information",
+        "pdf_page": 115,
+        "char_offset": 508,
+        "end_page": 117,
+        "end_number": 14
+      },
+      {
+        "number": 14,
+        "title": "Commitments and Contingencies",
+        "pdf_page": 117,
+        "char_offset": 2534,
+        "end_page": 120,
+        "end_number": 15
+      },
+      {
+        "number": 15,
+        "title": "Variable Interest Entities",
+        "pdf_page": 120,
+        "char_offset": 4477,
+        "end_page": 121,
+        "end_number": 16
+      },
+      {
+        "number": 16,
+        "title": "Non-Controlling Interests",
+        "pdf_page": 121,
+        "char_offset": 1749,
+        "end_page": 123,
+        "end_number": 17
+      },
+      {
+        "number": 17,
+        "title": "Business Combinations",
+        "pdf_page": 123,
+        "char_offset": 447,
+        "end_page": 123,
+        "end_number": 18
+      },
+      {
+        "number": 18,
+        "title": "Divestitures",
+        "pdf_page": 123,
+        "char_offset": 2751,
+        "end_page": 124,
+        "end_number": 19
+      },
+      {
+        "number": 19,
+        "title": "Subsequent Events",
+        "pdf_page": 124,
+        "char_offset": 513,
+        "end_page": 124,
+        "end_number": null
+      }
+    ],
+    "statements": [
+      {
+        "name": "auditor_report",
+        "heading": "report of independent registered public accounting firm",
+        "pdf_page": 71,
+        "end_page": 73
+      },
+      {
+        "name": "balance_sheet",
+        "heading": "consolidated balance sheets",
+        "pdf_page": 74,
+        "end_page": 74
+      },
+      {
+        "name": "operations",
+        "heading": "consolidated statements of operations",
+        "pdf_page": 75,
+        "end_page": 75
+      },
+      {
+        "name": "comprehensive_income",
+        "heading": "consolidated statements of comprehensive income",
+        "pdf_page": 76,
+        "end_page": 76
+      },
+      {
+        "name": "equity",
+        "heading": "consolidated statements of redeemable non-controlling interests and equity",
+        "pdf_page": 77,
+        "end_page": 79
+      },
+      {
+        "name": "cash_flows",
+        "heading": "consolidated statements of cash flows",
+        "pdf_page": 80,
+        "end_page": 81
+      }
+    ]
   },
   {
-    "schema_version": 1,
+    "schema_version": 3,
     "doc_id": "UBER_FY2024",
     "file_name": "uber_10k_fy2024.pdf",
     "ticker": "UBER",
@@ -525,10 +717,186 @@
         ]
       }
     },
-    "verification_source": "ch05 manual, ch07 graph, ch08 agent team"
+    "verification_source": "ch05 manual, ch07 graph, ch08 agent team",
+    "notes": [
+      {
+        "number": 1,
+        "title": "Description of Business and Summary of Significant Accounting Policies",
+        "pdf_page": 84,
+        "char_offset": 67,
+        "end_page": 96,
+        "end_number": 2
+      },
+      {
+        "number": 2,
+        "title": "Revenue",
+        "pdf_page": 96,
+        "char_offset": 254,
+        "end_page": 97,
+        "end_number": 3
+      },
+      {
+        "number": 3,
+        "title": "Investments and Fair Value Measurement",
+        "pdf_page": 97,
+        "char_offset": 0,
+        "end_page": 101,
+        "end_number": 4
+      },
+      {
+        "number": 4,
+        "title": "Equity Method Investments",
+        "pdf_page": 101,
+        "char_offset": 626,
+        "end_page": 102,
+        "end_number": 5
+      },
+      {
+        "number": 5,
+        "title": "Property and Equipment, Net",
+        "pdf_page": 102,
+        "char_offset": 1083,
+        "end_page": 102,
+        "end_number": 6
+      },
+      {
+        "number": 6,
+        "title": "Leases",
+        "pdf_page": 102,
+        "char_offset": 1951,
+        "end_page": 104,
+        "end_number": 7
+      },
+      {
+        "number": 7,
+        "title": "Goodwill and Intangible Assets",
+        "pdf_page": 104,
+        "char_offset": 1536,
+        "end_page": 105,
+        "end_number": 8
+      },
+      {
+        "number": 8,
+        "title": "Long-Term Debt and Revolving Credit Arrangements",
+        "pdf_page": 105,
+        "char_offset": 805,
+        "end_page": 110,
+        "end_number": 9
+      },
+      {
+        "number": 9,
+        "title": "Supplemental Financial Statement Information",
+        "pdf_page": 110,
+        "char_offset": 3396,
+        "end_page": 113,
+        "end_number": 10
+      },
+      {
+        "number": 10,
+        "title": "Stockholders' Equity",
+        "pdf_page": 113,
+        "char_offset": 0,
+        "end_page": 115,
+        "end_number": 11
+      },
+      {
+        "number": 11,
+        "title": "Income Taxes",
+        "pdf_page": 115,
+        "char_offset": 2214,
+        "end_page": 118,
+        "end_number": 12
+      },
+      {
+        "number": 12,
+        "title": "Net Income (Loss) Per Share",
+        "pdf_page": 118,
+        "char_offset": 3650,
+        "end_page": 120,
+        "end_number": 13
+      },
+      {
+        "number": 13,
+        "title": "Segment Information and Geographic Information",
+        "pdf_page": 120,
+        "char_offset": 452,
+        "end_page": 123,
+        "end_number": 14
+      },
+      {
+        "number": 14,
+        "title": "Commitments and Contingencies",
+        "pdf_page": 123,
+        "char_offset": 1844,
+        "end_page": 126,
+        "end_number": 15
+      },
+      {
+        "number": 15,
+        "title": "Variable Interest Entities",
+        "pdf_page": 126,
+        "char_offset": 3647,
+        "end_page": 127,
+        "end_number": 16
+      },
+      {
+        "number": 16,
+        "title": "Non-Controlling Interests",
+        "pdf_page": 127,
+        "char_offset": 4499,
+        "end_page": 129,
+        "end_number": 17
+      },
+      {
+        "number": 17,
+        "title": "Divestitures",
+        "pdf_page": 129,
+        "char_offset": 2893,
+        "end_page": 130,
+        "end_number": null
+      }
+    ],
+    "statements": [
+      {
+        "name": "auditor_report",
+        "heading": "report of independent registered public accounting firm",
+        "pdf_page": 73,
+        "end_page": 75
+      },
+      {
+        "name": "balance_sheet",
+        "heading": "consolidated balance sheets",
+        "pdf_page": 76,
+        "end_page": 76
+      },
+      {
+        "name": "operations",
+        "heading": "consolidated statements of operations",
+        "pdf_page": 77,
+        "end_page": 77
+      },
+      {
+        "name": "comprehensive_income",
+        "heading": "consolidated statements of comprehensive income",
+        "pdf_page": 78,
+        "end_page": 78
+      },
+      {
+        "name": "equity",
+        "heading": "consolidated statements of redeemable non-controlling interests and equity",
+        "pdf_page": 79,
+        "end_page": 81
+      },
+      {
+        "name": "cash_flows",
+        "heading": "consolidated statements of cash flows",
+        "pdf_page": 82,
+        "end_page": 83
+      }
+    ]
   },
   {
-    "schema_version": 1,
+    "schema_version": 3,
     "doc_id": "LYFT_FY2025",
     "file_name": "lyft_10k_fy2025.pdf",
     "ticker": "LYFT",
@@ -753,10 +1121,178 @@
       }
     ],
     "verified_figures": {},
-    "verification_source": "none yet"
+    "verification_source": "none yet",
+    "notes": [
+      {
+        "number": 1,
+        "title": "Description of Business and Basis of Presentation",
+        "pdf_page": 74,
+        "char_offset": 54,
+        "end_page": 74,
+        "end_number": 2
+      },
+      {
+        "number": 2,
+        "title": "Summary of Significant Accounting Policies",
+        "pdf_page": 74,
+        "char_offset": 3879,
+        "end_page": 83,
+        "end_number": 3
+      },
+      {
+        "number": 3,
+        "title": "Revenue",
+        "pdf_page": 83,
+        "char_offset": 711,
+        "end_page": 83,
+        "end_number": 4
+      },
+      {
+        "number": 4,
+        "title": "Acquisitions",
+        "pdf_page": 83,
+        "char_offset": 1697,
+        "end_page": 86,
+        "end_number": 5
+      },
+      {
+        "number": 5,
+        "title": "Goodwill and Intangible Assets, Net",
+        "pdf_page": 86,
+        "char_offset": 0,
+        "end_page": 87,
+        "end_number": 6
+      },
+      {
+        "number": 6,
+        "title": "Cash Equivalents and Investments",
+        "pdf_page": 87,
+        "char_offset": 0,
+        "end_page": 90,
+        "end_number": 7
+      },
+      {
+        "number": 7,
+        "title": "Fair Value Measurements",
+        "pdf_page": 90,
+        "char_offset": 0,
+        "end_page": 91,
+        "end_number": 8
+      },
+      {
+        "number": 8,
+        "title": "Supplemental Financial Statement Information",
+        "pdf_page": 91,
+        "char_offset": 1372,
+        "end_page": 93,
+        "end_number": 9
+      },
+      {
+        "number": 9,
+        "title": "Leases",
+        "pdf_page": 93,
+        "char_offset": 0,
+        "end_page": 95,
+        "end_number": 10
+      },
+      {
+        "number": 10,
+        "title": "Commitments and Contingencies",
+        "pdf_page": 95,
+        "char_offset": 917,
+        "end_page": 98,
+        "end_number": 11
+      },
+      {
+        "number": 11,
+        "title": "Debt",
+        "pdf_page": 98,
+        "char_offset": 4246,
+        "end_page": 104,
+        "end_number": 12
+      },
+      {
+        "number": 12,
+        "title": "Common Stock and Employee Stock Plans",
+        "pdf_page": 104,
+        "char_offset": 5014,
+        "end_page": 107,
+        "end_number": 13
+      },
+      {
+        "number": 13,
+        "title": "Income Taxes",
+        "pdf_page": 107,
+        "char_offset": 0,
+        "end_page": 111,
+        "end_number": 14
+      },
+      {
+        "number": 14,
+        "title": "Net Income (Loss) Per Share Attributable to Common Stockholders",
+        "pdf_page": 111,
+        "char_offset": 3879,
+        "end_page": 112,
+        "end_number": 15
+      },
+      {
+        "number": 15,
+        "title": "Restructuring",
+        "pdf_page": 112,
+        "char_offset": 3207,
+        "end_page": 113,
+        "end_number": 16
+      },
+      {
+        "number": 16,
+        "title": "Subsequent Events",
+        "pdf_page": 113,
+        "char_offset": 1663,
+        "end_page": 114,
+        "end_number": null
+      }
+    ],
+    "statements": [
+      {
+        "name": "auditor_report",
+        "heading": "report of independent registered public accounting firm",
+        "pdf_page": 66,
+        "end_page": 67
+      },
+      {
+        "name": "balance_sheet",
+        "heading": "consolidated balance sheets",
+        "pdf_page": 68,
+        "end_page": 68
+      },
+      {
+        "name": "operations",
+        "heading": "consolidated statements of operations",
+        "pdf_page": 69,
+        "end_page": 69
+      },
+      {
+        "name": "comprehensive_income",
+        "heading": "consolidated statements of comprehensive income",
+        "pdf_page": 70,
+        "end_page": 70
+      },
+      {
+        "name": "equity",
+        "heading": "consolidated statements of stockholders' equity",
+        "pdf_page": 71,
+        "end_page": 71
+      },
+      {
+        "name": "cash_flows",
+        "heading": "consolidated statements of cash flows",
+        "pdf_page": 72,
+        "end_page": 73
+      }
+    ]
   },
   {
-    "schema_version": 1,
+    "schema_version": 3,
     "doc_id": "LYFT_FY2024",
     "file_name": "lyft_10k_fy2024.pdf",
     "ticker": "LYFT",
@@ -981,10 +1517,186 @@
       }
     ],
     "verified_figures": {},
-    "verification_source": "none yet"
+    "verification_source": "none yet",
+    "notes": [
+      {
+        "number": 1,
+        "title": "Description of Business and Basis of Presentation",
+        "pdf_page": 79,
+        "char_offset": 54,
+        "end_page": 79,
+        "end_number": 2
+      },
+      {
+        "number": 2,
+        "title": "Summary of Significant Accounting Policies",
+        "pdf_page": 79,
+        "char_offset": 3349,
+        "end_page": 88,
+        "end_number": 3
+      },
+      {
+        "number": 3,
+        "title": "Revenue",
+        "pdf_page": 88,
+        "char_offset": 3467,
+        "end_page": 89,
+        "end_number": 4
+      },
+      {
+        "number": 4,
+        "title": "Acquisitions",
+        "pdf_page": 89,
+        "char_offset": 321,
+        "end_page": 90,
+        "end_number": 5
+      },
+      {
+        "number": 5,
+        "title": "Goodwill and Intangible Assets, Net",
+        "pdf_page": 90,
+        "char_offset": 2667,
+        "end_page": 91,
+        "end_number": 6
+      },
+      {
+        "number": 6,
+        "title": "Cash Equivalents and Short-Term Investments",
+        "pdf_page": 91,
+        "char_offset": 798,
+        "end_page": 93,
+        "end_number": 7
+      },
+      {
+        "number": 7,
+        "title": "Fair Value Measurements",
+        "pdf_page": 93,
+        "char_offset": 0,
+        "end_page": 94,
+        "end_number": 8
+      },
+      {
+        "number": 8,
+        "title": "Supplemental Financial Statement Information",
+        "pdf_page": 94,
+        "char_offset": 3200,
+        "end_page": 96,
+        "end_number": 9
+      },
+      {
+        "number": 9,
+        "title": "Leases",
+        "pdf_page": 96,
+        "char_offset": 4031,
+        "end_page": 99,
+        "end_number": 10
+      },
+      {
+        "number": 10,
+        "title": "Commitments and Contingencies",
+        "pdf_page": 99,
+        "char_offset": 919,
+        "end_page": 103,
+        "end_number": 11
+      },
+      {
+        "number": 11,
+        "title": "Debt",
+        "pdf_page": 103,
+        "char_offset": 2885,
+        "end_page": 109,
+        "end_number": 12
+      },
+      {
+        "number": 12,
+        "title": "Common Stock and Employee Stock Plans",
+        "pdf_page": 109,
+        "char_offset": 899,
+        "end_page": 112,
+        "end_number": 13
+      },
+      {
+        "number": 13,
+        "title": "Income Taxes",
+        "pdf_page": 112,
+        "char_offset": 898,
+        "end_page": 114,
+        "end_number": 14
+      },
+      {
+        "number": 14,
+        "title": "Net Income (Loss) Per Share Attributable to Common Stockholders",
+        "pdf_page": 114,
+        "char_offset": 952,
+        "end_page": 115,
+        "end_number": 15
+      },
+      {
+        "number": 15,
+        "title": "Restructuring",
+        "pdf_page": 115,
+        "char_offset": 1352,
+        "end_page": 117,
+        "end_number": 16
+      },
+      {
+        "number": 16,
+        "title": "Variable Interest Entities",
+        "pdf_page": 117,
+        "char_offset": 909,
+        "end_page": 118,
+        "end_number": 17
+      },
+      {
+        "number": 17,
+        "title": "Subsequent Events",
+        "pdf_page": 118,
+        "char_offset": 0,
+        "end_page": 119,
+        "end_number": null
+      }
+    ],
+    "statements": [
+      {
+        "name": "auditor_report",
+        "heading": "report of independent registered public accounting firm",
+        "pdf_page": 71,
+        "end_page": 72
+      },
+      {
+        "name": "balance_sheet",
+        "heading": "consolidated balance sheets",
+        "pdf_page": 73,
+        "end_page": 73
+      },
+      {
+        "name": "operations",
+        "heading": "consolidated statements of operations",
+        "pdf_page": 74,
+        "end_page": 74
+      },
+      {
+        "name": "comprehensive_income",
+        "heading": "consolidated statements of comprehensive income",
+        "pdf_page": 75,
+        "end_page": 75
+      },
+      {
+        "name": "equity",
+        "heading": "consolidated statements of stockholders' equity",
+        "pdf_page": 76,
+        "end_page": 76
+      },
+      {
+        "name": "cash_flows",
+        "heading": "consolidated statements of cash flows",
+        "pdf_page": 77,
+        "end_page": 78
+      }
+    ]
   },
   {
-    "schema_version": 1,
+    "schema_version": 3,
     "doc_id": "DASH_FY2025",
     "file_name": "dash_10k_fy2025.pdf",
     "ticker": "DASH",
@@ -1210,10 +1922,186 @@
       }
     ],
     "verified_figures": {},
-    "verification_source": "none yet"
+    "verification_source": "none yet",
+    "notes": [
+      {
+        "number": 1,
+        "title": "Organization and Description of Business",
+        "pdf_page": 81,
+        "char_offset": 76,
+        "end_page": 81,
+        "end_number": 2
+      },
+      {
+        "number": 2,
+        "title": "Summary of Significant Accounting Policies",
+        "pdf_page": 81,
+        "char_offset": 2146,
+        "end_page": 91,
+        "end_number": 3
+      },
+      {
+        "number": 3,
+        "title": "Revenue",
+        "pdf_page": 91,
+        "char_offset": 742,
+        "end_page": 92,
+        "end_number": 4
+      },
+      {
+        "number": 4,
+        "title": "Acquisitions",
+        "pdf_page": 92,
+        "char_offset": 722,
+        "end_page": 96,
+        "end_number": 5
+      },
+      {
+        "number": 5,
+        "title": "Goodwill and Intangible Assets, Net",
+        "pdf_page": 96,
+        "char_offset": 784,
+        "end_page": 98,
+        "end_number": 6
+      },
+      {
+        "number": 6,
+        "title": "Fair Value Measurements",
+        "pdf_page": 98,
+        "char_offset": 18,
+        "end_page": 100,
+        "end_number": 7
+      },
+      {
+        "number": 7,
+        "title": "Balance Sheet Components",
+        "pdf_page": 100,
+        "char_offset": 18,
+        "end_page": 102,
+        "end_number": 8
+      },
+      {
+        "number": 8,
+        "title": "Leases",
+        "pdf_page": 102,
+        "char_offset": 18,
+        "end_page": 103,
+        "end_number": 9
+      },
+      {
+        "number": 9,
+        "title": "Convertible Notes, Net",
+        "pdf_page": 103,
+        "char_offset": 18,
+        "end_page": 104,
+        "end_number": 10
+      },
+      {
+        "number": 10,
+        "title": "Commitments and Contingencies",
+        "pdf_page": 104,
+        "char_offset": 3533,
+        "end_page": 107,
+        "end_number": 11
+      },
+      {
+        "number": 11,
+        "title": "Common Stock",
+        "pdf_page": 107,
+        "char_offset": 774,
+        "end_page": 111,
+        "end_number": 12
+      },
+      {
+        "number": 12,
+        "title": "Income Taxes",
+        "pdf_page": 111,
+        "char_offset": 1952,
+        "end_page": 113,
+        "end_number": 13
+      },
+      {
+        "number": 13,
+        "title": "Net Income (Loss) per Share Attributable to DoorDash, Inc. Common Stockholders",
+        "pdf_page": 113,
+        "char_offset": 1608,
+        "end_page": 115,
+        "end_number": 14
+      },
+      {
+        "number": 14,
+        "title": "Employee Benefit Plans",
+        "pdf_page": 115,
+        "char_offset": 693,
+        "end_page": 115,
+        "end_number": 15
+      },
+      {
+        "number": 15,
+        "title": "Variable Interest Entities",
+        "pdf_page": 115,
+        "char_offset": 2424,
+        "end_page": 116,
+        "end_number": 16
+      },
+      {
+        "number": 16,
+        "title": "Derivative",
+        "pdf_page": 116,
+        "char_offset": 1220,
+        "end_page": 116,
+        "end_number": 17
+      },
+      {
+        "number": 17,
+        "title": "Segment Reporting",
+        "pdf_page": 116,
+        "char_offset": 2104,
+        "end_page": 117,
+        "end_number": null
+      }
+    ],
+    "statements": [
+      {
+        "name": "auditor_report",
+        "heading": "report of independent registered public accounting firm",
+        "pdf_page": 72,
+        "end_page": 74
+      },
+      {
+        "name": "balance_sheet",
+        "heading": "consolidated balance sheets",
+        "pdf_page": 75,
+        "end_page": 75
+      },
+      {
+        "name": "operations",
+        "heading": "consolidated statements of operations",
+        "pdf_page": 76,
+        "end_page": 76
+      },
+      {
+        "name": "comprehensive_income",
+        "heading": "consolidated statements of comprehensive income",
+        "pdf_page": 77,
+        "end_page": 77
+      },
+      {
+        "name": "equity",
+        "heading": "consolidated statements of redeemable non-controlling interests and stockholders' equity",
+        "pdf_page": 78,
+        "end_page": 79
+      },
+      {
+        "name": "cash_flows",
+        "heading": "consolidated statements of cash flows",
+        "pdf_page": 80,
+        "end_page": 80
+      }
+    ]
   },
   {
-    "schema_version": 1,
+    "schema_version": 3,
     "doc_id": "DASH_FY2024",
     "file_name": "dash_10k_fy2024.pdf",
     "ticker": "DASH",
@@ -1439,6 +2327,174 @@
       }
     ],
     "verified_figures": {},
-    "verification_source": "none yet"
+    "verification_source": "none yet",
+    "notes": [
+      {
+        "number": 1,
+        "title": "Organization and Description of Business",
+        "pdf_page": 80,
+        "char_offset": 76,
+        "end_page": 80,
+        "end_number": 2
+      },
+      {
+        "number": 2,
+        "title": "Summary of Significant Accounting Policies",
+        "pdf_page": 80,
+        "char_offset": 2137,
+        "end_page": 89,
+        "end_number": 3
+      },
+      {
+        "number": 3,
+        "title": "Revenue",
+        "pdf_page": 89,
+        "char_offset": 3186,
+        "end_page": 90,
+        "end_number": 4
+      },
+      {
+        "number": 4,
+        "title": "Acquisitions",
+        "pdf_page": 90,
+        "char_offset": 3090,
+        "end_page": 93,
+        "end_number": 5
+      },
+      {
+        "number": 5,
+        "title": "Goodwill and Intangible Assets, Net",
+        "pdf_page": 93,
+        "char_offset": 18,
+        "end_page": 94,
+        "end_number": 6
+      },
+      {
+        "number": 6,
+        "title": "Fair Value Measurements",
+        "pdf_page": 94,
+        "char_offset": 18,
+        "end_page": 95,
+        "end_number": 7
+      },
+      {
+        "number": 7,
+        "title": "Balance Sheet Components",
+        "pdf_page": 95,
+        "char_offset": 1617,
+        "end_page": 97,
+        "end_number": 8
+      },
+      {
+        "number": 8,
+        "title": "Leases",
+        "pdf_page": 97,
+        "char_offset": 1165,
+        "end_page": 98,
+        "end_number": 9
+      },
+      {
+        "number": 9,
+        "title": "Commitments and Contingencies",
+        "pdf_page": 98,
+        "char_offset": 1183,
+        "end_page": 100,
+        "end_number": 10
+      },
+      {
+        "number": 10,
+        "title": "Common Stock",
+        "pdf_page": 100,
+        "char_offset": 1901,
+        "end_page": 105,
+        "end_number": 11
+      },
+      {
+        "number": 11,
+        "title": "Income Taxes",
+        "pdf_page": 105,
+        "char_offset": 18,
+        "end_page": 106,
+        "end_number": 12
+      },
+      {
+        "number": 12,
+        "title": "Net Income (Loss) per Share Attributable to DoorDash, Inc. Common Stockholders",
+        "pdf_page": 106,
+        "char_offset": 3401,
+        "end_page": 107,
+        "end_number": 13
+      },
+      {
+        "number": 13,
+        "title": "Employee Benefit Plans",
+        "pdf_page": 107,
+        "char_offset": 2229,
+        "end_page": 108,
+        "end_number": 14
+      },
+      {
+        "number": 14,
+        "title": "Variable Interest Entities",
+        "pdf_page": 108,
+        "char_offset": 1151,
+        "end_page": 108,
+        "end_number": 15
+      },
+      {
+        "number": 15,
+        "title": "Segment Reporting",
+        "pdf_page": 108,
+        "char_offset": 3575,
+        "end_page": 109,
+        "end_number": 16
+      },
+      {
+        "number": 16,
+        "title": "Subsequent Events",
+        "pdf_page": 109,
+        "char_offset": 1147,
+        "end_page": 110,
+        "end_number": null
+      }
+    ],
+    "statements": [
+      {
+        "name": "auditor_report",
+        "heading": "report of independent registered public accounting firm",
+        "pdf_page": 72,
+        "end_page": 73
+      },
+      {
+        "name": "balance_sheet",
+        "heading": "consolidated balance sheets",
+        "pdf_page": 74,
+        "end_page": 74
+      },
+      {
+        "name": "operations",
+        "heading": "consolidated statements of operations",
+        "pdf_page": 75,
+        "end_page": 75
+      },
+      {
+        "name": "comprehensive_income",
+        "heading": "consolidated statements of comprehensive income",
+        "pdf_page": 76,
+        "end_page": 76
+      },
+      {
+        "name": "equity",
+        "heading": "consolidated statements of redeemable non-controlling interests and stockholders' equity",
+        "pdf_page": 77,
+        "end_page": 78
+      },
+      {
+        "name": "cash_flows",
+        "heading": "consolidated statements of cash flows",
+        "pdf_page": 79,
+        "end_page": 79
+      }
+    ]
   }
 ]

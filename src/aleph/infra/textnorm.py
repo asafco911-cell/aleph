@@ -42,3 +42,19 @@ def normalise(text: str, fold_case: bool = True) -> str:
 def contains(haystack: str, needle: str) -> bool:
     """Substring test that survives typographic and whitespace differences."""
     return normalise(needle) in normalise(haystack)
+
+def normalise_lines(text: str, fold_case: bool = False) -> str:
+    """Normalise for matching while PRESERVING line structure.
+
+    Headings open a line; cross-references sit mid-sentence. Collapsing all
+    whitespace destroys that distinction and forces lexical guessing about
+    which words precede a heading.
+    """
+    text = unicodedata.normalize("NFKC", text)
+    for source, target in LOOKALIKES.items():
+        text = text.replace(source, target)
+    text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", " ", text)
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n{2,}", "\n", text)
+    text = "\n".join(line.strip() for line in text.split("\n"))
+    return text.lower() if fold_case else text

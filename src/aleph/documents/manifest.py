@@ -10,10 +10,15 @@ from pathlib import Path
 
 from pypdf import PdfReader
 
+from aleph.documents.notes import find_notes
+from aleph.documents.statements import find_statements
+
 from ..infra.textnorm import contains
 from ..schemas.documents import DocumentRecord, VerifiedFigure
 from .errors import DocumentError
 from .structure import build_sections
+from .notes import find_notes
+from .statements import find_statements
 
 MONTHS = ("January|February|March|April|May|June|July|"
           "August|September|October|November|December")
@@ -79,6 +84,8 @@ def inspect(doc_id: str, entry: dict, data_dir: Path) -> DocumentRecord:
     month, day, year = fiscal.group(1), int(fiscal.group(2)), int(fiscal.group(3))
 
     toc_page, sections = build_sections(path)
+    notes = find_notes(path, sections)
+    statements = find_statements(path, sections, notes_start=notes[0].pdf_page)
 
     return DocumentRecord(
         doc_id=doc_id,
@@ -94,6 +101,8 @@ def inspect(doc_id: str, entry: dict, data_dir: Path) -> DocumentRecord:
         toc_page=toc_page,
         page_offset_deltas=sorted({s.pdf_page - s.printed_page for s in sections}),
         sections=sections,
+        notes=notes,
+        statements=statements,
         verified_figures=_check_anchors(path, entry["verified_figures"]),
         verification_source=entry["verification_source"],
     )

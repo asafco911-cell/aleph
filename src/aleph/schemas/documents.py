@@ -10,7 +10,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, model_validator
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 3
 
 
 class SectionRange(BaseModel):
@@ -37,6 +37,35 @@ class VerifiedFigure(BaseModel):
     value: str = Field(description="Verbatim string as it appears in the filing, e.g. '43,978'.")
     pages: list[int] = Field(description="PDF pages where the string was found.")
 
+class NoteRange(BaseModel):
+    """One note to the consolidated financial statements, inside Item 8.
+
+    Item 8 spans dozens of pages, so section scoping alone leaves far too much
+    text for an extractor. Notes give a second resolution layer, and they also
+    disambiguate: the same metric name appears under different definitions in
+    MD&A and in the notes, so a fact is only interpretable once its origin is
+    known.
+    """
+    number: int
+    title: str
+    pdf_page: int
+    char_offset: int = Field(description="Heading offset within NORMALISED page text.")
+    end_page: int
+    end_number: Optional[int] = Field(
+        default=None, description="Note that closes this range. None means end of Item 8."
+    )
+
+class StatementRange(BaseModel):
+    """One primary financial statement inside Item 8.
+
+    Statements are identified by statutory heading text, which the SEC dictates
+    and which appears as a running header on every page of the statement. Notes
+    are identified by number. Two different structures, two different maps.
+    """
+    name: str = Field(description="Canonical key, e.g. 'cash_flows', 'operations'.")
+    heading: str = Field(description="Statutory heading as matched.")
+    pdf_page: int
+    end_page: int
 
 class DocumentRecord(BaseModel):
     """One filing, fully identified and structurally mapped."""
@@ -60,6 +89,8 @@ class DocumentRecord(BaseModel):
     sections: list[SectionRange]
     verified_figures: dict[str, VerifiedFigure] = Field(default_factory=dict)
     verification_source: str
+    notes: list[NoteRange] = Field(default_factory=list)
+    statements: list[StatementRange] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def check_identity(self) -> "DocumentRecord":
