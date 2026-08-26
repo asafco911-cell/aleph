@@ -7,3 +7,7 @@ __pycache__/
 data/*.pdf
 
 src/*.egg-info/
+
+schemas_dump.txt
+
+schemas_dump.txt
