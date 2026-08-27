@@ -6,12 +6,12 @@ Python is not. A fact that fails any gate is rejected, never repaired.
 
 Column semantics are resolved LOCALLY, from the nearest header ABOVE the quoted
 row, with no distance ceiling: measured, the cash flow statement's header sits
-26 rows above its data while the segment note's sits 2 rows above. Statements
-repeat their header on each page, so the nearest match still governs.
+26 rows above its data while the segment note's sits 2 rows above.
 
-The scan runs in TWO passes. A period line ("Year Ended December 31, 2024")
-normally sits ABOVE the column header, so returning at the first structural
-match leaves the period unset and silently disables the period cross-check.
+Column ORDER is never assumed. Uber's cash flow statement runs 2022 2023 2024
+while its balance sheet runs 2023 2024, so any rule of the form "the last
+column is the most recent year" works on one statement and silently mis-assigns
+on the other.
 """
 import re
 from dataclasses import dataclass
@@ -22,8 +22,15 @@ from ..schemas.evidence import Fact
 RE_NUMBER = re.compile(r"\(?\$?\s?\d[\d,]*(?:\.\d+)?\)?")
 RE_YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
 
+MONTHS = ("january|february|march|april|may|june|july|"
+          "august|september|october|november|december")
+
+# "As of December 31," / "December 31," - the day number is part of the date and
+# must not be counted as table data.
+RE_DATE_PHRASE = re.compile(rf"(?:as\s+of\s+)?(?:{MONTHS})\s+\d{{1,2}},?", re.IGNORECASE)
+
 RE_PERIOD_LINE = re.compile(
-    r"^(?:year|years|three months|six months|nine months)\s+ended\b",
+    r"^(?:year|years|three months|six months|nine months)\s+ended\b|^as\s+of\b",
     re.IGNORECASE,
 )
 
@@ -83,6 +90,11 @@ def row_cells(quote: str) -> list[float]:
     return [value for value in parsed if value is not None]
 
 
+def _strip_dates(line: str) -> str:
+    """Remove date phrases so their day numbers are not read as table data."""
+    return RE_DATE_PHRASE.sub(" ", line)
+
+
 def _non_year_numbers(line: str) -> list[str]:
     return [
         token for token in RE_NUMBER.findall(line)
@@ -118,15 +130,15 @@ def _find_period_above(lines: list[str], start: int) -> str | None:
         line = lines[index].strip()
         if not line:
             continue
-        years = RE_YEAR.findall(line)
+        bare = _strip_dates(line)
+        years = RE_YEAR.findall(bare)
         if RE_PERIOD_LINE.match(line):
-            # "Year Ended December 31," may carry its year on the next line.
             if len(years) == 1:
                 return f"FY{years[0]}"
             continue
-        if len(years) == 1 and not _non_year_numbers(line):
+        if len(years) == 1 and not _non_year_numbers(bare):
             return f"FY{years[0]}"
-        if RE_NUMBER.search(line):
+        if RE_NUMBER.search(bare):
             return None  # A data row: the header block has ended.
     return None
 
@@ -143,11 +155,15 @@ def resolve_axis(source_text: str, quote: str, n_cells: int) -> Axis:
         if not line:
             continue
 
-        years = RE_YEAR.findall(line)
-        if len(years) >= 2 and not _non_year_numbers(line):
-            # Years are themselves the periods; no separate period line needed.
+        bare = _strip_dates(line)
+        years = RE_YEAR.findall(bare)
+
+        # A run of years and nothing else is a year axis, in the order printed.
+        if len(years) >= 2 and not _non_year_numbers(bare):
             return Axis("years", [f"FY{year}" for year in years])
 
+        # A line with no numbers is a label axis when it has one label per
+        # cell. Word count is the only structure PDF extraction preserves here.
         if not RE_NUMBER.search(line):
             labels = line.split()
             if len(labels) == n_cells and _is_label_header(labels):

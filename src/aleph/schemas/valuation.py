@@ -58,3 +58,18 @@ class AssumptionRange(BaseModel):
     method: str = Field(description="How low/base/high were computed.")
     rationale: str = Field(description="Why this range is defensible, or why it is blocked.")
     doc_ids: list[str] = Field(default_factory=list)
+
+class MarketAssumption(BaseModel):
+    """An input that does not exist in the filing: rates, betas, prices.
+
+    Market data cannot be cached against a document hash, because the hash is
+    fixed while the value moves daily. Reproducibility therefore requires an
+    explicit as_of date recorded alongside the value: a run from last month is
+    only reconstructible if the observation date travels with the number.
+    """
+    name: str
+    value: float
+    unit: str
+    as_of: str = Field(description="ISO date the value was observed.")
+    source: str = Field(description="Where it came from, e.g. 'US Treasury 10Y'.")
+    rationale: str

@@ -14,6 +14,12 @@ TARGETS = [
     ("statement:cash_flows",
      "Extract net cash provided by operating activities and purchases of "
      "property and equipment."),
+    ("statement:operations",
+     "Extract diluted weighted-average shares outstanding, interest expense, "
+     "and net income attributable to Uber Technologies, Inc."),
+    ("statement:balance_sheet",
+     "Extract cash and cash equivalents, short-term investments, restricted "
+     "cash, and long-term debt net of current portion."),
 ]
 
 doc_id = sys.argv[1]
@@ -54,4 +60,3 @@ blocked = [a.name for a in derive_all(facts, overrides) if a.status == "blocked"
 if blocked:
     print(f"BLOCKED: {blocked}")
     sys.exit(1)
-    
