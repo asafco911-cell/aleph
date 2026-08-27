@@ -98,3 +98,21 @@ quoted row rather than to the whole region. Alternative: cross-footing, since
 components must sum to their stated total.
 
 Status: open, unmeasured.
+
+## #13 Dispersion test is scale-dependent for rate quantities
+
+MAX_RELATIVE_SPREAD = 1.0 in valuation/assumptions.py is an invented constant,
+the same class of error as the fixed header-search window already corrected in
+gates.py. Relative spread divides by the median, so any quantity whose median
+sits near zero blows past the limit regardless of economic materiality:
+effective tax rates of 1.9 and 9.2 percent are 7.3 percentage points apart and
+were blocked at 1.3x, while 45 and 52 percent would pass comfortably.
+
+The block was correct here but for the wrong reason, so the stated rationale is
+misleading - a message that sounds right and is not.
+
+Fix direction: dispersion limits should be per-quantity and declared alongside
+the derivation, expressed in the quantity's own units (percentage points for
+rates, percent for levels), rather than one global ratio.
+
+Status: open.

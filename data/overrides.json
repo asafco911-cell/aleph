@@ -1,1 +1,11 @@
-{}
+{
+  "UBER_FY2024": {
+    "effective_tax_rate": {
+      "excluded_periods": [],
+      "fixed_value": 21.0,
+      "rationale": "Reported effective rates are distorted by one-off deferred tax events, including the 5.2B USD federal valuation allowance release disclosed in Note 11 for 2024, which drove the rate to -139.6 percent. These are balance-sheet recognition events, not sustainable earning power. Using the 21.0 percent US federal statutory rate stated in the same note as the going-forward assumption.",
+      "decided_by": "Asi",
+      "decided_at": "2026-08-27"
+    }
+  }
+}
