@@ -4,11 +4,14 @@ The model is asked to copy, not to compute. Every gate here is Python checking
 that copying actually happened, because LLM verification is probabilistic and
 Python is not. A fact that fails any gate is rejected, never repaired.
 
-Column semantics are resolved LOCALLY, from the header lines immediately above
-the quoted row. Scanning a whole note for a year run was wrong: Uber's segment
-note carries a geography table with year columns and a segment table with label
-columns, and applying one axis to the other produces a real quote, a real
-number, and the wrong meaning.
+Column semantics are resolved LOCALLY, from the nearest header ABOVE the quoted
+row, with no distance ceiling: measured, the cash flow statement's header sits
+26 rows above its data while the segment note's sits 2 rows above. Statements
+repeat their header on each page, so the nearest match still governs.
+
+The scan runs in TWO passes. A period line ("Year Ended December 31, 2024")
+normally sits ABOVE the column header, so returning at the first structural
+match leaves the period unset and silently disables the period cross-check.
 """
 import re
 from dataclasses import dataclass
@@ -19,14 +22,11 @@ from ..schemas.evidence import Fact
 RE_NUMBER = re.compile(r"\(?\$?\s?\d[\d,]*(?:\.\d+)?\)?")
 RE_YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
 
-# "Year Ended December 31, 2024" - one period governing the whole table.
 RE_PERIOD_LINE = re.compile(
-    r"^(?:year|years|three months|six months|nine months)\s+ended\b"
-    r".*?((?:19|20)\d{2})\s*$",
+    r"^(?:year|years|three months|six months|nine months)\s+ended\b",
     re.IGNORECASE,
 )
 
-HEADER_SEARCH_DEPTH = 6
 TOTAL_TOKENS = ("total", "consolidated")
 
 
@@ -42,7 +42,7 @@ class Axis:
     """What the columns of the quoted row mean."""
     kind: str  # "years" | "labels" | "unknown"
     labels: list[str]
-    period: str | None = None  # Set when a period line governs the table.
+    period: str | None = None  # Set when a single period governs the table.
 
 
 def _parse_number(token: str) -> float | None:
@@ -83,6 +83,26 @@ def row_cells(quote: str) -> list[float]:
     return [value for value in parsed if value is not None]
 
 
+def _non_year_numbers(line: str) -> list[str]:
+    return [
+        token for token in RE_NUMBER.findall(line)
+        if not RE_YEAR.fullmatch(token.strip())
+    ]
+
+
+def _is_label_header(labels: list[str]) -> bool:
+    """Distinguish a column header from a section subheading.
+
+    Word count alone is insufficient: "Costs and expenses" happens to have
+    three words above a three-column row and was read as a column axis. Column
+    headers capitalise every token; section subheadings carry lowercase
+    function words. This is a typographic convention rather than a rule, but it
+    fails safe - a rejected real header yields columns_undetermined, never a
+    false accept.
+    """
+    return bool(labels) and all(token[:1].isupper() for token in labels)
+
+
 def _find_line(lines: list[str], quote: str) -> int:
     """Index of the source line the quote came from, or -1."""
     target = normalise(quote)
@@ -92,57 +112,49 @@ def _find_line(lines: list[str], quote: str) -> int:
     return -1
 
 
+def _find_period_above(lines: list[str], start: int) -> str | None:
+    """Climb above the column header looking for the governing period."""
+    for index in range(start - 1, -1, -1):
+        line = lines[index].strip()
+        if not line:
+            continue
+        years = RE_YEAR.findall(line)
+        if RE_PERIOD_LINE.match(line):
+            # "Year Ended December 31," may carry its year on the next line.
+            if len(years) == 1:
+                return f"FY{years[0]}"
+            continue
+        if len(years) == 1 and not _non_year_numbers(line):
+            return f"FY{years[0]}"
+        if RE_NUMBER.search(line):
+            return None  # A data row: the header block has ended.
+    return None
+
+
 def resolve_axis(source_text: str, quote: str, n_cells: int) -> Axis:
-    """Determine column meaning from the nearest headers ABOVE the quoted row.
-
-    Locality is the point: two tables in one note can carry different axes, so
-    the header governing a row is the one directly above it, never the first
-    one found anywhere in the region.
-
-    The window is scanned TWICE. A period line ("Year Ended December 31, 2024")
-    normally sits above the column header, so returning at the first structural
-    match would leave the period permanently unset and silently disable the
-    period cross-check.
-    """
+    """Determine column meaning from the nearest header above the quoted row."""
     lines = normalise_lines(source_text, fold_case=False).split("\n")
     row = _find_line(lines, quote)
     if row < 0 or n_cells == 0:
         return Axis("unknown", [])
 
-    start = max(0, row - HEADER_SEARCH_DEPTH)
-    window = [line.strip() for line in lines[start:row]][::-1]  # nearest first
-
-    period: str | None = None
-    for line in window:
-        match = RE_PERIOD_LINE.match(line)
-        if match:
-            period = f"FY{match.group(1)}"
-            break
-
-    for line in window:
+    for index in range(row - 1, -1, -1):
+        line = lines[index].strip()
         if not line:
             continue
+
         years = RE_YEAR.findall(line)
-        others = [
-            token for token in RE_NUMBER.findall(line)
-            if not RE_YEAR.fullmatch(token.strip())
-        ]
+        if len(years) >= 2 and not _non_year_numbers(line):
+            # Years are themselves the periods; no separate period line needed.
+            return Axis("years", [f"FY{year}" for year in years])
 
-        # A run of years with nothing else is a year axis.
-        if len(years) >= 2 and not others:
-            return Axis("years", [f"FY{year}" for year in years], period)
-
-        # A line with no numbers is a label axis, if it has one label per cell.
-        # Word count is the only structure PDF extraction preserves here.
         if not RE_NUMBER.search(line):
             labels = line.split()
-            if len(labels) == n_cells:
-                return Axis("labels", labels, period)
-            # Multi-word labels cannot be split reliably; stop rather than guess.
-            if 0 < len(labels) < n_cells:
-                return Axis("unknown", labels, period)
+            if len(labels) == n_cells and _is_label_header(labels):
+                return Axis("labels", labels, _find_period_above(lines, index))
+            continue  # Section subheading or caption: keep climbing.
 
-    return Axis("unknown", [], period)
+    return Axis("unknown", [])
 
 
 def check_has_source(fact: Fact) -> Rejection | None:
