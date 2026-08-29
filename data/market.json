@@ -1,20 +1,44 @@
 {
   "UBER_FY2024": {
-        "discount_rate": {
-      "name": "discount_rate",
-      "value": 0.09,
-      "unit": "decimal",
-      "as_of": "2026-08-27",
-      "source": "integration test",
-      "rationale": "NOT A VALUATION INPUT. Round-number rate used only to prove the pipeline runs end to end. Not built bottom-up: no industry beta, no risk-free rate, no ERP, no country risk premium, no market-weight capital structure. Any output from this run is an integration test result."
-    },
     "terminal_growth": {
-      "name": "terminal_growth",
-      "value": 0.025,
-      "unit": "decimal",
-      "as_of": "2026-08-27",
-      "source": "analyst judgment",
+      "name": "terminal_growth", "value": 0.025, "unit": "decimal",
+      "as_of": "2026-08-27", "source": "analyst judgment",
       "rationale": "Below long-run nominal GDP growth, per the g<3% constraint enforced by the engine."
+    },
+    "risk_free_rate": {
+      "name": "risk_free_rate", "value": 0.0, "unit": "decimal",
+      "as_of": "", "source": "placeholder",
+      "rationale": "Use the 10Y US Treasury yield on the valuation date. Record the date."
+    },
+    "equity_risk_premium": {
+      "name": "equity_risk_premium", "value": 0.0, "unit": "decimal",
+      "as_of": "", "source": "placeholder",
+      "rationale": "Mature-market ERP. Damodaran publishes a monthly implied series."
+    },
+    "unlevered_industry_beta": {
+      "name": "unlevered_industry_beta", "value": 0.0, "unit": "decimal",
+      "as_of": "", "source": "placeholder",
+      "rationale": "Bottom-up: unlevered beta of the peer group, not a regression on Uber's own stock."
+    },
+    "debt_spread": {
+      "name": "debt_spread", "value": 0.0, "unit": "decimal",
+      "as_of": "", "source": "placeholder",
+      "rationale": "Spread over risk-free implied by Uber's credit rating or its actual issuance yields."
+    },
+    "country_risk_premium": {
+      "name": "country_risk_premium", "value": 0.0, "unit": "decimal",
+      "as_of": "", "source": "placeholder",
+      "rationale": "JUDGEMENT, NOT A DERIVATION. Note 13 gives US 21,429, UK 8,373, all other 14,176 - 32 percent of revenue sits in an undisaggregated bucket whose per-country split is not disclosed. State a premium and say what mix you assumed and why."
+    },
+    "share_price": {
+      "name": "share_price", "value": 0.0, "unit": "USD",
+      "as_of": "", "source": "placeholder",
+      "rationale": "Closing price on the valuation date, for market-weight capital structure."
+    },
+    "discount_rate": {
+      "name": "discount_rate", "value": 0.09, "unit": "decimal",
+      "as_of": "2026-08-27", "source": "integration test",
+      "rationale": "NOT A VALUATION INPUT. Round-number rate used only to prove the pipeline runs end to end. Superseded once WACC is built bottom-up from the six components above."
     }
   }
 }

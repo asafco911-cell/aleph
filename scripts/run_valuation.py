@@ -29,6 +29,7 @@ TARGETS = [
     ("statement:balance_sheet",
      "Extract cash and cash equivalents, short-term investments, restricted "
      "cash, and long-term debt net of current portion."),
+    ("note:13", "Extract revenue by geography."),
 ]
 
 doc_id = sys.argv[1]

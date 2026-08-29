@@ -222,9 +222,25 @@ def derive_net_debt(facts, overrides) -> AssumptionRange:
     )
 
 
+def derive_geographic_revenue(facts, overrides) -> AssumptionRange:
+    """Revenue by geography, for the CRP judgement. Not itself a WACC input."""
+    regions = ("united states revenue", "united kingdom revenue",
+               "all other countries revenue")
+    observations = [o for region in regions for o in _observations(facts, region)]
+    if not observations:
+        return _blocked("geographic_revenue", "USD millions", [], [],
+                        "geography facts not pooled; check the extraction targets",
+                        _doc_ids(facts))
+
+    latest = max(o.period for o in observations)
+    return build_level("geographic_revenue", "USD millions",
+                       [o for o in observations if o.period == latest],
+                       overrides.get("geographic_revenue"), _doc_ids(facts))
+
+
 DERIVATIONS = (
     derive_growth, derive_tax_rate, derive_operating_cash_flow, derive_capex,
-    derive_interest_expense, derive_diluted_shares, derive_net_debt,
+    derive_interest_expense, derive_diluted_shares, derive_net_debt, derive_geographic_revenue, 
 )
 
 
