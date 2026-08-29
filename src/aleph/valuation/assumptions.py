@@ -10,9 +10,12 @@ Two kinds of quantity are derived differently:
   across periods is meaningful and a wide spread means the summary is unsafe.
 
   LEVEL quantities (cash flow, share count, net debt) take the most recent
-  period. Min/max across years is a time series, not an uncertainty band:
-  treating Uber's 2022 operating cash flow as the low bound on its 2024 figure
-  would report a 91 percent downside that reflects growth, not risk.
+  period. Min/max across years is a time series, not an uncertainty band.
+
+Fact selection is by substring, which collides: "cash and cash equivalents" is
+contained in "restricted cash and cash equivalents". Two different facts
+matching one query in one period is an ambiguous query, and silently keeping
+the last one drops the figure that matters. Collisions therefore block.
 """
 from statistics import median
 
@@ -22,17 +25,34 @@ from ..schemas.valuation import AssumptionRange, Observation, Override
 MAX_RELATIVE_SPREAD = 1.0  # see ISSUES.md #13: scale-dependent, per-quantity limits pending
 
 
-def _observations(facts: list[Fact], *name_contains: str) -> list[Observation]:
-    """Collect one observation per period for facts matching all labels."""
+def _observations(
+    facts: list[Fact], *name_contains: str, exclude: tuple[str, ...] = ()
+) -> tuple[list[Observation], list[str]]:
+    """Return (one observation per period, collision descriptions)."""
     found: dict[str, Observation] = {}
+    collisions: list[str] = []
+
     for fact in facts:
         name = fact.name.lower()
-        if fact.period is None or not all(t.lower() in name for t in name_contains):
+        if fact.period is None:
+            continue
+        if not all(token.lower() in name for token in name_contains):
+            continue
+        if any(token.lower() in name for token in exclude):
+            continue
+
+        prior = found.get(fact.period)
+        if prior is not None and prior.fact_name != fact.name:
+            collisions.append(
+                f"{fact.period}: '{prior.fact_name}' and '{fact.name}' both match "
+                f"{list(name_contains)}"
+            )
             continue
         found[fact.period] = Observation(
             period=fact.period, value=fact.value, fact_name=fact.name
         )
-    return [found[period] for period in sorted(found)]
+
+    return [found[period] for period in sorted(found)], collisions
 
 
 def _dispersion_problem(values: list[float]) -> str | None:
@@ -59,14 +79,6 @@ def _blocked(name, unit, observations, excluded, reason, doc_ids) -> AssumptionR
     )
 
 
-def _apply_override(observations, override):
-    if not override or not override.excluded_periods:
-        return observations, []
-    kept = [o for o in observations if o.period not in override.excluded_periods]
-    dropped = [o for o in observations if o.period in override.excluded_periods]
-    return kept, dropped
-
-
 def _fixed(name, unit, observations, excluded, override, doc_ids) -> AssumptionRange:
     return AssumptionRange(
         name=name, unit=unit, status="overridden",
@@ -78,8 +90,27 @@ def _fixed(name, unit, observations, excluded, override, doc_ids) -> AssumptionR
     )
 
 
-def build_trend(name, unit, observations, override, doc_ids) -> AssumptionRange:
+def _apply_override(observations, override):
+    if not override or not override.excluded_periods:
+        return observations, []
+    kept = [o for o in observations if o.period not in override.excluded_periods]
+    dropped = [o for o in observations if o.period in override.excluded_periods]
+    return kept, dropped
+
+
+def _override_note(override) -> str:
+    if not override or not override.excluded_periods:
+        return ""
+    return (f" Analyst excluded {override.excluded_periods}: {override.rationale} "
+            f"[{override.decided_by}, {override.decided_at}]")
+
+
+def build_trend(name, unit, observations, collisions, override, doc_ids) -> AssumptionRange:
     """Summarise several periods. Blocks when dispersion makes a summary unsafe."""
+    if collisions:
+        return _blocked(name, unit, observations, [],
+                        "ambiguous fact selection: " + "; ".join(collisions), doc_ids)
+
     kept, excluded = _apply_override(observations, override)
     if override and override.fixed_value is not None:
         return _fixed(name, unit, observations, excluded, override, doc_ids)
@@ -101,8 +132,6 @@ def build_trend(name, unit, observations, override, doc_ids) -> AssumptionRange:
             doc_ids,
         )
 
-    note = (f" Analyst excluded {override.excluded_periods}: {override.rationale} "
-            f"[{override.decided_by}, {override.decided_at}]") if override else ""
     return AssumptionRange(
         name=name, unit=unit, status="overridden" if override else "derived",
         low=min(values), base=median(values), high=max(values),
@@ -110,13 +139,17 @@ def build_trend(name, unit, observations, override, doc_ids) -> AssumptionRange:
         method="low/high are the observed min and max; base is the median",
         rationale=(f"Derived from {len(kept)} periods "
                    f"({', '.join(o.period for o in kept)}); "
-                   f"dispersion within limits.{note}"),
+                   f"dispersion within limits.{_override_note(override)}"),
         doc_ids=doc_ids,
     )
 
 
-def build_level(name, unit, observations, override, doc_ids) -> AssumptionRange:
+def build_level(name, unit, observations, collisions, override, doc_ids) -> AssumptionRange:
     """Take the most recent period. Prior periods are context, not a range."""
+    if collisions:
+        return _blocked(name, unit, observations, [],
+                        "ambiguous fact selection: " + "; ".join(collisions), doc_ids)
+
     kept, excluded = _apply_override(observations, override)
     if override and override.fixed_value is not None:
         return _fixed(name, unit, observations, excluded, override, doc_ids)
@@ -125,8 +158,6 @@ def build_level(name, unit, observations, override, doc_ids) -> AssumptionRange:
                         "no facts extracted for this quantity", doc_ids)
 
     latest = kept[-1]
-    note = (f" Analyst excluded {override.excluded_periods}: {override.rationale} "
-            f"[{override.decided_by}, {override.decided_at}]") if override else ""
     return AssumptionRange(
         name=name, unit=unit, status="overridden" if override else "derived",
         low=latest.value, base=latest.value, high=latest.value,
@@ -134,7 +165,7 @@ def build_level(name, unit, observations, override, doc_ids) -> AssumptionRange:
         method=f"most recent period ({latest.period}); no band derived from history",
         rationale=(f"Level quantity taken from {latest.period}. Prior periods "
                    f"{[f'{o.period}={o.value:,.0f}' for o in kept[:-1]]} are "
-                   f"context, not an uncertainty band.{note}"),
+                   f"context, not an uncertainty band.{_override_note(override)}"),
         doc_ids=doc_ids,
     )
 
@@ -145,45 +176,66 @@ def _doc_ids(facts: list[Fact]) -> list[str]:
 
 def derive_growth(facts, overrides) -> AssumptionRange:
     """Year-over-year revenue growth, one observation per consecutive pair."""
-    totals = _observations(facts, "total revenue")
+    totals, collisions = _observations(facts, "total revenue")
     pairs = [
         Observation(period=current.period,
                     value=(current.value / previous.value - 1.0) * 100.0,
                     fact_name=f"{current.fact_name} over {previous.fact_name}")
         for previous, current in zip(totals, totals[1:]) if previous.value
     ]
-    return build_trend("revenue_growth", "percent", pairs,
+    return build_trend("revenue_growth", "percent", pairs, collisions,
                        overrides.get("revenue_growth"), _doc_ids(facts))
 
 
 def derive_tax_rate(facts, overrides) -> AssumptionRange:
-    return build_trend("effective_tax_rate", "percent",
-                       _observations(facts, "effective income tax rate"),
+    observations, collisions = _observations(facts, "effective income tax rate")
+    return build_trend("effective_tax_rate", "percent", observations, collisions,
                        overrides.get("effective_tax_rate"), _doc_ids(facts))
 
 
 def derive_operating_cash_flow(facts, overrides) -> AssumptionRange:
-    return build_level("operating_cash_flow", "USD millions",
-                       _observations(facts, "operating activities"),
+    observations, collisions = _observations(facts, "operating activities")
+    return build_level("operating_cash_flow", "USD millions", observations, collisions,
                        overrides.get("operating_cash_flow"), _doc_ids(facts))
 
 
 def derive_capex(facts, overrides) -> AssumptionRange:
-    return build_level("capex", "USD millions",
-                       _observations(facts, "property and equipment"),
+    observations, collisions = _observations(facts, "property and equipment")
+    return build_level("capex", "USD millions", observations, collisions,
                        overrides.get("capex"), _doc_ids(facts))
 
 
 def derive_interest_expense(facts, overrides) -> AssumptionRange:
-    return build_level("interest_expense", "USD millions",
-                       _observations(facts, "interest expense"),
+    observations, collisions = _observations(facts, "interest expense")
+    return build_level("interest_expense", "USD millions", observations, collisions,
                        overrides.get("interest_expense"), _doc_ids(facts))
 
 
 def derive_diluted_shares(facts, overrides) -> AssumptionRange:
-    return build_level("diluted_shares", "thousands",
-                       _observations(facts, "diluted"),
+    observations, collisions = _observations(facts, "diluted")
+    return build_level("diluted_shares", "thousands", observations, collisions,
                        overrides.get("diluted_shares"), _doc_ids(facts))
+
+
+def derive_geographic_revenue(facts, overrides) -> AssumptionRange:
+    """Revenue by geography, for the CRP judgement. Not itself a WACC input."""
+    regions = ("united states revenue", "united kingdom revenue",
+               "all other countries revenue")
+    observations, collisions = [], []
+    for region in regions:
+        found, clashes = _observations(facts, region)
+        observations.extend(found)
+        collisions.extend(clashes)
+
+    if not observations:
+        return _blocked("geographic_revenue", "USD millions", [], [],
+                        "geography facts not pooled; check the extraction targets",
+                        _doc_ids(facts))
+
+    latest = max(o.period for o in observations)
+    return build_level("geographic_revenue", "USD millions",
+                       [o for o in observations if o.period == latest], collisions,
+                       overrides.get("geographic_revenue"), _doc_ids(facts))
 
 
 def derive_net_debt(facts, overrides) -> AssumptionRange:
@@ -193,22 +245,33 @@ def derive_net_debt(facts, overrides) -> AssumptionRange:
     investments can service debt is a judgement about liquidity and intent,
     neither of which is a disclosed fact. Operating lease liabilities are a
     second judgement with the same shape: including them in net debt while
-    leaving lease costs inside operating cash flow charges for leases twice -
-    the same numerator/denominator inconsistency the engine guards against.
+    leaving lease costs inside operating cash flow charges for leases twice.
 
-    Components are surfaced so the decision is made against the numbers.
+    Components are surfaced so the decision is made against the numbers. The
+    unrestricted cash query excludes "restricted" explicitly, because substring
+    matching would otherwise return restricted balances as available cash.
     """
     override = overrides.get("net_debt")
-    components = (
-        _observations(facts, "cash and cash equivalents")
-        + _observations(facts, "short-term investments")
-        + _observations(facts, "long-term debt")
-        + _observations(facts, "restricted cash")
-    )
     doc_ids = _doc_ids(facts)
+
+    queries = (
+        (("cash and cash equivalents",), ("restricted",)),
+        (("short-term investments",), ()),
+        (("long-term debt",), ()),
+        (("restricted cash",), ()),
+    )
+    components, collisions = [], []
+    for name_contains, exclude in queries:
+        found, clashes = _observations(facts, *name_contains, exclude=exclude)
+        components.extend(found)
+        collisions.extend(clashes)
 
     if override and override.fixed_value is not None:
         return _fixed("net_debt", "USD millions", components, [], override, doc_ids)
+
+    if collisions:
+        return _blocked("net_debt", "USD millions", components, [],
+                        "ambiguous fact selection: " + "; ".join(collisions), doc_ids)
 
     listing = [f"{o.fact_name}={o.value:,.0f}" for o in components] or ["none extracted"]
     return _blocked(
@@ -222,25 +285,10 @@ def derive_net_debt(facts, overrides) -> AssumptionRange:
     )
 
 
-def derive_geographic_revenue(facts, overrides) -> AssumptionRange:
-    """Revenue by geography, for the CRP judgement. Not itself a WACC input."""
-    regions = ("united states revenue", "united kingdom revenue",
-               "all other countries revenue")
-    observations = [o for region in regions for o in _observations(facts, region)]
-    if not observations:
-        return _blocked("geographic_revenue", "USD millions", [], [],
-                        "geography facts not pooled; check the extraction targets",
-                        _doc_ids(facts))
-
-    latest = max(o.period for o in observations)
-    return build_level("geographic_revenue", "USD millions",
-                       [o for o in observations if o.period == latest],
-                       overrides.get("geographic_revenue"), _doc_ids(facts))
-
-
 DERIVATIONS = (
     derive_growth, derive_tax_rate, derive_operating_cash_flow, derive_capex,
-    derive_interest_expense, derive_diluted_shares, derive_net_debt, derive_geographic_revenue, 
+    derive_interest_expense, derive_diluted_shares, derive_geographic_revenue,
+    derive_net_debt,
 )
 
 
