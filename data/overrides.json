@@ -6,6 +6,13 @@
       "rationale": "Reported effective rates are distorted by one-off deferred tax events, including the 5.2B USD federal valuation allowance release disclosed in Note 11 for 2024, which drove the rate to -139.6 percent. These are balance-sheet recognition events, not sustainable earning power. Using the 21.0 percent US federal statutory rate stated in the same note as the going-forward assumption.",
       "decided_by": "Asi",
       "decided_at": "2026-08-27"
+    },
+    "net_debt": {
+      "excluded_periods": [],
+      "fixed_value": 1370.0,
+      "rationale": "Long-term debt net of current portion 8,347 less cash and cash equivalents 5,893 less short-term investments 1,084. Restricted cash of 2,717 is excluded because it is not available to service debt. Operating lease liabilities are excluded because their costs already sit inside operating cash flow, and including them here would charge for leases twice. Current portion of long-term debt was not extracted and is a known gap.",
+      "decided_by": "Asi",
+      "decided_at": "2026-08-27"
     }
   }
 }

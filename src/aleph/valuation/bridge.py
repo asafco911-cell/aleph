@@ -1,19 +1,35 @@
 """Assemble DCFInputs from derived assumptions. Deterministic, no LLM.
 
-Two consistency rules are enforced here because the engine cannot see them:
+Three consistency rules are enforced here because the engine cannot see them:
 
   1. Numerator and denominator must match. Cash flow from operations is stated
      AFTER interest paid, so it is a levered figure. Discounting it at WACC and
      then subtracting net debt charges for the debt twice. FCFF is therefore
      reconstructed explicitly: CFO + interest x (1 - tax) - capex.
 
-  2. Units are converted once, from the declared unit on each range, never
-     inferred from magnitude. A rate of 0.21 and a rate of 21.0 are both
-     plausible-looking numbers and mean different things.
+  2. Units are converted once, from the DECLARED unit on each range, never
+     inferred from magnitude. Cash flow is reported in millions and share
+     counts in thousands; dividing one by the other unconverted yields a
+     per-share value wrong by a factor of 1000 with no arithmetic error to
+     detect.
+
+  3. A placeholder discount rate blocks the run. It is the largest single
+     driver of the result, so a run on an invented rate produces a number that
+     looks like a valuation and is not.
 """
 from dataclasses import dataclass
 
 from ..schemas.valuation import AssumptionRange, MarketAssumption
+
+SCALE_TO_MILLIONS = {
+    "USD millions": 1.0,
+    "millions": 1.0,
+    "thousands": 0.001,
+    "USD thousands": 0.001,
+    "billions": 1000.0,
+}
+
+PLACEHOLDER_SOURCES = ("placeholder", "todo", "tbd")
 
 
 class BridgeError(ValueError):
@@ -25,6 +41,15 @@ class Bridged:
     inputs: object            # DCFInputs, imported lazily to keep layers apart
     tornado_ranges: dict
     notes: list[str]
+
+
+def require(ranges: dict[str, AssumptionRange], name: str) -> AssumptionRange:
+    found = ranges.get(name)
+    if found is None:
+        raise BridgeError(f"missing required assumption '{name}'")
+    if found.status == "blocked":
+        raise BridgeError(f"'{name}' is blocked: {found.rationale}")
+    return found
 
 
 def as_decimal(assumption: AssumptionRange, which: str = "base") -> float:
@@ -40,22 +65,9 @@ def as_decimal(assumption: AssumptionRange, which: str = "base") -> float:
         f"{assumption.name}: unit '{assumption.unit}' cannot be read as a rate"
     )
 
-SCALE_TO_MILLIONS = {
-    "USD millions": 1.0,
-    "millions": 1.0,
-    "thousands": 0.001,
-    "USD thousands": 0.001,
-    "billions": 1000.0,
-}
-
 
 def to_millions(assumption: AssumptionRange, which: str = "base") -> float:
-    """Convert to millions using the DECLARED unit, never inferred from size.
-
-    Cash flow is reported in millions and share counts in thousands. Dividing
-    one by the other without conversion yields a per-share value wrong by a
-    factor of 1000, with no arithmetic error to detect.
-    """
+    """Convert to millions using the DECLARED unit, never inferred from size."""
     value = getattr(assumption, which)
     if value is None:
         raise BridgeError(f"{assumption.name}: {which} is unset ({assumption.status})")
@@ -66,14 +78,6 @@ def to_millions(assumption: AssumptionRange, which: str = "base") -> float:
             "add it to SCALE_TO_MILLIONS rather than assuming"
         )
     return value * scale
-
-def require(ranges: dict[str, AssumptionRange], name: str) -> AssumptionRange:
-    found = ranges.get(name)
-    if found is None:
-        raise BridgeError(f"missing required assumption '{name}'")
-    if found.status == "blocked":
-        raise BridgeError(f"'{name}' is blocked: {found.rationale}")
-    return found
 
 
 def fade(start: float, end: float, years: int) -> list[float]:
@@ -90,6 +94,22 @@ def fade(start: float, end: float, years: int) -> list[float]:
     return [start - step * i for i in range(years)]
 
 
+def _market(market: dict[str, MarketAssumption], name: str) -> MarketAssumption:
+    found = market.get(name)
+    if found is None:
+        raise BridgeError(
+            f"'{name}' is a market or judgment input and is not derivable from "
+            "the filing; supply it with an as_of date in data/market.json"
+        )
+    if found.source.strip().lower() in PLACEHOLDER_SOURCES:
+        raise BridgeError(
+            f"'{name}' is marked as a placeholder. Change source to something "
+            "truthful only once the value is real, or to 'integration test' to "
+            "acknowledge that the output is not a valuation."
+        )
+    return found
+
+
 def build_dcf_inputs(
     ranges: dict[str, AssumptionRange],
     market: dict[str, MarketAssumption],
@@ -100,23 +120,19 @@ def build_dcf_inputs(
     tax = as_decimal(require(ranges, "effective_tax_rate"))
     growth = as_decimal(require(ranges, "revenue_growth"))
 
-    cfo = require(ranges, "operating_cash_flow").base
-    capex = abs(require(ranges, "capex").base)
-    interest = abs(require(ranges, "interest_expense").base)
-    shares_range = require(ranges, "diluted_shares")
-    shares = to_millions(shares_range)
-    net_debt = require(ranges, "net_debt").base
+    cfo = to_millions(require(ranges, "operating_cash_flow"))
+    capex = abs(to_millions(require(ranges, "capex")))
+    interest = abs(to_millions(require(ranges, "interest_expense")))
+    shares = to_millions(require(ranges, "diluted_shares"))
+    net_debt = to_millions(require(ranges, "net_debt"))
 
     # Rule 1: rebuild a firm-level cash flow from a levered starting point.
     fcff = cfo + interest * (1 - tax) - capex
 
-    if "discount_rate" not in market or "terminal_growth" not in market:
-        raise BridgeError(
-            "discount_rate and terminal_growth are market/judgment inputs and "
-            "must be supplied with an as_of date; they are not in the filing"
-        )
-    discount = market["discount_rate"].value
-    terminal = market["terminal_growth"].value
+    discount_input = _market(market, "discount_rate")
+    terminal_input = _market(market, "terminal_growth")
+    discount = discount_input.value
+    terminal = terminal_input.value
 
     assumptions = [
         Assumption("base_cash_flow", fcff, "filing",
@@ -127,12 +143,10 @@ def build_dcf_inputs(
         Assumption("growth_year_1", growth, "filing",
                    ranges["revenue_growth"].rationale[:150]),
         Assumption("terminal_growth", terminal, "analyst_judgment",
-                   f"{market['terminal_growth'].rationale} "
-                   f"[as of {market['terminal_growth'].as_of}]"),
+                   f"{terminal_input.rationale} [as of {terminal_input.as_of}]"),
         Assumption("discount_rate", discount, "market",
-                   f"{market['discount_rate'].rationale} "
-                   f"[{market['discount_rate'].source}, "
-                   f"as of {market['discount_rate'].as_of}]"),
+                   f"{discount_input.rationale} "
+                   f"[{discount_input.source}, as of {discount_input.as_of}]"),
         Assumption("shares_outstanding", shares, "filing",
                    ranges["diluted_shares"].rationale[:150]),
         Assumption("net_debt", net_debt, "filing",
@@ -150,26 +164,44 @@ def build_dcf_inputs(
         assumptions=assumptions,
     )
 
-    # Tornado bounds come from OBSERVED dispersion, not from bounds chosen by
-    # hand. A tornado measures the ranges it is given, so hand-picked bounds
-    # decide their own winner before the calculation runs.
-    tornado = {}
+    # A tornado measures the ranges it is given, so every driver must be present
+    # and every bound must mean something. A parameter left out is reported as
+    # irrelevant by omission, and a zero-width bound is reported as having no
+    # effect at all - both look like findings and are artefacts.
+    tornado: dict[str, tuple[float, float]] = {}
+
     growth_range = ranges["revenue_growth"]
     if growth_range.low is not None and growth_range.high is not None:
         span = (growth_range.high - growth_range.low) / 100.0 / 2
-        tornado["growth_rates_shift"] = (-span, span)
+        if span:
+            tornado["growth_rates_shift"] = (-span, span)
 
-    cash = ranges["operating_cash_flow"]
-    if cash.low is not None and cash.high is not None:
-        low_fcff = cash.low + interest * (1 - tax) - capex
-        high_fcff = cash.high + interest * (1 - tax) - capex
-        tornado["base_cash_flow"] = (low_fcff, high_fcff)
+    # Level quantities carry no historical band by construction, so a bound for
+    # cash flow must come from the volatile component rather than from prior
+    # years of the level itself.
+    capex_values = [abs(o.value) for o in ranges["capex"].observations]
+    if capex_values and max(capex_values) != min(capex_values):
+        tornado["base_cash_flow"] = (
+            cfo + interest * (1 - tax) - max(capex_values),
+            cfo + interest * (1 - tax) - min(capex_values),
+        )
+
+    # The discount rate dominated the tornado in ch09 and must never be absent.
+    # Bounds are declared judgment, not derivation: plus or minus 200bp around
+    # the stated rate, and the terminal band stops below the engine's 3% guard.
+    tornado["discount_rate"] = (discount - 0.02, discount + 0.02)
+    tornado["terminal_growth"] = (
+        max(0.0, terminal - 0.01), min(0.029, terminal + 0.005)
+    )
 
     notes = [
         f"FCFF rebuilt from CFO: {cfo:,.0f} + {interest:,.0f} x (1 - {tax:.1%}) "
         f"- {capex:,.0f} = {fcff:,.0f}",
         f"Growth fades {growth:.1%} -> {terminal:.1%} over {forecast_years} years "
         "(linear; a modelling choice, not a derivation)",
-        "discount_rate and terminal_growth are not derivable from the filing",
+        f"discount_rate {discount:.2%} from {discount_input.source} "
+        f"as of {discount_input.as_of}; not derivable from the filing",
+        "Tornado bounds for discount_rate and terminal_growth are declared "
+        "judgment; the others come from observed dispersion",
     ]
     return Bridged(inputs=inputs, tornado_ranges=tornado, notes=notes)

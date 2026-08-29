@@ -1,0 +1,20 @@
+{
+  "UBER_FY2024": {
+        "discount_rate": {
+      "name": "discount_rate",
+      "value": 0.09,
+      "unit": "decimal",
+      "as_of": "2026-08-27",
+      "source": "integration test",
+      "rationale": "NOT A VALUATION INPUT. Round-number rate used only to prove the pipeline runs end to end. Not built bottom-up: no industry beta, no risk-free rate, no ERP, no country risk premium, no market-weight capital structure. Any output from this run is an integration test result."
+    },
+    "terminal_growth": {
+      "name": "terminal_growth",
+      "value": 0.025,
+      "unit": "decimal",
+      "as_of": "2026-08-27",
+      "source": "analyst judgment",
+      "rationale": "Below long-run nominal GDP growth, per the g<3% constraint enforced by the engine."
+    }
+  }
+}
