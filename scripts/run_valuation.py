@@ -14,6 +14,7 @@ from aleph.schemas import DocumentRecord
 from aleph.schemas.valuation import MarketAssumption, Override
 from aleph.valuation import derive_all
 from aleph.valuation.bridge import BridgeError, build_dcf_inputs
+from aleph.valuation import build_wacc
 
 from dcf_engine import DCFConsistencyError, reverse_dcf, run_dcf, sensitivity_tornado
 
@@ -70,11 +71,47 @@ if blocked:
     sys.exit(1)
 
 try:
+    wacc = build_wacc(ranges, market)
+except BridgeError as exc:
+    print(f"\nWACC NOT BUILT: {exc}")
+    wacc = None
+
+if wacc:
+    print("\n" + "=" * 74)
+    print("WACC (bottom-up)")
+    print("=" * 74)
+    for note in wacc.notes:
+        print(f"  {note}")
+
+    market["discount_rate"] = MarketAssumption(
+        name="discount_rate", value=wacc.wacc, unit="decimal",
+        as_of=market["risk_free_rate"].as_of, source="derived bottom-up",
+        rationale=" | ".join(wacc.notes[:3]),
+    )
+
+    # Once the discount rate is derived, a hand-picked band around it is
+    # arbitrary and hides the component actually driving it. Bounds are
+    # recomputed by rerunning WACC at the beta bounds instead.
+    beta_base = market["unlevered_industry_beta"].value
+    beta_bounds = []
+    for label, beta in (("low", beta_base * 0.75), ("high", beta_base * 1.45)):
+        trial = dict(market)
+        trial["unlevered_industry_beta"] = market["unlevered_industry_beta"].model_copy(
+            update={"value": beta}
+        )
+        beta_bounds.append(build_wacc(ranges, trial).wacc)
+    print(f"  WACC at beta {beta_base * 0.75:.2f} / {beta_base:.2f} / "
+          f"{beta_base * 1.45:.2f}: {beta_bounds[0]:.2%} / {wacc.wacc:.2%} / "
+          f"{beta_bounds[1]:.2%}")
+
+try:
     bridged = build_dcf_inputs(ranges, market)
 except BridgeError as exc:
     print(f"\nBRIDGE FAILED: {exc}")
     sys.exit(1)
-
+if wacc:
+    bridged.tornado_ranges["discount_rate"] = (beta_bounds[0], beta_bounds[1])
+    
 print("\n" + "=" * 74)
 print("BRIDGE NOTES")
 print("=" * 74)

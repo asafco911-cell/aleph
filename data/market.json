@@ -1,44 +1,68 @@
 {
   "UBER_FY2024": {
     "terminal_growth": {
-      "name": "terminal_growth", "value": 0.025, "unit": "decimal",
-      "as_of": "2026-08-27", "source": "analyst judgment",
+      "name": "terminal_growth",
+      "value": 0.025,
+      "unit": "decimal",
+      "as_of": "2026-08-28",
+      "source": "analyst judgment",
       "rationale": "Below long-run nominal GDP growth, per the g<3% constraint enforced by the engine."
     },
     "risk_free_rate": {
-      "name": "risk_free_rate", "value": 0.0, "unit": "decimal",
-      "as_of": "", "source": "placeholder",
-      "rationale": "Use the 10Y US Treasury yield on the valuation date. Record the date."
+      "name": "risk_free_rate",
+      "value": 0.0467,
+      "unit": "decimal",
+      "as_of": "2026-08-28",
+      "source": "US 10Y Treasury yield",
+      "rationale": "10Y matches the USD denomination and the 10-year explicit forecast horizon."
     },
     "equity_risk_premium": {
-      "name": "equity_risk_premium", "value": 0.0, "unit": "decimal",
-      "as_of": "", "source": "placeholder",
-      "rationale": "Mature-market ERP. Damodaran publishes a monthly implied series."
+      "name": "equity_risk_premium",
+      "value": 0.0423,
+      "unit": "decimal",
+      "as_of": "2026-01-01",
+      "source": "Aswath Damodaran - Implied Equity Risk Premium, United States",
+      "rationale": "MATURE-MARKET ERP ONLY; country risk is added separately, so a country-weighted ERP here would double count. KNOWN MISMATCH: this is the January 2026 reading paired with an August 2026 risk-free rate. Damodaran recomputes the implied ERP from the prevailing risk-free rate each month, so the two inputs describe different market states. Replace with the latest monthly publication."
     },
     "unlevered_industry_beta": {
-      "name": "unlevered_industry_beta", "value": 0.0, "unit": "decimal",
-      "as_of": "", "source": "placeholder",
-      "rationale": "Bottom-up: unlevered beta of the peer group, not a regression on Uber's own stock."
+      "name": "unlevered_industry_beta",
+      "value": 0.81,
+      "unit": "decimal",
+      "as_of": "2026-01",
+      "source": "Aswath Damodaran - US Industry Betas, Business & Consumer Services, unlevered beta corrected for cash",
+      "rationale": "Bottom-up industry beta rather than Uber's single-stock regression beta. Business & Consumer Services is a better economic proxy for a platform-based mobility and delivery marketplace than asset-heavy Transportation. Damodaran reports 0.77 unlevered, 0.81 corrected for cash. The engine relevers via Hamada. The industry choice is itself the judgement here: a Software (Internet) or Transportation classification would produce a materially different beta."
     },
     "debt_spread": {
-      "name": "debt_spread", "value": 0.0, "unit": "decimal",
-      "as_of": "", "source": "placeholder",
-      "rationale": "Spread over risk-free implied by Uber's credit rating or its actual issuance yields."
+      "name": "debt_spread",
+      "value": 0.0111,
+      "unit": "decimal",
+      "as_of": "2026-01",
+      "source": "Aswath Damodaran - Ratings, Interest Coverage Ratios and Default Spread",
+      "rationale": "Spread over the risk-free rate, not the full yield; the engine computes (risk_free + spread). Damodaran's January 2026 spread for Baa2/BBB large non-financial service firms is 1.11%. Uber is rated BBB+ by S&P but the table has no BBB+ bucket, so BBB is used as a conservative and reproducible proxy: a wider spread raises WACC and lowers value."
     },
     "country_risk_premium": {
-      "name": "country_risk_premium", "value": 0.0, "unit": "decimal",
-      "as_of": "", "source": "placeholder",
-      "rationale": "JUDGEMENT, NOT A DERIVATION. Note 13 gives US 21,429, UK 8,373, all other 14,176 - 32 percent of revenue sits in an undisaggregated bucket whose per-country split is not disclosed. State a premium and say what mix you assumed and why."
+      "name": "country_risk_premium",
+      "value": 0.0064,
+      "unit": "decimal",
+      "as_of": "2026-08-28",
+      "source": "analyst judgment, weighted on Uber FY2024 Note 13 geographic revenue",
+      "rationale": "ASSUMED ZERO, WHICH IS A DIRECTIONAL ASSUMPTION, NOT A NEUTRAL ONE. FY2024 revenue by geography: US 21,429 (48%), UK 8,373 (19%), all other countries 14,176 (32%). US and UK are mature markets carrying no country premium by convention, so the weight in question is the disclosed 32% and only the premium of that bucket is unobservable. Setting CRP to zero asserts that the undisaggregated bucket carries US-level risk, which almost certainly understates cost of equity and therefore overstates value. The arithmetic frame for a non-zero base case is CRP = 0.32 x assumed bucket premium. Revisit before treating any output as a valuation."
     },
     "share_price": {
-      "name": "share_price", "value": 0.0, "unit": "USD",
-      "as_of": "", "source": "placeholder",
-      "rationale": "Closing price on the valuation date, for market-weight capital structure."
+      "name": "share_price",
+      "value": 76.95,
+      "unit": "USD",
+      "as_of": "2026-08-27",
+      "source": "NYSE close",
+      "rationale": "Closing price on August 27, 2026, for market-value capital structure. Shares an as_of with the risk-free rate to within one trading day."
     },
     "discount_rate": {
-      "name": "discount_rate", "value": 0.09, "unit": "decimal",
-      "as_of": "2026-08-27", "source": "integration test",
-      "rationale": "NOT A VALUATION INPUT. Round-number rate used only to prove the pipeline runs end to end. Superseded once WACC is built bottom-up from the six components above."
+      "name": "discount_rate",
+      "value": 0.09,
+      "unit": "decimal",
+      "as_of": "2026-08-28",
+      "source": "integration test",
+      "rationale": "NOT A VALUATION INPUT. Round-number rate proving the pipeline runs end to end. Superseded the moment build_wacc is wired into run_valuation."
     }
   }
 }
