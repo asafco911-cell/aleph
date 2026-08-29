@@ -52,16 +52,22 @@ def _get(market: dict[str, MarketAssumption], name: str) -> MarketAssumption:
 
 
 def geographic_mix(ranges: dict[str, AssumptionRange]) -> list[str]:
-    """Report the disclosed revenue mix so a CRP judgement is made against it."""
+    """Report the disclosed revenue mix so a CRP judgement is made against it.
+
+    Shares are computed against the sum of the components themselves, which is
+    only meaningful because derive_geographic_revenue guarantees a single
+    breakdown with stated totals removed.
+    """
     mix = ranges.get("geographic_revenue")
     if mix is None or not mix.observations:
-        return ["geographic revenue mix not extracted"]
-    total = sum(abs(o.value) for o in mix.observations) or 1.0
+        return ["geographic revenue mix not disclosed"]
+    total = sum(abs(o.value) for o in mix.observations)
+    if not total:
+        return ["geographic revenue mix sums to zero"]
     return [
         f"{o.fact_name}: {o.value:,.0f} ({abs(o.value) / total:.0%})"
         for o in mix.observations
     ]
-
 
 def build_wacc(
     ranges: dict[str, AssumptionRange],

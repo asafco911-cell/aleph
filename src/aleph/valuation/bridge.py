@@ -21,13 +21,15 @@ from dataclasses import dataclass
 
 from ..schemas.valuation import AssumptionRange, MarketAssumption
 
-SCALE_TO_MILLIONS = {
-    "USD millions": 1.0,
-    "millions": 1.0,
-    "thousands": 0.001,
-    "USD thousands": 0.001,
-    "billions": 1000.0,
-}
+# Scale is matched on tokens, not on an exact string. The unit is free text
+# chosen by the model, so "thousands", "USD thousands" and "thousands of
+# shares" all describe the same scale and an exact-match table breaks on the
+# first phrasing it has not seen.
+SCALE_TOKENS = (
+    ("billion", 1000.0),
+    ("million", 1.0),
+    ("thousand", 0.001),
+)
 
 PLACEHOLDER_SOURCES = ("placeholder", "todo", "tbd")
 
@@ -57,9 +59,10 @@ def as_decimal(assumption: AssumptionRange, which: str = "base") -> float:
     value = getattr(assumption, which)
     if value is None:
         raise BridgeError(f"{assumption.name}: {which} is unset ({assumption.status})")
-    if assumption.unit == "percent":
+    unit = assumption.unit.lower()
+    if "percent" in unit or unit.strip() == "%":
         return value / 100.0
-    if assumption.unit in ("decimal", "ratio"):
+    if unit in ("decimal", "ratio"):
         return value
     raise BridgeError(
         f"{assumption.name}: unit '{assumption.unit}' cannot be read as a rate"
@@ -71,13 +74,15 @@ def to_millions(assumption: AssumptionRange, which: str = "base") -> float:
     value = getattr(assumption, which)
     if value is None:
         raise BridgeError(f"{assumption.name}: {which} is unset ({assumption.status})")
-    scale = SCALE_TO_MILLIONS.get(assumption.unit)
-    if scale is None:
+
+    unit = assumption.unit.lower()
+    matches = [scale for token, scale in SCALE_TOKENS if token in unit]
+    if len(matches) != 1:
         raise BridgeError(
-            f"{assumption.name}: unit '{assumption.unit}' has no known scale; "
-            "add it to SCALE_TO_MILLIONS rather than assuming"
+            f"{assumption.name}: unit '{assumption.unit}' names "
+            f"{len(matches)} known scales; cannot convert without guessing"
         )
-    return value * scale
+    return value * matches[0]
 
 
 def fade(start: float, end: float, years: int) -> list[float]:
@@ -179,7 +184,8 @@ def build_dcf_inputs(
     # Level quantities carry no historical band by construction, so a bound for
     # cash flow must come from the volatile component rather than from prior
     # years of the level itself.
-    capex_values = [abs(o.value) for o in ranges["capex"].observations]
+    capex_scale = to_millions(ranges["capex"]) / (ranges["capex"].base or 1.0)
+    capex_values = [abs(o.value) * capex_scale for o in ranges["capex"].observations]
     if capex_values and max(capex_values) != min(capex_values):
         tornado["base_cash_flow"] = (
             cfo + interest * (1 - tax) - max(capex_values),

@@ -26,15 +26,29 @@ MAX_RELATIVE_SPREAD = 1.0  # see ISSUES.md #13: scale-dependent, per-quantity li
 
 
 def _observations(
-    facts: list[Fact], *name_contains: str, exclude: tuple[str, ...] = ()
+    facts: list[Fact],
+    *name_contains: str,
+    exclude: tuple[str, ...] = (),
+    exclude_targets: tuple[str, ...] = (),
 ) -> tuple[list[Observation], list[str]]:
-    """Return (one observation per period, collision descriptions)."""
+    """Return (one observation per period, collision descriptions).
+
+    exclude_targets removes facts by their extraction target rather than by
+    name. A geographic breakdown restates the same total under a different
+    label, so it collides with the income statement total while adding nothing;
+    excluding the target is precise, while excluding a name fragment would be a
+    guess about wording.
+    """
     found: dict[str, Observation] = {}
     collisions: list[str] = []
 
     for fact in facts:
         name = fact.name.lower()
         if fact.period is None:
+            continue
+        if fact.source and any(
+            fact.source.target_key.startswith(prefix) for prefix in exclude_targets
+        ):
             continue
         if not all(token.lower() in name for token in name_contains):
             continue
@@ -175,8 +189,14 @@ def _doc_ids(facts: list[Fact]) -> list[str]:
 
 
 def derive_growth(facts, overrides) -> AssumptionRange:
-    """Year-over-year revenue growth, one observation per consecutive pair."""
-    totals, collisions = _observations(facts, "total revenue")
+    """Year-over-year revenue growth from the income statement total.
+
+    Geographic and segment breakdowns restate the same total under different
+    labels, so they are excluded here rather than allowed to collide with it.
+    """
+    totals, collisions = _observations(
+        facts, "total revenue", exclude_targets=("geography",)
+    )
     pairs = [
         Observation(period=current.period,
                     value=(current.value / previous.value - 1.0) * 100.0,
@@ -188,9 +208,32 @@ def derive_growth(facts, overrides) -> AssumptionRange:
 
 
 def derive_tax_rate(facts, overrides) -> AssumptionRange:
-    observations, collisions = _observations(facts, "effective income tax rate")
-    return build_trend("effective_tax_rate", "percent", observations, collisions,
-                       overrides.get("effective_tax_rate"), _doc_ids(facts))
+    """Effective tax rate, stated if disclosed as a percentage, else computed.
+
+    Presentation varies: some filers state the rate, others reconcile only in
+    dollars. Computing provision over pretax income is the definition of the
+    rate, so it is filer-independent and is used whenever the components are
+    available.
+    """
+    stated, collisions = _observations(facts, "effective income tax rate")
+    if stated:
+        return build_trend("effective_tax_rate", "percent", stated, collisions,
+                           overrides.get("effective_tax_rate"), _doc_ids(facts))
+
+    provision, clash_a = _observations(facts, "provision for income taxes")
+    pretax, clash_b = _observations(facts, "before income taxes")
+    by_period = {o.period: o for o in pretax}
+
+    computed = [
+        Observation(period=p.period,
+                    value=(p.value / by_period[p.period].value) * 100.0,
+                    fact_name=f"{p.fact_name} over {by_period[p.period].fact_name}")
+        for p in provision
+        if p.period in by_period and by_period[p.period].value
+    ]
+    return build_trend("effective_tax_rate", "percent", computed,
+                       clash_a + clash_b, overrides.get("effective_tax_rate"),
+                       _doc_ids(facts))
 
 
 def derive_operating_cash_flow(facts, overrides) -> AssumptionRange:
@@ -218,25 +261,45 @@ def derive_diluted_shares(facts, overrides) -> AssumptionRange:
 
 
 def derive_geographic_revenue(facts, overrides) -> AssumptionRange:
-    """Revenue by geography, for the CRP judgement. Not itself a WACC input."""
-    regions = ("united states revenue", "united kingdom revenue",
-               "all other countries revenue")
-    observations, collisions = [], []
-    for region in regions:
-        found, clashes = _observations(facts, region)
-        observations.extend(found)
-        collisions.extend(clashes)
+    """Revenue by geography, for the CRP judgement. Not itself a WACC input.
 
-    if not observations:
+    Region names are filer-specific, so facts are selected by the extraction
+    target that produced them rather than by matching region wording.
+
+    A filing can disclose SEVERAL geographic breakdowns on different axes: Uber
+    reports US&CAN/LatAm/EMEA/APAC in its revenue note and US/UK/all-other in
+    its segment note. Both are complete and they are not additive, so merging
+    them quadruples the denominator and reports the United States at 12 percent
+    of revenue when it is 49. One breakdown is chosen - the most granular - and
+    stated totals are excluded so the parts sum to the whole.
+    """
+    by_target: dict[str, list[Observation]] = {}
+    for fact in facts:
+        if not (fact.source and fact.period):
+            continue
+        if not fact.source.target_key.startswith("geography"):
+            continue
+        if "total" in fact.name.lower():
+            continue  # A stated total is the denominator, not a component.
+        by_target.setdefault(fact.source.target_key, []).append(
+            Observation(period=fact.period, value=fact.value, fact_name=fact.name)
+        )
+
+    if not by_target:
         return _blocked("geographic_revenue", "USD millions", [], [],
-                        "geography facts not pooled; check the extraction targets",
+                        "no geographic revenue disclosed in any candidate note; "
+                        "a country risk premium cannot be weighted against the mix",
                         _doc_ids(facts))
 
-    latest = max(o.period for o in observations)
+    # Most granular breakdown wins: more regions means a tighter CRP judgement.
+    chosen = max(
+        by_target.values(),
+        key=lambda rows: len({r.fact_name.rsplit(" ", 1)[0] for r in rows}),
+    )
+    latest = max(o.period for o in chosen)
     return build_level("geographic_revenue", "USD millions",
-                       [o for o in observations if o.period == latest], collisions,
+                       [o for o in chosen if o.period == latest], [],
                        overrides.get("geographic_revenue"), _doc_ids(facts))
-
 
 def derive_net_debt(facts, overrides) -> AssumptionRange:
     """Net debt is NOT derived. It is blocked until the analyst states a policy.

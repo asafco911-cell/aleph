@@ -15,27 +15,13 @@ import streamlit as st
 sys.path.insert(0, str(Path("src/aleph/valuation")))
 
 from aleph.extraction import extract
+from aleph.extraction.targets import resolve_targets
 from aleph.schemas import DocumentRecord
 from aleph.schemas.valuation import MarketAssumption, Override
 from aleph.valuation import build_wacc, derive_all
 from aleph.valuation.bridge import BridgeError, build_dcf_inputs
 
 from dcf_engine import reverse_dcf, run_dcf, sensitivity_tornado
-
-TARGETS = [
-    ("note:13", "Extract revenue by reportable segment for each year."),
-    ("note:13", "Extract revenue by geography."),
-    ("note:11", "Extract the effective tax rate and the provision for income taxes."),
-    ("statement:cash_flows",
-     "Extract net cash provided by operating activities and purchases of "
-     "property and equipment."),
-    ("statement:operations",
-     "Extract diluted weighted-average shares outstanding, interest expense, "
-     "and net income attributable to Uber Technologies, Inc."),
-    ("statement:balance_sheet",
-     "Extract cash and cash equivalents, short-term investments, restricted "
-     "cash, and long-term debt net of current portion."),
-]
 
 # Ordered weakest-last. A composite inherits the weakest grade in its chain.
 GRADES = {
@@ -65,12 +51,19 @@ def load_manifest() -> list[dict]:
 
 @st.cache_data(show_spinner="Extracting and validating facts...")
 def pipeline(doc_id: str) -> dict:
-    """Run the whole chain for one document. Cached at the extraction layer too."""
+    """Run the whole chain for one document.
+
+    Targets are resolved per filing rather than hardcoded: note numbering
+    differs between filers, so a fixed number reads the wrong note silently.
+    """
     record = next(DocumentRecord(**r) for r in load_manifest() if r["doc_id"] == doc_id)
 
-    facts, rejected_all = [], []
-    for target, question in TARGETS:
-        accepted, rejected, _ = extract(record, target, question)
+    facts, rejected_all, skipped = [], [], []
+    for key, target, question, required in resolve_targets(record):
+        if target.startswith("UNRESOLVED"):
+            skipped.append(key)
+            continue
+        accepted, rejected, _ = extract(record, target, question, target_key=key)
         facts.extend(accepted)
         rejected_all.extend(rejected)
 
@@ -92,12 +85,17 @@ def pipeline(doc_id: str) -> dict:
 
     result = {
         "record": record, "facts": facts, "rejected": rejected_all,
-        "ranges": ranges, "market": market, "blocked": blocked,
+        "skipped": skipped, "ranges": ranges, "market": market, "blocked": blocked,
     }
     if blocked:
         return result
 
-    wacc = build_wacc(ranges, market)
+    try:
+        wacc = build_wacc(ranges, market)
+    except BridgeError as exc:
+        result["wacc_error"] = str(exc)
+        return result
+
     market["discount_rate"] = MarketAssumption(
         name="discount_rate", value=wacc.wacc, unit="decimal",
         as_of=market["risk_free_rate"].as_of, source="derived bottom-up",
@@ -141,6 +139,9 @@ st.sidebar.caption(
     f"{record.company}\nFY{record.fiscal_year} 10-K, {record.n_pages} pages\n"
     f"sha256 {record.sha256[:16]}"
 )
+if data["skipped"]:
+    st.sidebar.caption(f"Not disclosed by this filer: {', '.join(data['skipped'])}")
+
 st.sidebar.markdown("**Provenance grades**")
 for key in GRADE_ORDER:
     _, _, meaning = GRADES[key]
@@ -150,6 +151,10 @@ if data["blocked"]:
     st.error("Valuation blocked. Unverifiable inputs are not smoothed over.")
     for item in data["blocked"]:
         st.markdown(f"**{item.name}** — {item.rationale}")
+    st.stop()
+
+if "wacc_error" in data:
+    st.error(f"WACC not built: {data['wacc_error']}")
     st.stop()
 
 dcf, tornado = data["dcf"], data["tornado"]
@@ -222,7 +227,8 @@ with tab_evidence:
             st.markdown(badge("filing"), unsafe_allow_html=True)
             st.code(fact.quote, language=None)
             st.caption(
-                f"{record.doc_id} - {fact.source.kind} {fact.source.ref}, "
+                f"{record.doc_id} - {fact.source.kind} {fact.source.ref} "
+                f"(target {fact.source.target_key or 'n/a'}), "
                 f"PDF pages {fact.source.pages} - "
                 f"file {record.file_name} - sha256 {record.sha256[:16]}"
             )

@@ -2,6 +2,9 @@
 
 Blocked assumptions stop the run. A valuation built on a smoothed-over blocked
 input looks exactly like one built on evidence.
+
+Targets are resolved per filing rather than hardcoded: note numbering differs
+between filers, so a fixed number reads the wrong note without complaint.
 """
 import json
 import sys
@@ -10,28 +13,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path("src/aleph/valuation")))  # engine imports by bare name
 
 from aleph.extraction import extract
+from aleph.extraction.targets import resolve_targets
 from aleph.schemas import DocumentRecord
 from aleph.schemas.valuation import MarketAssumption, Override
-from aleph.valuation import derive_all
+from aleph.valuation import build_wacc, derive_all
 from aleph.valuation.bridge import BridgeError, build_dcf_inputs
-from aleph.valuation import build_wacc
 
 from dcf_engine import DCFConsistencyError, reverse_dcf, run_dcf, sensitivity_tornado
-
-TARGETS = [
-    ("note:13", "Extract revenue by reportable segment for each year."),
-    ("note:11", "Extract the effective tax rate and the provision for income taxes."),
-    ("statement:cash_flows",
-     "Extract net cash provided by operating activities and purchases of "
-     "property and equipment."),
-    ("statement:operations",
-     "Extract diluted weighted-average shares outstanding, interest expense, "
-     "and net income attributable to Uber Technologies, Inc."),
-    ("statement:balance_sheet",
-     "Extract cash and cash equivalents, short-term investments, restricted "
-     "cash, and long-term debt net of current portion."),
-    ("note:13", "Extract revenue by geography."),
-]
 
 doc_id = sys.argv[1]
 market_price = float(sys.argv[2]) if len(sys.argv) > 2 else None
@@ -43,10 +31,13 @@ record = next(
 )
 
 facts = []
-for target, question in TARGETS:
-    accepted, rejected, _ = extract(record, target, question)
-    if rejected:
-        print(f"  WARNING {target}: {len(rejected)} facts rejected by gates")
+for key, target, question, required in resolve_targets(record):
+    if target.startswith("UNRESOLVED"):
+        print(f"  SKIP {key}: not disclosed by this filer")
+        continue
+    accepted, rejected, _ = extract(record, target, question, target_key=key)
+    print(f"  {key:<14} {target:<12} accepted={len(accepted):>2} "
+          f"rejected={len(rejected):>2}")
     facts.extend(accepted)
 
 overrides = {
@@ -63,11 +54,11 @@ market = {
 }
 
 ranges = {a.name: a for a in derive_all(facts, overrides)}
-blocked = [a.name for a in ranges.values() if a.status == "blocked"]
+blocked = [a for a in ranges.values() if a.status == "blocked"]
 if blocked:
-    print(f"\nBLOCKED: {blocked}")
-    for name in blocked:
-        print(f"  {name}: {ranges[name].rationale}")
+    print(f"\nBLOCKED: {[a.name for a in blocked]}")
+    for item in blocked:
+        print(f"  {item.name}: {item.rationale}")
     sys.exit(1)
 
 try:
@@ -76,6 +67,7 @@ except BridgeError as exc:
     print(f"\nWACC NOT BUILT: {exc}")
     wacc = None
 
+beta_bounds = None
 if wacc:
     print("\n" + "=" * 74)
     print("WACC (bottom-up)")
@@ -90,14 +82,14 @@ if wacc:
     )
 
     # Once the discount rate is derived, a hand-picked band around it is
-    # arbitrary and hides the component actually driving it. Bounds are
-    # recomputed by rerunning WACC at the beta bounds instead.
+    # arbitrary and hides the component actually driving it. Bounds come from
+    # rerunning WACC at the beta bounds instead.
     beta_base = market["unlevered_industry_beta"].value
     beta_bounds = []
-    for label, beta in (("low", beta_base * 0.75), ("high", beta_base * 1.45)):
+    for factor in (0.75, 1.45):
         trial = dict(market)
         trial["unlevered_industry_beta"] = market["unlevered_industry_beta"].model_copy(
-            update={"value": beta}
+            update={"value": beta_base * factor}
         )
         beta_bounds.append(build_wacc(ranges, trial).wacc)
     print(f"  WACC at beta {beta_base * 0.75:.2f} / {beta_base:.2f} / "
@@ -109,9 +101,10 @@ try:
 except BridgeError as exc:
     print(f"\nBRIDGE FAILED: {exc}")
     sys.exit(1)
-if wacc:
+
+if beta_bounds:
     bridged.tornado_ranges["discount_rate"] = (beta_bounds[0], beta_bounds[1])
-    
+
 print("\n" + "=" * 74)
 print("BRIDGE NOTES")
 print("=" * 74)
@@ -142,7 +135,7 @@ print(f"  Terminal value is {result.terminal_pct:.0%} of total")
 
 if bridged.tornado_ranges:
     print("\n" + "=" * 74)
-    print("TORNADO (bounds from observed dispersion, not hand-picked)")
+    print("TORNADO")
     print("=" * 74)
     for row in sensitivity_tornado(bridged.inputs, bridged.tornado_ranges):
         if row["swing"] is None:

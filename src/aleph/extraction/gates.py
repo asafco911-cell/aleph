@@ -8,10 +8,15 @@ Column semantics are resolved LOCALLY, from the nearest header ABOVE the quoted
 row, with no distance ceiling: measured, the cash flow statement's header sits
 26 rows above its data while the segment note's sits 2 rows above.
 
-Column ORDER is never assumed. Uber's cash flow statement runs 2022 2023 2024
-while its balance sheet runs 2023 2024, so any rule of the form "the last
-column is the most recent year" works on one statement and silently mis-assigns
-on the other.
+Column ORDER is never assumed. Uber's cash flow statement runs 2022 2023 2024,
+its balance sheet runs 2023 2024, and Lyft's cash flow statement runs
+2024 2023 2022, so any rule of the form "the last column is the most recent
+year" works on one statement and silently mis-assigns on another.
+
+Header LAYOUT is not assumed either. Uber prints "As of December 31, 2023 As of
+December 31, 2024" on one line; DoorDash prints the date phrase and each year
+on separate lines. Lone years are therefore accumulated while climbing and
+reversed into printed order.
 """
 import re
 from dataclasses import dataclass
@@ -25,8 +30,8 @@ RE_YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
 MONTHS = ("january|february|march|april|may|june|july|"
           "august|september|october|november|december")
 
-# "As of December 31," / "December 31," - the day number is part of the date and
-# must not be counted as table data.
+# "As of December 31," / "December 31," - the day number is part of the date
+# and must not be counted as table data.
 RE_DATE_PHRASE = re.compile(rf"(?:as\s+of\s+)?(?:{MONTHS})\s+\d{{1,2}},?", re.IGNORECASE)
 
 RE_PERIOD_LINE = re.compile(
@@ -35,6 +40,12 @@ RE_PERIOD_LINE = re.compile(
 )
 
 TOTAL_TOKENS = ("total", "consolidated")
+
+# A running header carrying the registrant's name is not a column axis.
+# "DOORDASH, INC." is two capitalised tokens above a two-column row and passed
+# a purely typographic test.
+ENTITY_MARKERS = ("inc.", "inc", "corp.", "corp", "llc", "ltd.", "ltd",
+                  "plc", "company", "holdings", "technologies")
 
 
 @dataclass
@@ -103,16 +114,17 @@ def _non_year_numbers(line: str) -> list[str]:
 
 
 def _is_label_header(labels: list[str]) -> bool:
-    """Distinguish a column header from a section subheading.
+    """Distinguish a column header from a subheading or a registrant name.
 
-    Word count alone is insufficient: "Costs and expenses" happens to have
-    three words above a three-column row and was read as a column axis. Column
-    headers capitalise every token; section subheadings carry lowercase
-    function words. This is a typographic convention rather than a rule, but it
-    fails safe - a rejected real header yields columns_undetermined, never a
-    false accept.
+    Word count alone is insufficient: "Costs and expenses" has three words
+    above a three-column row, and "DOORDASH, INC." has two above a two-column
+    row. Column headers capitalise every token AND name no legal entity. The
+    test fails safe - a rejected real header yields columns_undetermined, never
+    a false accept.
     """
-    return bool(labels) and all(token[:1].isupper() for token in labels)
+    if not labels or not all(token[:1].isupper() for token in labels):
+        return False
+    return not any(token.lower().strip(",") in ENTITY_MARKERS for token in labels)
 
 
 def _find_line(lines: list[str], quote: str) -> int:
@@ -130,7 +142,7 @@ def _find_period_above(lines: list[str], start: int) -> str | None:
         line = lines[index].strip()
         if not line:
             continue
-        bare = _strip_dates(line)
+        bare = _strip_dates(line).strip()
         years = RE_YEAR.findall(bare)
         if RE_PERIOD_LINE.match(line):
             if len(years) == 1:
@@ -150,25 +162,46 @@ def resolve_axis(source_text: str, quote: str, n_cells: int) -> Axis:
     if row < 0 or n_cells == 0:
         return Axis("unknown", [])
 
+    # Years printed one per line are collected while climbing. Collection runs
+    # bottom-up, so the printed order is the reverse.
+    stacked: list[str] = []
+
     for index in range(row - 1, -1, -1):
         line = lines[index].strip()
         if not line:
             continue
 
-        bare = _strip_dates(line)
-        years = RE_YEAR.findall(bare)
+        bare = _strip_dates(line).strip()
+        if not bare:
+            continue  # A pure date phrase: still inside the header block.
 
-        # A run of years and nothing else is a year axis, in the order printed.
-        if len(years) >= 2 and not _non_year_numbers(bare):
+        years = RE_YEAR.findall(bare)
+        others = _non_year_numbers(bare)
+
+        if len(years) >= 2 and not others:
             return Axis("years", [f"FY{year}" for year in years])
 
-        # A line with no numbers is a label axis when it has one label per
-        # cell. Word count is the only structure PDF extraction preserves here.
+        if len(years) == 1 and not others:
+            # The same year appearing twice while climbing means the lines
+            # being collected are not one column header. Two identical labels
+            # make index() unreachable for the second column, so the axis is
+            # abandoned rather than reported.
+            if years[0] in stacked:
+                return Axis("unknown", [])
+            stacked.append(years[0])
+            if len(stacked) == n_cells:
+                return Axis("years", [f"FY{y}" for y in reversed(stacked)])
+            continue
+
         if not RE_NUMBER.search(line):
             labels = line.split()
             if len(labels) == n_cells and _is_label_header(labels):
                 return Axis("labels", labels, _find_period_above(lines, index))
             continue  # Section subheading or caption: keep climbing.
+
+        # A data row ends the header block; any years collected above it belong
+        # to a different table.
+        stacked = []
 
     return Axis("unknown", [])
 
@@ -194,9 +227,14 @@ def check_value_in_quote(fact: Fact) -> Rejection | None:
     This catches the commonest extraction failure: reading the right table and
     copying the wrong cell. The result is a plausible number with a real
     citation attached, which has no red flag of its own.
+
+    An em dash denotes nil in financial statements, so a zero is satisfied by
+    a dash where a figure would otherwise stand.
     """
     flat = re.sub(r"\s+", "", fact.quote)
     if any(re.sub(r"\s+", "", form) in flat for form in _number_forms(fact.value)):
+        return None
+    if fact.value == 0 and re.search(r"[\u2014\u2013-]", fact.quote):
         return None
     return Rejection(fact.name, "value_in_quote",
                      f"value {fact.value} not present in quote: {fact.quote[:80]!r}")

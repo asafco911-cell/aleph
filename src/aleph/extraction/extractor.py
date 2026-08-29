@@ -32,7 +32,9 @@ RULES:
 - Return JSON only. No prose, no markdown fences."""
 
 
-def resolve_target(record: DocumentRecord, target: str) -> tuple[str, FactSource]:
+def resolve_target(
+    record: DocumentRecord, target: str, target_key: str = ""
+) -> tuple[str, FactSource]:
     """Turn 'statement:cash_flows' or 'note:11' into text plus provenance."""
     kind, _, ref = target.partition(":")
     path = Path("data") / record.file_name
@@ -53,7 +55,10 @@ def resolve_target(record: DocumentRecord, target: str) -> tuple[str, FactSource
     else:
         raise DocumentError(f"unknown target kind '{kind}' (use statement: or note:)")
 
-    return text, FactSource(doc_id=record.doc_id, kind=kind, ref=ref, pages=pages)
+    return text, FactSource(
+        doc_id=record.doc_id, kind=kind, ref=ref,
+        target_key=target_key, pages=pages,
+    )
 
 
 def extract(
@@ -62,10 +67,17 @@ def extract(
     question: str,
     model: str = DEFAULT_MODEL,
     cache: Cache | None = None,
+    target_key: str = "",
 ) -> tuple[list[Fact], list[Rejection], bool]:
-    """Return (accepted, rejected, cache_hit)."""
+    """Return (accepted, rejected, cache_hit).
+
+    target_key is provenance only and is deliberately NOT part of the cache
+    key: the same note asked the same question returns the same answer whoever
+    asked, and including the key would fragment the cache without changing any
+    input the model sees.
+    """
     cache = cache or Cache()
-    source_text, source = resolve_target(record, target)
+    source_text, source = resolve_target(record, target, target_key)
 
     key = Cache.key(
         sha256=record.sha256,

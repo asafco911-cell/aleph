@@ -11,10 +11,19 @@ class FactSource(BaseModel):
     filing: an effective tax rate in MD&A is not necessarily the one in the tax
     note, and geographic revenue under ASC 280 need not match the operational
     split. A number without its origin is not interpretable.
+
+    target_key records WHICH extraction target produced the fact. Region names
+    are filer-specific - Uber reports United States, United Kingdom and all
+    other countries; DoorDash reports United States and international - so
+    downstream selection matches on the target rather than on region wording.
     """
     doc_id: str
     kind: Literal["statement", "note", "section"]
     ref: str = Field(description="Statement name, note number, or item id.")
+    target_key: str = Field(
+        default="",
+        description="Extraction target that produced this fact, e.g. 'geography_n3'.",
+    )
     pages: list[int]
 
 
