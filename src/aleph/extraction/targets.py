@@ -20,8 +20,9 @@ from ..schemas.documents import DocumentRecord
 # not, and the model filled the gap with its own judgement.
 STATEMENT_TARGETS = [
     ("cash_flows", "statement:cash_flows",
-     "Extract net cash provided by operating activities and purchases of "
-     "property and equipment, for each period presented.", True),
+     "Extract net cash provided by operating activities, purchases of "
+     "property and equipment, and stock-based compensation, for each "
+     "period presented.", True),
     ("operations", "statement:operations",
      "Extract total revenue, diluted weighted-average shares outstanding, "
      "interest expense, and net income attributable to the company, for each "

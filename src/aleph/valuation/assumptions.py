@@ -310,6 +310,23 @@ def derive_interest_expense(facts, overrides) -> AssumptionRange:
                        overrides.get("interest_expense"), _doc_ids(facts))
 
 
+def derive_stock_based_compensation(facts, overrides) -> AssumptionRange:
+    """SBC is a cash cost, subtracted from FCFF at full value (see bridge.py).
+
+    "capitalized" excludes DoorDash's second line, "Stock-based compensation
+    included in capitalized software and website development costs" - that
+    portion was capitalised into an asset and already leaves through capex,
+    so subtracting it here too would double count it. The same exclude=
+    mechanism derive_net_debt uses for "restricted".
+    """
+    observations, collisions = _observations(
+        facts, "stock-based compensation", exclude=("capitalized",)
+    )
+    return build_level("stock_based_compensation", "USD millions", observations,
+                       collisions, overrides.get("stock_based_compensation"),
+                       _doc_ids(facts))
+
+
 def derive_diluted_shares(facts, overrides) -> AssumptionRange:
     observations, collisions = _observations(facts, "diluted")
     return build_level("diluted_shares", "thousands", observations, collisions,
@@ -437,8 +454,8 @@ def derive_net_debt(facts, overrides) -> AssumptionRange:
 
 DERIVATIONS = (
     derive_growth, derive_tax_rate, derive_operating_cash_flow, derive_capex,
-    derive_interest_expense, derive_diluted_shares, derive_geographic_revenue,
-    derive_net_debt,
+    derive_interest_expense, derive_stock_based_compensation, derive_diluted_shares,
+    derive_geographic_revenue, derive_net_debt,
 )
 
 

@@ -1,11 +1,11 @@
 """Assemble DCFInputs from derived assumptions. Deterministic, no LLM.
 
-Three consistency rules are enforced here because the engine cannot see them:
+Four consistency rules are enforced here because the engine cannot see them:
 
   1. Numerator and denominator must match. Cash flow from operations is stated
      AFTER interest paid, so it is a levered figure. Discounting it at WACC and
      then subtracting net debt charges for the debt twice. FCFF is therefore
-     reconstructed explicitly: CFO + interest x (1 - tax) - capex.
+     reconstructed explicitly: CFO + interest x (1 - tax) - capex - SBC.
 
   2. Units are converted once, from the DECLARED unit on each range, never
      inferred from magnitude. Cash flow is reported in millions and share
@@ -16,6 +16,14 @@ Three consistency rules are enforced here because the engine cannot see them:
   3. A placeholder discount rate blocks the run. It is the largest single
      driver of the result, so a run on an invented rate produces a number that
      looks like a valuation and is not.
+
+  4. Stock-based compensation is a cash cost, not an accounting add-back to
+     ignore. CFO already adds SBC back to net income, so it silently counts
+     as free cash flow unless removed. Subtracted here at full value - it is
+     already tax-affected inside net income, so no further (1 - tax)
+     adjustment applies. The share count is held flat, deliberately:
+     subtracting SBC from cash flow AND modelling the dilution it funds
+     would double-count the same cost.
 """
 from dataclasses import dataclass
 
@@ -118,11 +126,13 @@ def build_dcf_inputs(
     cfo = to_millions(require(ranges, "operating_cash_flow"))
     capex = abs(to_millions(require(ranges, "capex")))
     interest = abs(to_millions(require(ranges, "interest_expense")))
+    sbc = abs(to_millions(require(ranges, "stock_based_compensation")))
     shares = to_millions(require(ranges, "diluted_shares"))
     net_debt = to_millions(require(ranges, "net_debt"))
 
-    # Rule 1: rebuild a firm-level cash flow from a levered starting point.
-    fcff = cfo + interest * (1 - tax) - capex
+    # Rule 1 + Rule 4: rebuild a firm-level cash flow from a levered starting
+    # point, then remove the cash cost CFO's own reconciliation added back.
+    fcff = cfo + interest * (1 - tax) - capex - sbc
 
     discount_input = _market(market, "discount_rate")
     terminal_input = _market(market, "terminal_growth")
@@ -132,7 +142,7 @@ def build_dcf_inputs(
     assumptions = [
         Assumption("base_cash_flow", fcff, "filing",
                    f"FCFF = CFO {cfo:,.0f} + interest {interest:,.0f} x "
-                   f"(1 - {tax:.1%}) - capex {capex:,.0f}"),
+                   f"(1 - {tax:.1%}) - capex {capex:,.0f} - SBC {sbc:,.0f}"),
         Assumption("effective_tax_rate", tax, "analyst_judgment",
                    ranges["effective_tax_rate"].rationale[:150]),
         Assumption("growth_year_1", growth, "filing",
@@ -142,6 +152,12 @@ def build_dcf_inputs(
         Assumption("discount_rate", discount, "market",
                    f"{discount_input.rationale} "
                    f"[{discount_input.source}, as of {discount_input.as_of}]"),
+        Assumption("stock_based_compensation", sbc, "filing",
+                   "Subtracted from FCFF at full value; already tax-affected "
+                   "inside net income, so no (1 - tax) adjustment applies. "
+                   "Share count is held flat, deliberately: subtracting SBC "
+                   "and also modelling the dilution it funds would "
+                   "double-count the same cost."),
         Assumption("shares_outstanding", shares, "filing",
                    ranges["diluted_shares"].rationale[:150]),
         Assumption("net_debt", net_debt, "filing",
@@ -178,8 +194,8 @@ def build_dcf_inputs(
     capex_values = [abs(o.value) * capex_scale for o in ranges["capex"].observations]
     if capex_values and max(capex_values) != min(capex_values):
         tornado["base_cash_flow"] = (
-            cfo + interest * (1 - tax) - max(capex_values),
-            cfo + interest * (1 - tax) - min(capex_values),
+            cfo + interest * (1 - tax) - max(capex_values) - sbc,
+            cfo + interest * (1 - tax) - min(capex_values) - sbc,
         )
 
     # The discount rate dominated the tornado in ch09 and must never be absent.
@@ -192,7 +208,10 @@ def build_dcf_inputs(
 
     notes = [
         f"FCFF rebuilt from CFO: {cfo:,.0f} + {interest:,.0f} x (1 - {tax:.1%}) "
-        f"- {capex:,.0f} = {fcff:,.0f}",
+        f"- {capex:,.0f} - {sbc:,.0f} (SBC, subtracted at full value, no tax "
+        f"adjustment - already tax-affected inside net income) = {fcff:,.0f}",
+        f"Share count held flat at {shares:,.0f} despite the SBC subtraction "
+        "above: modelling dilution as well would double-count the same cost",
         f"Growth fades {growth:.1%} -> {terminal:.1%} over {forecast_years} years "
         "(linear; a modelling choice, not a derivation)",
         f"discount_rate {discount:.2%} from {discount_input.source} "
