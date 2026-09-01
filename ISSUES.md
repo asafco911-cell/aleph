@@ -425,3 +425,48 @@ reserves, working capital) against a pre-tax loss. This also settles the
 industry-beta decision (#25) after the fact: bending Lyft's beta to close
 this gap would have concealed exactly this result, since the answer is
 demonstrably not inside that band.
+
+**#28 derive_geographic_revenue silently merged two overlapping revenue breakdowns for UBER_FY2025 — CLOSED**
+"Pick the more granular extraction TARGET" worked only as long as a filing's
+two geographic breakdowns arrived from two different notes, which is what
+UBER_FY2024 does (standalone Revenue note for the continent split, Segment
+Information and Geographic Information for the country split). UBER_FY2025
+dropped the standalone Revenue note and merged both breakdowns into Note 13
+- confirmed directly in the note's raw text, both tables back to back, each
+with its own "Total Revenue $52,017" row. With both breakdowns now arriving
+from ONE target, "most granular target" had nothing left to disambiguate:
+all 7 regions from two 4-and-3-way partitions were treated as one, and
+`geographic_mix()` printed them summing to 100% by coincidence of
+arithmetic - the "US at 12 percent instead of 49" failure class recurring
+in a new shape, this time inside a single note rather than across two.
+
+Fixed by reconciling against the filing's own stated total revenue
+(statement:operations) instead of trusting note or target boundaries: if a
+period's geography components sum to roughly the stated total, one
+breakdown is present; if they sum to roughly twice it, two breakdowns are
+mixed and the two-way split is found by search and the more granular half
+kept; anything else is not guessed at and blocks, naming what was found.
+This is a superset of the old target-based logic, not a special case of
+it: it now also correctly explains why UBER_FY2024's two SEPARATE targets
+should combine into the continent breakdown, arriving at the identical
+answer as before through reconciliation rather than target-counting.
+
+Verified on all six doc_ids. UBER_FY2024 unchanged: US&CAN 54% / LatAm 6% /
+EMEA 28% / APAC 11%. UBER_FY2025 now resolves to the continent breakdown
+alone: US&CAN 51% / LatAm 6% / EMEA 31% / APAC 11%, summing to the stated
+52,017. LYFT_FY2025, DASH_FY2025, DASH_FY2024 unchanged (single clean
+breakdown, no split needed). LYFT_FY2024 unchanged (still blocked, no
+geographic note found - pre-existing, unrelated).
+
+A same-size tie (two breakdowns with an equal number of regions) was found
+during review to record the one real split twice and block on a
+manufactured "2 different splits" disagreement, because the ordered-list
+pair key `(group, complement)` is not order-independent when the two
+halves are the same length. Fixed with a canonical `frozenset`-of-names
+identity for dedup, and a deterministic sorted-name tie-break when sizes
+are equal. `scripts/test_assumptions.py` proves it: an equal-sized split
+now resolves rather than blocks, alongside cases for the unequal split, no
+split needed, and two ways of failing to reconcile.
+
+Does not close #20 (segment-note-total vs statement-total, a different
+code path) - only the geography-note case is fixed here.
