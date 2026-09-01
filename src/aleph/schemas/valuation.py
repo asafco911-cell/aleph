@@ -12,7 +12,7 @@ interactive choice that is not stored destroys reproducibility.
 """
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 MIN_RATIONALE_CHARS = 20
 
@@ -22,12 +22,31 @@ class Observation(BaseModel):
     period: str
     value: float
     fact_name: str
+    unit: Optional[str] = Field(
+        default=None,
+        description="Unit the source fact declared, e.g. 'USD thousands'. "
+                    "None for a value Python computed itself, such as a "
+                    "growth rate or tax rate ratio, which has no scale of "
+                    "its own to report.",
+    )
 
 
 class Override(BaseModel):
-    """An analyst decision to exclude periods or fix a value outright."""
+    """An analyst decision to exclude periods or fix a value outright.
+
+    fixed_value carries the unit the FILING states, never one pre-converted
+    by hand: a human converting thousands to millions in their head is
+    exactly where a factor-of-1000 error enters. The engine converts it,
+    using the same declared-unit machinery it uses for extracted facts.
+    """
     excluded_periods: list[str] = Field(default_factory=list)
     fixed_value: Optional[float] = None
+    unit: Optional[str] = Field(
+        default=None,
+        description="Unit fixed_value is stated in, as the filing states "
+                    "it, e.g. 'USD thousands', 'percent'. Required whenever "
+                    "fixed_value is set.",
+    )
     rationale: str
     decided_by: str
     decided_at: str = Field(description="ISO date, e.g. '2026-08-27'.")
@@ -41,6 +60,15 @@ class Override(BaseModel):
                 "an exclusion without a stated reason is not a judgement"
             )
         return value
+
+    @model_validator(mode="after")
+    def unit_required_with_fixed_value(self) -> "Override":
+        if self.fixed_value is not None and not self.unit:
+            raise ValueError(
+                "unit is required whenever fixed_value is set; state the "
+                "unit the filing uses, not one converted by hand"
+            )
+        return self
 
 
 class AssumptionRange(BaseModel):

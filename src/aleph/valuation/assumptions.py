@@ -19,6 +19,7 @@ the last one drops the figure that matters. Collisions therefore block.
 """
 from statistics import median
 
+from ..infra.units import resolve_scale
 from ..schemas.evidence import Fact
 from ..schemas.valuation import AssumptionRange, Observation, Override
 
@@ -63,7 +64,8 @@ def _observations(
             )
             continue
         found[fact.period] = Observation(
-            period=fact.period, value=fact.value, fact_name=fact.name
+            period=fact.period, value=fact.value, fact_name=fact.name,
+            unit=fact.unit,
         )
 
     return [found[period] for period in sorted(found)], collisions
@@ -85,6 +87,46 @@ def _dispersion_problem(values: list[float]) -> str | None:
     return None
 
 
+def _scale_mismatch(observations: list[Observation]) -> str | None:
+    """Return why the observations do not share one unit scale, or None.
+
+    Scale is compared, not the unit string: "thousands" and "thousands of
+    shares" are the same scale and must not block each other. Comparison
+    uses the same token logic bridge.to_millions uses (infra.units), so the
+    two can never disagree about what a unit means. Percent/decimal
+    quantities and any observation whose unit names no recognised scale
+    token are excluded from the comparison rather than treated as a
+    mismatch: an unresolved unit is unverifiable, not wrong - the same
+    fail-safe rule check_unit_matches_source applies at the extraction gate.
+    """
+    scales: dict[float, list[Observation]] = {}
+    for o in observations:
+        scale = resolve_scale(o.unit)
+        if scale is None:
+            continue
+        scales.setdefault(scale, []).append(o)
+    if len(scales) <= 1:
+        return None
+    groups = [f"x{scale} ({', '.join(o.fact_name for o in group)})"
+              for scale, group in sorted(scales.items())]
+    return "observations do not share one unit scale: " + "; ".join(groups)
+
+
+def _derive_unit(observations: list[Observation], fallback: str) -> str:
+    """Use the unit the observations themselves carry, not a hardcoded label.
+
+    _scale_mismatch has already guaranteed the kept observations agree on
+    scale, so any one of their unit strings names the group correctly.
+    Falls back to the caller's declared unit only when no observation
+    carries one - true for Python-computed ratios like growth and tax rate,
+    which have no scale of their own to report.
+    """
+    for o in observations:
+        if o.unit:
+            return o.unit
+    return fallback
+
+
 def _blocked(name, unit, observations, excluded, reason, doc_ids) -> AssumptionRange:
     return AssumptionRange(
         name=name, unit=unit, status="blocked",
@@ -93,9 +135,11 @@ def _blocked(name, unit, observations, excluded, reason, doc_ids) -> AssumptionR
     )
 
 
-def _fixed(name, unit, observations, excluded, override, doc_ids) -> AssumptionRange:
+def _fixed(name, observations, excluded, override, doc_ids) -> AssumptionRange:
+    """Build an overridden range. unit comes from the override itself, in
+    the unit the filing states - the engine converts, the analyst does not."""
     return AssumptionRange(
-        name=name, unit=unit, status="overridden",
+        name=name, unit=override.unit, status="overridden",
         low=override.fixed_value, base=override.fixed_value, high=override.fixed_value,
         observations=observations, excluded=excluded,
         method="fixed by analyst override",
@@ -127,12 +171,16 @@ def build_trend(name, unit, observations, collisions, override, doc_ids) -> Assu
 
     kept, excluded = _apply_override(observations, override)
     if override and override.fixed_value is not None:
-        return _fixed(name, unit, observations, excluded, override, doc_ids)
+        return _fixed(name, observations, excluded, override, doc_ids)
     if not kept:
         reason = (f"{len(excluded)} of {len(observations)} periods excluded by override"
                   if excluded else
                   "no facts extracted for this quantity; check extraction gates")
         return _blocked(name, unit, observations, excluded, reason, doc_ids)
+
+    mismatch = _scale_mismatch(kept)
+    if mismatch:
+        return _blocked(name, unit, observations, excluded, mismatch, doc_ids)
 
     values = [o.value for o in kept]
     problem = _dispersion_problem(values)
@@ -147,7 +195,8 @@ def build_trend(name, unit, observations, collisions, override, doc_ids) -> Assu
         )
 
     return AssumptionRange(
-        name=name, unit=unit, status="overridden" if override else "derived",
+        name=name, unit=_derive_unit(kept, unit),
+        status="overridden" if override else "derived",
         low=min(values), base=median(values), high=max(values),
         observations=observations, excluded=excluded,
         method="low/high are the observed min and max; base is the median",
@@ -166,14 +215,19 @@ def build_level(name, unit, observations, collisions, override, doc_ids) -> Assu
 
     kept, excluded = _apply_override(observations, override)
     if override and override.fixed_value is not None:
-        return _fixed(name, unit, observations, excluded, override, doc_ids)
+        return _fixed(name, observations, excluded, override, doc_ids)
     if not kept:
         return _blocked(name, unit, observations, excluded,
                         "no facts extracted for this quantity", doc_ids)
 
+    mismatch = _scale_mismatch(kept)
+    if mismatch:
+        return _blocked(name, unit, observations, excluded, mismatch, doc_ids)
+
     latest = kept[-1]
     return AssumptionRange(
-        name=name, unit=unit, status="overridden" if override else "derived",
+        name=name, unit=_derive_unit(kept, unit),
+        status="overridden" if override else "derived",
         low=latest.value, base=latest.value, high=latest.value,
         observations=observations, excluded=excluded,
         method=f"most recent period ({latest.period}); no band derived from history",
@@ -238,6 +292,8 @@ def derive_tax_rate(facts, overrides) -> AssumptionRange:
 
 def derive_operating_cash_flow(facts, overrides) -> AssumptionRange:
     observations, collisions = _observations(facts, "operating activities")
+    # "USD millions" is a fallback label only, used if no observation
+    # carries a unit. The declared unit comes from the facts themselves.
     return build_level("operating_cash_flow", "USD millions", observations, collisions,
                        overrides.get("operating_cash_flow"), _doc_ids(facts))
 
@@ -282,7 +338,8 @@ def derive_geographic_revenue(facts, overrides) -> AssumptionRange:
         if "total" in fact.name.lower():
             continue  # A stated total is the denominator, not a component.
         by_target.setdefault(fact.source.target_key, []).append(
-            Observation(period=fact.period, value=fact.value, fact_name=fact.name)
+            Observation(period=fact.period, value=fact.value, fact_name=fact.name,
+                       unit=fact.unit)
         )
 
     if not by_target:
@@ -330,7 +387,7 @@ def derive_net_debt(facts, overrides) -> AssumptionRange:
         collisions.extend(clashes)
 
     if override and override.fixed_value is not None:
-        return _fixed("net_debt", "USD millions", components, [], override, doc_ids)
+        return _fixed("net_debt", components, [], override, doc_ids)
 
     if collisions:
         return _blocked("net_debt", "USD millions", components, [],
