@@ -231,6 +231,86 @@ fewer than the manifest suggests.
 
 Status: open.
 
+## #26 Derivation queries match on wording measured against two filers only
+
+`derive_net_debt` (assumptions.py) looked for the substring
+"short-term investments". DoorDash's FY2024 10-K prints "Short-term
+marketable securities" for the same account - a fully extracted,
+gate-verified fact, invisible to the derivation purely because its name
+does not contain the query's substring. Uber and Lyft each use stable
+wording across both of their own filed years; DoorDash does not, which
+makes this worse than the five cross-filer assumptions already documented
+in CLAUDE.md - wording is not even stable within one company over time,
+let alone across companies.
+
+net_debt still blocked correctly (it always blocks pending an override),
+so the pipeline never valued DoorDash on a wrong number. The danger was the
+component list PRINTED under that block, which an analyst reads to set the
+override: it showed "none extracted" for short-term investments and
+implied net_debt was Cash (4,019) less Restricted cash (190) = roughly
+-4,019, when the true figure, including the security that was extracted
+all along under its other name, is -5,341. Both filings agree the FY2024
+short-term balance is 1,322. A block correctly stopped the run and still
+handed the analyst an incomplete evidentiary basis, with nothing to flag
+that the list was short - a new failure class for this project:
+**a block is not protection if the evidence it prints is incomplete.**
+
+FIXED for net_debt specifically: its blocked rationale now lists every
+fact extracted from the balance_sheet target that none of the four
+component queries matched, by name and value. Verified on DASH_FY2024, the
+block now prints, directly under the existing components list: "Extracted
+from the balance sheet but matched by none of the queries above:
+Short-term marketable securities FY2023=1,422; Short-term marketable
+securities FY2024=1,322". Verified on UBER_FY2024 and LYFT_FY2025 (forced
+through the blocked path with no override to see it): the extra line is
+absent when nothing is unmatched - no change to either's behavior.
+
+The substring query "short-term investments" is DELIBERATELY NOT patched
+to also match "marketable securities". A wider substring list only
+relocates this exact bug to the next filer that phrases it a third way.
+The mechanism that surfaces the miss - printing what the queries did not
+match - is the fix; the query stays exactly as narrow, and exactly as
+fallible, as it always was, by design.
+
+NOT fixed - a second, live instance of the same bug class, in a different
+derivation, found by the same unconsumed-facts measurement that found the
+net_debt instance: DoorDash's own income-tax-provision caption is "Total
+provision for (benefit from) income taxes" - the inserted "(benefit from)"
+breaks derive_tax_rate's computed-fallback substring query "provision for
+income taxes" (confirmed: the substring does not match), which is why
+DASH_FY2024's effective_tax_rate blocks as "no facts extracted" rather than
+computing a rate from real, extracted, gate-verified components.
+derive_tax_rate has no equivalent unmatched-evidence line. Deliberately not
+fixed here - Task 1c decided against a repo-wide gate, so the fix applies
+only where it was measured to have caused real harm (a wrong number an
+analyst could have acted on), not to every derivation with the same shape
+of latent risk.
+
+Status: open - the net_debt instance is fixed; the derive_tax_rate instance
+is not, and the general pattern (a derivation query written against wording
+measured on too few filers) remains a real risk in any derive_* function
+not yet audited this way.
+
+## #27 check_coverage cannot see a row the model never quoted
+
+Confirmed by a direct synthetic test, not inferred from reading the code: a
+fixture with one row fully quoted and extracted across both periods,
+alongside a second row never referenced in any Fact's quote at all, run
+through the real `validate()`, produces zero coverage rejections for the
+second row. `check_coverage` groups facts by `fact.quote` and only ever
+examines rows that appear in at least one quote; a row absent from every
+quote produces no group, so there is nothing for the gate to iterate over.
+This is a structural limitation of the gate as designed, not a bug in one
+run of it.
+
+No concrete instance found across the six filings tested tonight.
+DASH_FY2024's short-term-securities row (see #26) looked like a candidate
+but was not one: the model quoted and extracted that row completely: the
+loss happened one layer downstream, in derivation, not here.
+
+Status: open, unmeasured beyond the synthetic proof above.
+
+
 ## Closed
 
 **#1 Connect extractor to DCF engine (Ch8 + Ch9) — CLOSED**

@@ -394,13 +394,43 @@ def derive_net_debt(facts, overrides) -> AssumptionRange:
                         "ambiguous fact selection: " + "; ".join(collisions), doc_ids)
 
     listing = [f"{o.fact_name}={o.value:,.0f}" for o in components] or ["none extracted"]
+
+    # The block above is correct; the danger is a component list an analyst
+    # reads as complete when it is not. Measured on DASH_FY2024: the balance
+    # sheet target extracted "Short-term marketable securities" - gate-
+    # verified, sitting in `facts` the whole time - and none of the four
+    # queries above matched it, because DoorDash's own wording differs from
+    # the one every query was written against. The queries are deliberately
+    # NOT widened to catch this one phrasing: a wider substring list only
+    # relocates the same bug to the next filer that renames something. This
+    # line is the fix - it surfaces whatever the queries miss, whatever the
+    # wording turns out to be, without needing to have seen that wording first.
+    matched_names = {
+        fact.name
+        for name_contains, exclude in queries
+        for fact in facts
+        if all(token.lower() in fact.name.lower() for token in name_contains)
+        and not any(token.lower() in fact.name.lower() for token in exclude)
+    }
+    unmatched = [
+        f for f in facts
+        if f.source and f.source.target_key == "balance_sheet"
+        and f.name not in matched_names
+    ]
+    unmatched_note = (
+        " Extracted from the balance sheet but matched by none of the "
+        "queries above: " + "; ".join(f"{f.name}={f.value:,.0f}" for f in unmatched)
+        if unmatched else ""
+    )
+
     return _blocked(
         "net_debt", "USD millions", components, [],
         "net debt requires a stated cash and debt policy, not a derivation. "
         "Restricted cash is unavailable by definition; cash equivalents are "
         "available; short-term investments and operating lease liabilities are "
         "analyst judgements. Components found: " + "; ".join(listing) +
-        ". Set fixed_value in data/overrides.json with the policy as rationale.",
+        "." + unmatched_note +
+        " Set fixed_value in data/overrides.json with the policy as rationale.",
         doc_ids,
     )
 
