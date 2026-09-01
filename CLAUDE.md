@@ -23,8 +23,10 @@ the LYFT_FY2025 unit-scale bug and a silent net-debt clamp in WACC.
   first. Asi reviews those personally.
 - A fix is not finished until a command proves it. Every change reports the
   command run and its output. `python scripts\run_valuation.py UBER_FY2024
-  76.95` must still print `Value per share: 102.40` after any change to
-  extraction, assumptions, bridge, wacc, or dcf_engine.
+  76.95` must still print `Value per share: 77.08` after any change to
+  extraction, assumptions, bridge, wacc, or dcf_engine. This anchor was
+  102.40 before the SBC decision (ISSUES.md #16); it moved deliberately,
+  once, on that decision - it is not evidence of drift.
 
 ## Environment
 
@@ -181,7 +183,8 @@ ISSUES.md        open issues, several already fixed (#10-13 open, #1-2 closed
 ## Commands that verify the system works
 
 ```
-python scripts\run_valuation.py UBER_FY2024 76.95   # must print Value per share: 102.40
+python scripts\run_valuation.py UBER_FY2024 76.95   # must print Value per share: 77.08 (was 102.40 pre-SBC, see #16)
+python scripts\run_valuation.py LYFT_FY2025 17.35   # must print Value per share: 49.06 (was 67.79 pre-SBC, see #16)
 python scripts\test_regression.py                    # gate over cached extraction targets, exit(1) on shortfall
 python scripts\test_gates.py
 python scripts\test_dcf_engine.py

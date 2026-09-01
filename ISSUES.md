@@ -83,36 +83,6 @@ rates, percent for levels), rather than one global ratio.
 
 Status: open.
 
-## #16 FCFF counts stock-based compensation as free cash flow while the share count carries no dilution model
-
-FCFF is rebuilt in bridge.py as CFO + interest x (1 - tax) - capex. CFO
-already adds back stock-based compensation as a non-cash reconciling item,
-so SBC counts as free cash flow in the DCF. Measured directly from each
-filing's cash flow statement (not yet an extracted Fact - see below):
-LYFT_FY2025 stock-based compensation is 322,268 thousand against an FCFF of
-approximately 1,132,000 thousand - about 28 percent. UBER_FY2024 stock-based
-compensation is 1,796 million against an FCFF of approximately 7,308
-million - about 25 percent.
-
-Meanwhile shares_outstanding is a LEVEL quantity (derive_diluted_shares,
-assumptions.py), taken from the single most recent period with no dilution
-model. The share count SBC pays for never grows in the ten-year forecast,
-while the cash SBC would otherwise cost is treated as available to today's
-shareholders.
-
-SBC is not currently extracted as a Fact for either filer - the cash_flows
-target's question does not ask for it, so the numbers above were read
-directly from the source region text, not from the pipeline's own output.
-
-Three standard treatments exist and each moves both valuations differently:
-leave SBC in FCFF and model dilution in the share count; subtract SBC from
-FCFF and hold shares flat; or do both, which double-counts the cost.
-
-This is an analyst judgement, not a code defect, and it changes both
-UBER_FY2024 and LYFT_FY2025 materially.
-
-Status: open, investigated, not fixed.
-
 ## #17 build_wacc clamps negative net debt to zero with no note in the output
 
 wacc.py computes `debt_value = max(net_debt, 0.0)` before Hamada relevering.
@@ -310,15 +280,21 @@ loss happened one layer downstream, in derivation, not here.
 
 Status: open, unmeasured beyond the synthetic proof above.
 
-
 ## Closed
 
 **#1 Connect extractor to DCF engine (Ch8 + Ch9) — CLOSED**
 `python scripts\run_valuation.py UBER_FY2024 76.95` -> `Value per share:
-102.40`. `python scripts\run_valuation.py LYFT_FY2025 17.35` -> `Value per
-share: 67.79`. Both run the full pipeline: extract, derive, bridge, value.
+77.08`. `python scripts\run_valuation.py LYFT_FY2025 17.35` -> `Value per
+share: 49.06`. Both run the full pipeline: extract, derive, bridge, value.
 Closed by `a17c103` "Complete extract-to-DCF pipeline (issue #1)",
 2026-08-29.
+
+These numbers were 102.40 and 67.79 when this issue closed. The anchor
+moved deliberately, once, when #16 closed: stock-based compensation was
+decided to be a cash cost and subtracted from FCFF, which lowered both
+values by construction. This is not the pipeline drifting - a future
+session diffing this file against an old run should look for #16, not for
+a regression.
 
 **#2 Pydantic schemas not serializable by LangGraph checkpointer (Ch8) — CLOSED**
 `src/aleph/schemas/` is a package (`agents.py`, `documents.py`, `evidence.py`,
@@ -406,3 +382,46 @@ that weight carries (an assumed 2%, undisclosed) - recompute to 0.0062,
 within rounding of the committed 0.0064. The number survived the change of
 source data, which is why it was kept rather than restated. `UBER_FY2024`
 confirmed unchanged at $102.40 after the rewrite.
+
+**#16 FCFF counts stock-based compensation as free cash flow while the share count carries no dilution model — CLOSED**
+Decided: SBC is a cash cost. Subtracted from FCFF at full value - it is
+already tax-affected inside net income, so no further `(1 - tax)`
+adjustment applies. Share count held FLAT, deliberately: subtracting SBC
+from cash flow and also modelling the dilution it funds would double-count
+the same cost. The cash_flows extraction target now asks for it directly
+(same bounded region, no new target needed); `"capitalized"` excludes
+DoorDash's second line, "Stock-based compensation included in capitalized
+software and website development costs," which was capitalised into an
+asset and already leaves through capex. SBC is a REQUIRED quantity - a
+filer where it does not resolve blocks the run rather than valuing at the
+old, higher number.
+
+Results: `UBER_FY2024` 102.40 -> **77.08**. `LYFT_FY2025` 67.79 -> **49.06**.
+Reverse DCF: at $76.95, the market now implies 10.5% annual growth for ten
+years for Uber (was 6.8%); at $17.35, -8.5% for Lyft (was -13.2%).
+
+CAUTION, do not read the 13-cent gap between Uber's $77.08 and its $76.95
+market price as validation. It is a consequence of one analyst decision,
+not evidence the model is right. It also makes the reverse DCF close to
+tautological for UBER_FY2024 specifically: a linear fade from 17.5% to 2.5%
+over ten years has an arithmetic mean of 10.0% and a compound CAGR of 9.9%,
+and the market-implied 10.5% is essentially that number, not a figure to
+agree or disagree with - once value and price coincide, the market is by
+construction asking for close to the model's own base case. The tornado is
+the informative output now:
+
+`UBER_FY2024` - at the regression-beta end of the tested range the value is
+$60.57 against the $76.95 market, 21% below; at the industry-beta base it
+is $77.08, on the market. There is no third case tested. Uber is fairly
+priced if its systematic risk is the industry's, and 21% expensive if it is
+the stock's own - a sentence, not a number.
+
+`LYFT_FY2025` - $17.35 sits 55% BELOW the low end of its own discount-rate
+band ($38.57 to $57.85). No discount rate inside the tested range explains
+the price. The disagreement between model and market is about cash flow,
+not the price of risk - the market is pricing either autonomous
+substitution or a CFO of $1.13 billion that is not durable cash (insurance
+reserves, working capital) against a pre-tax loss. This also settles the
+industry-beta decision (#25) after the fact: bending Lyft's beta to close
+this gap would have concealed exactly this result, since the answer is
+demonstrably not inside that band.
