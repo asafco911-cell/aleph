@@ -23,8 +23,8 @@ BROKEN = "Broken row $ 100 $ 200 $ 300 $ 999"
 ORPHAN = "Orphan row with no header above it 11 22 33"
 
 
-def fact(name, value, quote=ROW, period="FY2024", source=SRC):
-    return Fact(name=name, value=value, unit="USD millions",
+def fact(name, value, quote=ROW, period="FY2024", source=SRC, unit="USD millions"):
+    return Fact(name=name, value=value, unit=unit,
                 quote=quote, period=period, source=source)
 
 
@@ -46,6 +46,8 @@ CASES = [
      fact("Mobility revenue FY2024", 5000.0)),
     ("missing provenance", "has_source",
      fact("Mobility revenue FY2024", 25087.0, source=None)),
+    ("no caption in region", None,
+     fact("Income from operations FY2024", 1110.0, quote="Income from operations 1,110")),
 ]
 
 axis = resolve_axis(SOURCE, ROW, len(row_cells(ROW)))
@@ -60,7 +62,40 @@ for label, expected_gate, item in CASES:
     actual = rejected[0].gate if rejected else None
     ok = actual == expected_gate
     failures += not ok
-    print(f"  {'ok  ' if ok else 'FAIL'} {label:<26} "
+    print(f"  {'ok  ' if ok else 'FAIL'} {label:<32} "
+          f"expected={expected_gate or 'accept':<21} actual={actual or 'accept'}")
+
+# check_unit_matches_source needs a captioned region: UBER_FY2024's own
+# operations statement caption, reused verbatim (measured, not invented,
+# see item 1 of the unit-fix review) - "(In millions, except share amounts
+# which are reflected in thousands, and per share amounts)" declares two
+# scales in one sentence, which is exactly the case the share-count
+# exemption exists for.
+CAPTIONED_SOURCE = "\n".join([
+    "UBER TECHNOLOGIES, INC.",
+    "CONSOLIDATED STATEMENTS OF OPERATIONS",
+    "(In millions, except share amounts which are reflected in thousands, "
+    "and per share amounts)",
+    "Year Ended December 31, 2024",
+    "Revenue $ 43,978",
+    "Diluted weighted-average shares outstanding 2,150,508",
+])
+
+UNIT_CASES = [
+    ("unit contradicts caption", "unit_matches_source",
+     fact("Revenue FY2024", 43978.0, quote="Revenue $ 43,978", unit="USD thousands")),
+    ("share count under dual-scale caption", None,
+     fact("Diluted weighted-average shares outstanding FY2024", 2150508.0,
+          quote="Diluted weighted-average shares outstanding 2,150,508",
+          unit="thousands")),
+]
+
+for label, expected_gate, item in UNIT_CASES:
+    _, rejected = validate([item], CAPTIONED_SOURCE)
+    actual = rejected[0].gate if rejected else None
+    ok = actual == expected_gate
+    failures += not ok
+    print(f"  {'ok  ' if ok else 'FAIL'} {label:<32} "
           f"expected={expected_gate or 'accept':<21} actual={actual or 'accept'}")
 
 sys.exit(1 if failures else 0)
