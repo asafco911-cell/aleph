@@ -12,16 +12,24 @@ absence is recorded as a fact about the filer rather than a tool failure.
 from ..schemas.documents import DocumentRecord
 
 # (key, target, question, required)
+# Periods are requested explicitly. Measured on LYFT_FY2025: the same prompt
+# shape returned three periods from the cash flow statement, two from the
+# balance sheet and one from the income statement, which left revenue_growth
+# with a single period and nothing to compute a trend from. The note-level
+# questions below already say "for each year"; the statement-level ones did
+# not, and the model filled the gap with its own judgement.
 STATEMENT_TARGETS = [
     ("cash_flows", "statement:cash_flows",
      "Extract net cash provided by operating activities and purchases of "
-     "property and equipment.", True),
+     "property and equipment, for each period presented.", True),
     ("operations", "statement:operations",
      "Extract total revenue, diluted weighted-average shares outstanding, "
-     "interest expense, and net income attributable to the company.", True),
+     "interest expense, and net income attributable to the company, for each "
+     "period presented.", True),
     ("balance_sheet", "statement:balance_sheet",
      "Extract cash and cash equivalents, short-term investments, restricted "
-     "cash, and long-term debt net of current portion.", True),
+     "cash, and long-term debt net of current portion, for each period "
+     "presented.", True),
 ]
 
 # One distinctive word, disambiguated by uniqueness. Guessing a full phrase
