@@ -3,6 +3,32 @@
 Closed issues are kept here, not deleted, once resolved: the reasoning that
 closed them is part of what this repository demonstrates.
 
+## Decisions
+
+Decisions taken and closed - not open questions. Recorded so the reasoning
+is not silently reopened by a future session that only sees the outcome.
+
+**#25 Industry beta held identical across all filers, not tuned to market price — DECIDED**
+LYFT_FY2025's bottom-up WACC (8.10%) comes out below UBER_FY2024's (8.72%).
+This is not an error: it is driven entirely by capital structure. Lyft
+holds net cash and carries no leverage risk, and Hamada is doing exactly
+what it should with that fact. What CAPM does not express is competitive
+position - Lyft is the number two operator in one market facing autonomous
+substitution - and the discount rate is the price of systematic risk, not a
+drawer for every concern an analyst has about a company. Tuning beta until
+the model agrees with the market price is unfalsifiable, and market.json's
+own rationale already argues that an industry beta beats a single-stock
+regression beta - doubly true for a stock with heavy short interest whose
+volatility reflects trading rather than business risk.
+
+Lyft's competitive risk belongs in the cash flows and in scenarios, not in
+the discount rate. The reverse DCF already reports the honest output: at
+$17.35/share the market implies -13.2% annual growth for ten years. That
+gap, and what would have to be true for the market to be right, is the
+finding - not a beta chosen to close it.
+
+Decided by Asi, 2026-09-01. See CLAUDE.md, "Cross-company comparability."
+
 ## Quality improvements
 
 **#3 Golden dataset is 14 questions, target 30 (Ch5)**

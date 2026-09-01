@@ -105,6 +105,14 @@ cash and equivalents, less short-term investments; restricted cash and
 operating leases excluded). Company facts that legitimately differ: share
 price, country risk premium, growth.
 
+Holding beta identical is deliberate even when it produces a WACC ranking
+that looks wrong: LYFT_FY2025's bottom-up WACC (8.10%) sits below
+UBER_FY2024's (8.72%), driven entirely by Lyft's net-cash capital structure
+under Hamada, not by a beta tuned to make the model agree with the market.
+Competitive risk belongs in the cash flows and in scenarios, not in a
+discount rate quietly adjusted until the answer looks right - see
+ISSUES.md #25.
+
 ## File layout
 
 ```
