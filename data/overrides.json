@@ -3,6 +3,7 @@
     "effective_tax_rate": {
       "excluded_periods": [],
       "fixed_value": 21.0,
+      "unit": "percent",
       "rationale": "Reported effective rates are distorted by one-off deferred tax events, including the 5.2B USD federal valuation allowance release disclosed in Note 11 for 2024, which drove the rate to -139.6 percent. These are balance-sheet recognition events, not sustainable earning power. Using the 21.0 percent US federal statutory rate stated in the same note as the going-forward assumption.",
       "decided_by": "Asi",
       "decided_at": "2026-08-27"
@@ -10,9 +11,36 @@
     "net_debt": {
       "excluded_periods": [],
       "fixed_value": 1370.0,
+      "unit": "USD millions",
       "rationale": "Long-term debt net of current portion 8,347 less cash and cash equivalents 5,893 less short-term investments 1,084. Restricted cash of 2,717 is excluded because it is not available to service debt. Operating lease liabilities are excluded because their costs already sit inside operating cash flow, and including them here would charge for leases twice. Current portion of long-term debt was not extracted and is a known gap.",
       "decided_by": "Asi",
       "decided_at": "2026-08-27"
+    }
+  },
+  "LYFT_FY2025": {
+    "effective_tax_rate": {
+      "excluded_periods": [],
+      "fixed_value": 21.0,
+      "unit": "percent",
+      "rationale": "Same policy as UBER_FY2024. Reported rates are distorted by one-off deferred tax events: FY2025 shows a 2,897,255 thousand tax benefit against a pre-tax LOSS of 53,247 thousand, an effective rate of 5441.2 percent, while FY2023 to FY2024 swing from -2.6 to 10.1 percent. The 2,897,255 benefit is 102 percent of reported net income of 2,844,008 and is a balance-sheet recognition event, not earning power. Using the 21.0 percent US federal statutory rate as the going-forward assumption, identical to UBER_FY2024 so the two valuations stay comparable. KNOWN DIRECTIONAL ASSUMPTION: large loss carryforwards mean the near-term CASH tax rate is likely well below 21 percent, so this understates value.",
+      "decided_by": "Asi",
+      "decided_at": "2026-08-31"
+    },
+    "net_debt": {
+      "excluded_periods": [],
+      "fixed_value": -834777.0,
+      "unit": "USD thousands",
+      "rationale": "Same policy as UBER_FY2024. Long-term debt net of current portion 1,002,404 less cash and cash equivalents 1,132,009 less short-term investments 705,172, all in USD thousands as reported, giving net CASH of 834,777 thousand. Restricted cash of 705,361 is excluded because it is not available to service debt. Operating lease liabilities are excluded because their cost already sits inside operating cash flow. Unlike UBER_FY2024 the current portion is not a gap: convertible senior notes, current are nil at FY2025 against 390,175 at FY2024, so no current debt is omitted.",
+      "decided_by": "Asi",
+      "decided_at": "2026-08-31"
+    },
+    "revenue_growth": {
+      "excluded_periods": [],
+      "fixed_value": 9.2,
+      "unit": "percent",
+      "rationale": "FY2024 growth of 31.4 percent and FY2025 of 9.2 percent are not draws from one distribution: Lyft moved from a mature North American ridesharing market to international expansion, acquiring Freenow in July 2025 and TBR in October 2025. Averaging them would restate the dispersion the gate correctly refused. Using the FY2025 rate of 9.2 percent as the going-forward year-one assumption. THIS IS TOTAL GROWTH, NOT ORGANIC: 9.2 percent already contains roughly half a year of Freenow and one quarter of TBR, so organic growth was lower and cannot be quantified from the filing alone. It is also directionally CONSERVATIVE for FY2026, which carries a full year of both: reported Q2 2026 revenue growth was 16.1 percent and sell-side consensus for FY2026 is about 15 percent. Those figures are deliberately excluded from the base case because UBER_FY2024 derives its growth from the filing, and importing a consensus forecast for one company and not the other would make the cross-company comparison measure the input source rather than the businesses. The consensus path belongs in sensitivity, and the reverse DCF reports what the market price implies.",
+      "decided_by": "Asi",
+      "decided_at": "2026-08-31"
     }
   }
 }

@@ -64,5 +64,71 @@
       "source": "integration test",
       "rationale": "NOT A VALUATION INPUT. Round-number rate proving the pipeline runs end to end. Superseded the moment build_wacc is wired into run_valuation."
     }
+  },
+  "LYFT_FY2025": {
+    "terminal_growth": {
+      "name": "terminal_growth",
+      "value": 0.025,
+      "unit": "decimal",
+      "as_of": "2026-08-28",
+      "source": "analyst judgment",
+      "rationale": "Identical to UBER_FY2024. Below long-run nominal GDP growth, per the g<3% constraint enforced by the engine."
+    },
+    "risk_free_rate": {
+      "name": "risk_free_rate",
+      "value": 0.0467,
+      "unit": "decimal",
+      "as_of": "2026-08-28",
+      "source": "US 10Y Treasury yield",
+      "rationale": "Same market, same date as UBER_FY2024. A property of the market, not of the company; duplicated here only because market.json is keyed by doc_id, which is a known structural gap."
+    },
+    "equity_risk_premium": {
+      "name": "equity_risk_premium",
+      "value": 0.0423,
+      "unit": "decimal",
+      "as_of": "2026-01-01",
+      "source": "Aswath Damodaran - Implied Equity Risk Premium, United States",
+      "rationale": "MATURE-MARKET ERP ONLY; country risk is added separately. Same value and same KNOWN MISMATCH as UBER_FY2024: a January 2026 reading paired with an August 2026 risk-free rate."
+    },
+    "unlevered_industry_beta": {
+      "name": "unlevered_industry_beta",
+      "value": 0.81,
+      "unit": "decimal",
+      "as_of": "2026-01",
+      "source": "Aswath Damodaran - Betas by Sector (US), Business and Consumer Services",
+      "rationale": "Deliberately identical to UBER_FY2024. Same Damodaran industry classification, Business and Consumer Services, for the same reason: a platform-based mobility marketplace, not asset-heavy transportation. Holding the industry beta constant across both filers is a precondition for the cross-company comparison; letting it differ would make the comparison measure the classification choice. Lyft's single-stock regression beta is materially higher and is a sensitivity case, not the base."
+    },
+    "debt_spread": {
+      "name": "debt_spread",
+      "value": 0.0111,
+      "unit": "decimal",
+      "as_of": "2026-01",
+      "source": "Aswath Damodaran - Ratings, Interest Coverage Ratios and Default Spread",
+      "rationale": "UNVERIFIED FOR THIS FILER. Copied from UBER_FY2024, whose BBB proxy was chosen for an investment-grade rated issuer. Lyft's credit rating has not been checked. The error is bounded: with net CASH of 834,777 thousand the debt weight in the WACC is negative and small, so the spread has little influence on the result. Verify before treating any output as a valuation."
+    },
+    "country_risk_premium": {
+      "name": "country_risk_premium",
+      "value": 0.0,
+      "unit": "decimal",
+      "as_of": "2026-08-31",
+      "source": "analyst judgment",
+      "rationale": "Set to zero for FY2025 because Lyft operated in the United States and Canada only until the Freenow acquisition closed in July 2025, so almost all FY2025 revenue is mature-market. UNLIKE UBER_FY2024 the assumption is close to neutral here rather than directional. IT IS ALREADY STALE FORWARD-LOOKING: Freenow adds nine countries and TBR operates globally, so FY2026 will carry real non-US exposure. Verify against the geographic revenue disclosed in Note 3 and revisit for FY2026."
+    },
+    "share_price": {
+      "name": "share_price",
+      "value": 17.35,
+      "unit": "USD",
+      "as_of": "2026-08-27",
+      "source": "NASDAQ close",
+      "rationale": "Closing price on August 27, 2026, the same trading day as the UBER_FY2024 price and within one day of the risk-free rate, so the two valuations share a market state."
+    },
+    "discount_rate": {
+      "name": "discount_rate",
+      "value": 0.09,
+      "unit": "decimal",
+      "as_of": "2026-08-28",
+      "source": "integration test",
+      "rationale": "NOT A VALUATION INPUT. Carried over from UBER_FY2024 only because it is unclear whether the loader requires the key. Superseded by build_wacc and should be deleted from both blocks once confirmed optional."
+    }
   }
 }
