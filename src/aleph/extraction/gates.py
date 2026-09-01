@@ -22,6 +22,7 @@ import re
 from dataclasses import dataclass
 
 from ..infra.textnorm import normalise, normalise_lines
+from ..infra.units import resolve_scale
 from ..schemas.evidence import Fact
 
 RE_NUMBER = re.compile(r"\(?\$?\s?\d[\d,]*(?:\.\d+)?\)?")
@@ -47,13 +48,22 @@ TOTAL_TOKENS = ("total", "consolidated")
 ENTITY_MARKERS = ("inc.", "inc", "corp.", "corp", "llc", "ltd.", "ltd",
                   "plc", "company", "holdings", "technologies")
 
+# Statement and note captions declare scale near their table, e.g.
+# "(In millions)" or "(in thousands)". A region can hold more than one:
+# measured, UBER_FY2024 note:13 is 7,738 characters and declares
+# "(in millions)" twice - once at offset 2,138 above the segment table, again
+# at offset 7,046 above the geography table. One caption per table, not one
+# per region. The caption that governs a quoted row is therefore the nearest
+# one ABOVE it, with no distance ceiling - the same principle resolve_axis
+# already uses for column headers.
+RE_SCALE_CAPTION = re.compile(r"\(\s*in\s+(thousand|million|billion)s?\b", re.IGNORECASE)
+
 
 @dataclass
 class Rejection:
     fact_name: str
     gate: str
     detail: str
-
 
 @dataclass
 class Axis:
@@ -240,6 +250,70 @@ def check_value_in_quote(fact: Fact) -> Rejection | None:
                      f"value {fact.value} not present in quote: {fact.quote[:80]!r}")
 
 
+def _nearest_caption_scale(source_text: str, quote: str) -> float | None:
+    """Return the scale named by the caption nearest above the quote.
+
+    Falls back to the region's only caption when the quote's exact position
+    cannot be located by raw substring search (check_quote_exists tolerates
+    typographic differences via normalisation; this needs a character OFFSET
+    to compare positions, so it cannot). With more than one caption and an
+    unlocatable quote, or with a quote that precedes every caption in the
+    region, nothing can be verified - unverifiable, not wrong, so no forward
+    guess is made either.
+    """
+    captions = list(RE_SCALE_CAPTION.finditer(source_text))
+    if not captions:
+        return None
+    position = source_text.find(quote)
+    if position < 0:
+        return resolve_scale(captions[0].group(1)) if len(captions) == 1 else None
+    before = [c for c in captions if c.start() <= position]
+    if not before:
+        return None
+    return resolve_scale(before[-1].group(1))
+
+
+def check_unit_matches_source(fact: Fact, source_text: str) -> Rejection | None:
+    """The fact's declared unit must match the scale printed in its source.
+
+    check_value_in_quote already proves the NUMBER was copied correctly; this
+    proves the SCALE was too. A model that quotes "1,132,009" faithfully but
+    labels it "USD millions" instead of "USD thousands" passes every other
+    gate and produces a valuation wrong by that factor, with no red flag.
+
+    Fails safe in two ways, both measured rather than assumed:
+
+    - Share-count facts are skipped by NAME, not by unit string. Measured on
+      UBER_FY2024's operations statement: the caption reads "(In millions,
+      except share amounts which are reflected in thousands, and per share
+      amounts)" - one caption, two scales. Comparing the diluted-shares fact
+      (unit "thousands") against that caption's own scale token ("million")
+      would false-reject the exact fact the valuation depends on. The name
+      always says "shares" (the extraction prompt requires it); the unit
+      string does not reliably.
+    - An unrecognised or absent caption is unverifiable, not wrong, and is
+      not rejected - the same rule _is_label_header uses for a header it
+      cannot classify.
+    """
+    if "share" in fact.name.lower():
+        return None
+    fact_scale = resolve_scale(fact.unit)
+    if fact_scale is None:
+        return None  # non-currency (percent, decimal, ...) or unrecognised
+
+    source_scale = _nearest_caption_scale(source_text, fact.quote)
+    if source_scale is None:
+        return None  # no caption governs this quote: unverifiable, not wrong
+
+    if source_scale == fact_scale:
+        return None
+    return Rejection(
+        fact.name, "unit_matches_source",
+        f"fact declares unit '{fact.unit}' but the nearest source caption "
+        f"above it declares a different scale: {fact.quote[:80]!r}"
+    )
+
+
 def check_cross_foot(fact: Fact, axis: Axis) -> Rejection | None:
     """Components of a labelled row must sum to its stated total.
 
@@ -336,8 +410,56 @@ def validate(
             check_has_source(fact)
             or check_quote_exists(fact, source_text)
             or check_value_in_quote(fact)
+            or check_unit_matches_source(fact, source_text)
             or check_cross_foot(fact, axis)
             or check_column_alignment(fact, axis)
         )
         (rejected.append(failure) if failure else accepted.append(fact))
+    # Coverage is judged over every fact returned, accepted or rejected: the
+    # question is whether the row was transcribed, not whether each
+    # transcription survived the gates above.
+    rejected.extend(check_coverage(facts, source_text))
     return accepted, rejected
+
+
+def check_coverage(facts: list[Fact], source_text: str) -> list[Rejection]:
+    """Report columns the model cited but never transcribed.
+
+    Every other gate asks whether what was copied is correct. This one asks
+    whether copying finished, and no per-fact check can see an absence.
+
+    Measured on LYFT_FY2025 before the targets were fixed: the income
+    statement row "Revenue $ 6,316,261 $ 5,786,016 $ 4,403,589" produced a
+    single fact for FY2025 and the extractor reported accepted=4 rejected=0.
+    Nothing was wrong with the fact that came back; what was wrong was the two
+    that did not, and the failure surfaced only three layers downstream as
+    "no facts extracted for this quantity".
+
+    Scope: rows whose axis resolves to years. A labelled axis would need each
+    column mapped to a fact name to say which one is missing, which is not
+    attempted here.
+    """
+    groups: dict[str, list[Fact]] = {}
+    for fact in facts:
+        groups.setdefault(normalise(fact.quote), []).append(fact)
+
+    gaps: list[Rejection] = []
+    for members in groups.values():
+        quote = members[0].quote
+        cells = row_cells(quote)
+        if len(cells) < 2:
+            continue  # A single value cannot be partially transcribed.
+        axis = resolve_axis(source_text, quote, len(cells))
+        if axis.kind != "years" or len(axis.labels) != len(cells):
+            continue  # An unverifiable axis is column_alignment's problem.
+        claimed = {fact.period for fact in members if fact.period}
+        missing = [label for label in axis.labels if label not in claimed]
+        if not missing:
+            continue
+        gaps.append(Rejection(
+            f"{members[0].name} [{', '.join(missing)}]",
+            "coverage",
+            f"row quotes {len(cells)} periods {axis.labels} but only "
+            f"{sorted(claimed)} were transcribed: {quote[:90]}"
+        ))
+    return gaps
