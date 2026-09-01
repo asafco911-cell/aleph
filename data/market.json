@@ -65,6 +65,72 @@
       "rationale": "NOT A VALUATION INPUT. Round-number rate proving the pipeline runs end to end. Superseded the moment build_wacc is wired into run_valuation."
     }
   },
+  "UBER_FY2025": {
+    "terminal_growth": {
+      "name": "terminal_growth",
+      "value": 0.025,
+      "unit": "decimal",
+      "as_of": "2026-08-28",
+      "source": "analyst judgment",
+      "rationale": "Identical to UBER_FY2024, LYFT_FY2025 and DASH_FY2025. Below long-run nominal GDP growth, per the g<3% constraint enforced by the engine."
+    },
+    "risk_free_rate": {
+      "name": "risk_free_rate",
+      "value": 0.0467,
+      "unit": "decimal",
+      "as_of": "2026-08-28",
+      "source": "US 10Y Treasury yield",
+      "rationale": "Same market, same date as every other block. A property of the market, not of the company; duplicated here only because market.json is keyed by doc_id, which is a known structural gap (ISSUES.md #21)."
+    },
+    "equity_risk_premium": {
+      "name": "equity_risk_premium",
+      "value": 0.0423,
+      "unit": "decimal",
+      "as_of": "2026-01-01",
+      "source": "Aswath Damodaran - Implied Equity Risk Premium, United States",
+      "rationale": "MATURE-MARKET ERP ONLY; country risk is added separately. Same value and same KNOWN MISMATCH as every other block: a January 2026 reading paired with an August 2026 risk-free rate."
+    },
+    "unlevered_industry_beta": {
+      "name": "unlevered_industry_beta",
+      "value": 0.81,
+      "unit": "decimal",
+      "as_of": "2026-01",
+      "source": "Aswath Damodaran - US Industry Betas, Business & Consumer Services, unlevered beta corrected for cash",
+      "rationale": "Deliberately identical across all filers, per ISSUES.md #25. Holding the industry beta constant is a precondition for the cross-company comparison; letting it differ would make the comparison measure the classification choice rather than the businesses. Single-stock regression betas are not used as the base for any filer."
+    },
+    "debt_spread": {
+      "name": "debt_spread",
+      "value": 0.0111,
+      "unit": "decimal",
+      "as_of": "2026-01",
+      "source": "Aswath Damodaran - Ratings, Interest Coverage Ratios and Default Spread",
+      "rationale": "Spread over the risk-free rate, not the full yield; the engine computes (risk_free + spread). Damodaran's January 2026 spread for Baa2/BBB large non-financial service firms is 1.11%. Uber is rated BBB+ by S&P but the table has no BBB+ bucket, so BBB is used as a conservative and reproducible proxy: a wider spread raises WACC and lowers value."
+    },
+    "country_risk_premium": {
+      "name": "country_risk_premium",
+      "value": 0.0067,
+      "unit": "decimal",
+      "as_of": "2026-09-01",
+      "source": "analyst judgment, weighted on the FY2025 continent revenue breakdown in Note 13",
+      "rationale": "Same method as UBER_FY2024, applied to the FY2025 continent breakdown: US&CAN 26,469 (50.9%), LatAm 3,327 (6.4%), EMEA 16,364 (31.5%), APAC 5,857 (11.3%), summing to total revenue of 52,017. Two judgements build this number and neither is disclosed. FIRST, which revenue carries country risk: LatAm and APAC are emerging at 17.7% of revenue, US&CAN is mature at zero by convention, and EMEA at 31.5% is not disaggregated, so half is assumed non-mature - giving a 33.4% weight. SECOND, the premium that weight multiplies: an assumed 2% for the emerging bucket, derived from no disclosure. 33.4% x 2% = 0.0067. THIS IS DIRECTIONAL, NOT NEUTRAL: a higher CRP raises the cost of equity and lowers value, so understating it overstates the company. The FY2025 figure is higher than UBER_FY2024's 0.0064 because the disclosed mix shifted, not because the method changed."
+    },
+    "share_price": {
+      "name": "share_price",
+      "value": 76.95,
+      "unit": "USD",
+      "as_of": "2026-08-27",
+      "source": "NYSE close",
+      "rationale": "Closing price on August 27, 2026, the same trading day as LYFT_FY2025 and DASH_FY2025, so all three FY2025 valuations share one market state."
+    },
+    "discount_rate": {
+      "name": "discount_rate",
+      "value": 0.09,
+      "unit": "decimal",
+      "as_of": "2026-08-28",
+      "source": "integration test",
+      "rationale": "NOT A VALUATION INPUT. Present only because it is unclear whether the loader requires the key; run_valuation overwrites it with the derived bottom-up figure. See ISSUES.md #19: delete from every block once confirmed optional."
+    }
+  },
   "LYFT_FY2025": {
     "terminal_growth": {
       "name": "terminal_growth",
@@ -129,6 +195,72 @@
       "as_of": "2026-08-28",
       "source": "integration test",
       "rationale": "NOT A VALUATION INPUT. Carried over from UBER_FY2024 only because it is unclear whether the loader requires the key. Superseded by build_wacc and should be deleted from both blocks once confirmed optional."
+    }
+  },
+  "DASH_FY2025": {
+    "terminal_growth": {
+      "name": "terminal_growth",
+      "value": 0.025,
+      "unit": "decimal",
+      "as_of": "2026-08-28",
+      "source": "analyst judgment",
+      "rationale": "Identical to UBER_FY2024, UBER_FY2025 and LYFT_FY2025. Below long-run nominal GDP growth, per the g<3% constraint enforced by the engine."
+    },
+    "risk_free_rate": {
+      "name": "risk_free_rate",
+      "value": 0.0467,
+      "unit": "decimal",
+      "as_of": "2026-08-28",
+      "source": "US 10Y Treasury yield",
+      "rationale": "Same market, same date as every other block. A property of the market, not of the company; duplicated here only because market.json is keyed by doc_id, which is a known structural gap (ISSUES.md #21)."
+    },
+    "equity_risk_premium": {
+      "name": "equity_risk_premium",
+      "value": 0.0423,
+      "unit": "decimal",
+      "as_of": "2026-01-01",
+      "source": "Aswath Damodaran - Implied Equity Risk Premium, United States",
+      "rationale": "MATURE-MARKET ERP ONLY; country risk is added separately. Same value and same KNOWN MISMATCH as every other block: a January 2026 reading paired with an August 2026 risk-free rate."
+    },
+    "unlevered_industry_beta": {
+      "name": "unlevered_industry_beta",
+      "value": 0.81,
+      "unit": "decimal",
+      "as_of": "2026-01",
+      "source": "Aswath Damodaran - US Industry Betas, Business & Consumer Services, unlevered beta corrected for cash",
+      "rationale": "Deliberately identical across all filers, per ISSUES.md #25. DoorDash is a delivery marketplace and Uber's Delivery segment is a material part of the same business, so the same Damodaran classification applies on its merits as well as for comparability. The classification is itself the judgement being held constant: holding it fixed is a precondition for the comparison, and letting it differ would make the comparison measure the classification choice rather than the businesses."
+    },
+    "debt_spread": {
+      "name": "debt_spread",
+      "value": 0.0111,
+      "unit": "decimal",
+      "as_of": "2026-01",
+      "source": "Aswath Damodaran - Ratings, Interest Coverage Ratios and Default Spread",
+      "rationale": "UNVERIFIED FOR THIS FILER, and near-irrelevant to the result. Copied from UBER_FY2024, whose BBB proxy was chosen for a rated investment-grade issuer. DoorDash's only debt is a zero-coupon convertible note and it holds net CASH of 2,782, so the debt weight in the WACC is negative or clamped to zero and the spread has essentially no influence. Verify before treating any output as a valuation."
+    },
+    "country_risk_premium": {
+      "name": "country_risk_premium",
+      "value": 0.0016,
+      "unit": "decimal",
+      "as_of": "2026-09-01",
+      "source": "analyst judgment, weighted on the FY2025 two-bucket geographic revenue disclosure",
+      "rationale": "Same method as the other filers, on far less disclosure. DoorDash reports only two buckets: United States 11,460 (83.5%) and International 2,257 (16.5%). The entire non-US bucket is undisaggregated, so the half-non-mature assumption applied to Uber's EMEA is applied to all of it here: an 8.2% weight against an assumed 2% emerging-bucket premium gives 0.0016. This is the weakest CRP of the three by disclosure quality. The direction of the likely error is that International is MORE mature than assumed - it is Canada, Australia, Wolt's Nordic and European markets and Deliveroo's UK and European markets, with Mexico the main emerging exposure - so this probably overstates the premium, which understates value and is the conservative direction."
+    },
+    "share_price": {
+      "name": "share_price",
+      "value": 231.89,
+      "unit": "USD",
+      "as_of": "2026-08-27",
+      "source": "NASDAQ close",
+      "rationale": "Closing price on August 27, 2026, the same trading day as UBER_FY2025 and LYFT_FY2025, so all three FY2025 valuations share one market state."
+    },
+    "discount_rate": {
+      "name": "discount_rate",
+      "value": 0.09,
+      "unit": "decimal",
+      "as_of": "2026-08-28",
+      "source": "integration test",
+      "rationale": "NOT A VALUATION INPUT. Present only because it is unclear whether the loader requires the key; run_valuation overwrites it with the derived bottom-up figure. See ISSUES.md #19: delete from every block once confirmed optional."
     }
   }
 }
