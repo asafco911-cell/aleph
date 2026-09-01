@@ -133,18 +133,6 @@ proceeding.
 
 Status: open.
 
-## #18 UBER_FY2024 country_risk_premium rationale contradicts its own value
-
-data/market.json's country_risk_premium rationale for UBER_FY2024 opens
-"ASSUMED ZERO, WHICH IS A DIRECTIONAL ASSUMPTION, NOT A NEUTRAL ONE" but the
-committed value is 0.0064, not zero. The rationale also justifies the figure
-against the Note 13 geographic split (US 48% / UK 19% / other 32%), while the
-pipeline now selects the more granular Note 2 split (US&CAN 54%) as the
-geographic mix it actually reports elsewhere - the rationale's own arithmetic
-frame no longer matches the breakdown the code uses.
-
-Status: open.
-
 ## #19 market.json carries a leftover integration-test discount_rate in both blocks
 
 Both UBER_FY2024 and LYFT_FY2025 blocks in data/market.json carry a
@@ -324,3 +312,17 @@ from the observations that actually fed it (blocking if periods disagree on
 scale), and adding `check_unit_matches_source` to verify the declared unit
 against the filing's own scale caption at extraction time.
 `UBER_FY2024` unchanged at $102.40; `LYFT_FY2025` corrected to $67.79.
+
+**#18 UBER_FY2024 country_risk_premium rationale contradicted its own value — CLOSED**
+The rationale opened "ASSUMED ZERO, WHICH IS A DIRECTIONAL ASSUMPTION, NOT
+A NEUTRAL ONE" above a committed value of 0.0064, and justified that figure
+against the Note 13 geographic split (US 48% / UK 19% / other 32%) the
+pipeline no longer selects, having moved to the more granular Note 2 split.
+The VALUE was not the problem and was not changed: rewritten against the
+mix the pipeline actually reports (US&CAN 54%, LatAm 6%, EMEA 28%, APAC
+11%), the same two judgements - which revenue is non-mature (LatAm + APAC
+at 17%, plus half of undisaggregated EMEA, giving 31%) and what premium
+that weight carries (an assumed 2%, undisclosed) - recompute to 0.0062,
+within rounding of the committed 0.0064. The number survived the change of
+source data, which is why it was kept rather than restated. `UBER_FY2024`
+confirmed unchanged at $102.40 after the rewrite.
