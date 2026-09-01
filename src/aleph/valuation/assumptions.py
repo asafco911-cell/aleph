@@ -17,6 +17,7 @@ contained in "restricted cash and cash equivalents". Two different facts
 matching one query in one period is an ambiguous query, and silently keeping
 the last one drops the figure that matters. Collisions therefore block.
 """
+from itertools import combinations
 from statistics import median
 
 from ..infra.units import resolve_scale
@@ -24,6 +25,14 @@ from ..schemas.evidence import Fact
 from ..schemas.valuation import AssumptionRange, Observation, Override
 
 MAX_RELATIVE_SPREAD = 1.0  # see ISSUES.md #13: scale-dependent, per-quantity limits pending
+
+# Rounding slack when checking a set of components against a stated total.
+# Measured on every geography breakdown extracted this session (Uber's two
+# breakdowns, both fiscal years; Lyft's; DoorDash's): every one sums to its
+# stated total exactly, to the unit the filing reports in. This tolerance
+# exists for filings that round components independently of the total, not
+# because slack was observed here.
+TOTAL_REVENUE_TOLERANCE = 0.005
 
 
 def _observations(
@@ -333,20 +342,145 @@ def derive_diluted_shares(facts, overrides) -> AssumptionRange:
                        overrides.get("diluted_shares"), _doc_ids(facts))
 
 
+def _stated_total_revenue(facts: list[Fact], period: str) -> float | None:
+    """Total revenue from the income statement, to check geography against.
+
+    Selected by target (statement:operations), not by wording: the geography
+    note's own restated "Total revenue by geography" line uses similar words
+    and would collide with an exact-string match. Returns None, not a guess,
+    if the operations target did not produce exactly one figure for the
+    period - an unreconcilable geography breakdown is then reported as
+    unverifiable rather than silently passed.
+    """
+    candidates = [
+        f for f in facts
+        if f.period == period and f.source
+        and f.source.target_key == "operations"
+        and "total revenue" in f.name.lower()
+    ]
+    return candidates[0].value if len(candidates) == 1 else None
+
+
+def _split_geographic_partitions(
+    rows: list[Observation], total: float | None
+) -> tuple[list[Observation] | None, str | None]:
+    """Reconcile one period's geography observations against stated revenue.
+
+    A filing can disclose SEVERAL geographic breakdowns of the SAME revenue:
+    Uber reports US&CAN/LatAm/EMEA/APAC and US/UK/all-other. Both are
+    complete and not additive - merging them reports the United States at 12
+    percent of revenue when it is 49. Previously this was avoided by picking
+    the more granular EXTRACTION TARGET, which worked only as long as the two
+    breakdowns arrived from two different notes. Measured on UBER_FY2025:
+    Uber dropped its standalone Revenue note and merged both breakdowns into
+    Note 13, so the two breakdowns now arrive from ONE target, and the
+    target-based split has nothing left to distinguish them by.
+
+    Reconciling against the filing's OWN stated total revenue does not
+    depend on which note or target a component came from. If the full set
+    already sums to the total, it is one clean breakdown. If it sums to
+    roughly twice the total, exactly two breakdowns are mixed together; the
+    two halves are found by search (only two-way splits are attempted - the
+    only case measured) and the more granular one is kept. Anything else -
+    no two-way split reconciles, or the search finds more than one distinct
+    reconciling split - is not guessed at; the caller blocks.
+
+    Only two-region-or-larger halves are searched (`range(2, ...)`): a
+    single fact equal to the total is not a "breakdown" of anything, so a
+    1-versus-n split is deliberately never tested. If a filer ever really
+    does disclose revenue as one region plus a residual, this function finds
+    no reconciling two-way split and the caller blocks, naming what it
+    found - the correct behaviour for a shape genuinely unmeasured, not a
+    silent gap.
+
+    Returns (chosen_observations, note) on success, note is None if no split
+    was needed. Returns (None, reason) when nothing could be reconciled.
+    """
+    if total is None:
+        return None, "no single stated total revenue found to check against"
+    if not rows:
+        return None, "no geographic revenue observations for this period"
+
+    tolerance = max(1.0, total * TOTAL_REVENUE_TOLERANCE)
+
+    whole_sum = sum(o.value for o in rows)
+    if abs(whole_sum - total) <= tolerance:
+        return rows, None  # Already one coherent breakdown.
+
+    seen_pairs: set[frozenset[frozenset[str]]] = set()
+    splits_found = []
+    for size in range(2, len(rows) - 1):
+        for group in combinations(rows, size):
+            if abs(sum(o.value for o in group) - total) > tolerance:
+                continue
+            complement = [o for o in rows if o not in group]
+            if abs(sum(o.value for o in complement) - total) > tolerance:
+                continue
+            # Both halves independently reconcile to the stated total: two
+            # partitions of the same revenue, not one. Identity is the
+            # UNORDERED pair of half-names, not (group, complement) as
+            # lists: when the two halves are the same size, both iteration
+            # orders satisfy "len(group) >= len(complement)", so an
+            # ordered-list key records the one real split twice and blocks
+            # on a manufactured disagreement. A frozenset of frozensets
+            # cannot be fooled by which half the loop happened to call
+            # "group".
+            key = frozenset((
+                frozenset(o.fact_name for o in group),
+                frozenset(o.fact_name for o in complement),
+            ))
+            if key in seen_pairs:
+                continue
+            seen_pairs.add(key)
+            # More regions wins on a real size difference. A genuine tie is
+            # broken by sorted names - not "more correct" than the other
+            # order, just deterministic, so the same input never resolves
+            # differently between runs.
+            if len(group) != len(complement):
+                chosen, other = (list(group), complement) if len(group) > len(complement) \
+                    else (complement, list(group))
+            else:
+                names_a = tuple(sorted(o.fact_name for o in group))
+                names_b = tuple(sorted(o.fact_name for o in complement))
+                chosen, other = (list(group), complement) if names_a < names_b \
+                    else (complement, list(group))
+            splits_found.append((chosen, other))
+
+    if len(splits_found) == 1:
+        chosen, other = splits_found[0]
+        return chosen, (
+            f"two geographic breakdowns of the same revenue were found in "
+            f"the source (each reconciles to the stated total {total:,.0f}); "
+            f"selected the more granular one, {len(chosen)} regions "
+            f"({', '.join(o.fact_name for o in chosen)}), over "
+            f"{len(other)} regions ({', '.join(o.fact_name for o in other)})"
+        )
+
+    if not splits_found:
+        return None, (
+            f"observations sum to {whole_sum:,.0f}, neither the stated total "
+            f"revenue {total:,.0f} nor a two-way split of it; cannot "
+            f"determine which facts form one coherent breakdown"
+        )
+
+    return None, (
+        f"{len(splits_found)} different two-way splits each reconcile to the "
+        f"stated total {total:,.0f}; cannot determine which is the real "
+        "breakdown without guessing"
+    )
+
+
 def derive_geographic_revenue(facts, overrides) -> AssumptionRange:
     """Revenue by geography, for the CRP judgement. Not itself a WACC input.
 
-    Region names are filer-specific, so facts are selected by the extraction
-    target that produced them rather than by matching region wording.
-
-    A filing can disclose SEVERAL geographic breakdowns on different axes: Uber
-    reports US&CAN/LatAm/EMEA/APAC in its revenue note and US/UK/all-other in
-    its segment note. Both are complete and they are not additive, so merging
-    them quadruples the denominator and reports the United States at 12 percent
-    of revenue when it is 49. One breakdown is chosen - the most granular - and
-    stated totals are excluded so the parts sum to the whole.
+    Region names are filer-specific, so components are gathered from every
+    extraction target whose key starts with "geography" rather than by
+    matching region wording. Selecting ONE coherent breakdown among possibly
+    several is done by reconciling against the filing's own stated total
+    revenue - see _split_geographic_partitions - not by which target or note
+    a component happened to come from.
     """
-    by_target: dict[str, list[Observation]] = {}
+    all_rows: list[Observation] = []
     for fact in facts:
         if not (fact.source and fact.period):
             continue
@@ -354,26 +488,34 @@ def derive_geographic_revenue(facts, overrides) -> AssumptionRange:
             continue
         if "total" in fact.name.lower():
             continue  # A stated total is the denominator, not a component.
-        by_target.setdefault(fact.source.target_key, []).append(
-            Observation(period=fact.period, value=fact.value, fact_name=fact.name,
-                       unit=fact.unit)
-        )
+        all_rows.append(Observation(period=fact.period, value=fact.value,
+                                    fact_name=fact.name, unit=fact.unit))
 
-    if not by_target:
+    if not all_rows:
         return _blocked("geographic_revenue", "USD millions", [], [],
                         "no geographic revenue disclosed in any candidate note; "
                         "a country risk premium cannot be weighted against the mix",
                         _doc_ids(facts))
 
-    # Most granular breakdown wins: more regions means a tighter CRP judgement.
-    chosen = max(
-        by_target.values(),
-        key=lambda rows: len({r.fact_name.rsplit(" ", 1)[0] for r in rows}),
-    )
-    latest = max(o.period for o in chosen)
-    return build_level("geographic_revenue", "USD millions",
-                       [o for o in chosen if o.period == latest], [],
-                       overrides.get("geographic_revenue"), _doc_ids(facts))
+    latest = max(o.period for o in all_rows)
+    latest_rows = [o for o in all_rows if o.period == latest]
+    total = _stated_total_revenue(facts, latest)
+    chosen, note = _split_geographic_partitions(latest_rows, total)
+
+    if chosen is None:
+        listing = "; ".join(f"{o.fact_name}={o.value:,.0f}" for o in latest_rows)
+        return _blocked(
+            "geographic_revenue", "USD millions", latest_rows, [],
+            f"geographic breakdown does not reconcile to stated total "
+            f"revenue: {note}. Observations: {listing}.",
+            _doc_ids(facts),
+        )
+
+    result = build_level("geographic_revenue", "USD millions", chosen, [],
+                         overrides.get("geographic_revenue"), _doc_ids(facts))
+    if note:
+        return result.model_copy(update={"rationale": f"{result.rationale} {note}."})
+    return result
 
 def derive_net_debt(facts, overrides) -> AssumptionRange:
     """Net debt is NOT derived. It is blocked until the analyst states a policy.

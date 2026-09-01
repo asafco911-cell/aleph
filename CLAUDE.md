@@ -191,6 +191,7 @@ python scripts\test_dcf_engine.py
 python scripts\test_schemas.py
 python scripts\test_sections.py
 python scripts\test_multicompany.py
+python scripts\test_assumptions.py
 ```
 
 `.github/workflows/eval-gate.yml` runs `experiments/ch05_evaluation/02_ab_test.py`
