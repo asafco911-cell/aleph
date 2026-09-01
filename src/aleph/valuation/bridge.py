@@ -19,17 +19,8 @@ Three consistency rules are enforced here because the engine cannot see them:
 """
 from dataclasses import dataclass
 
+from ..infra.units import matching_scales
 from ..schemas.valuation import AssumptionRange, MarketAssumption
-
-# Scale is matched on tokens, not on an exact string. The unit is free text
-# chosen by the model, so "thousands", "USD thousands" and "thousands of
-# shares" all describe the same scale and an exact-match table breaks on the
-# first phrasing it has not seen.
-SCALE_TOKENS = (
-    ("billion", 1000.0),
-    ("million", 1.0),
-    ("thousand", 0.001),
-)
 
 PLACEHOLDER_SOURCES = ("placeholder", "todo", "tbd")
 
@@ -75,14 +66,13 @@ def to_millions(assumption: AssumptionRange, which: str = "base") -> float:
     if value is None:
         raise BridgeError(f"{assumption.name}: {which} is unset ({assumption.status})")
 
-    unit = assumption.unit.lower()
-    matches = [scale for token, scale in SCALE_TOKENS if token in unit]
+    matches = matching_scales(assumption.unit)
     if len(matches) != 1:
         raise BridgeError(
             f"{assumption.name}: unit '{assumption.unit}' names "
             f"{len(matches)} known scales; cannot convert without guessing"
         )
-    return value * matches[0]
+    return value * matches[0][1]
 
 
 def fade(start: float, end: float, years: int) -> list[float]:
