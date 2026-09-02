@@ -138,8 +138,9 @@ src/aleph/
                  collision), bridge.py (assemble DCFInputs, unit
                  conversion), wacc.py (bottom-up WACC), dcf_engine.py
                  (pure arithmetic, no LLM; run_dcf/reverse_dcf/tornado)
-  forensics/     language.py (year-over-year MD&A omission detection —
-                 FINISHED, validated on both registrants, do not modify)
+  forensics/     language.py (year-over-year MD&A omission detection; a
+                 null-control self-diff must read zero on every bucket
+                 before any real-pair result is trusted)
   infra/         textnorm.py (Unicode look-alike normalisation, matching
                  only, never sent to the LLM), cache.py (SQLite, sha256 of
                  every input that can change an answer)
@@ -149,15 +150,16 @@ data/            manifest.json (6 filings: UBER/LYFT/DASH x FY2024/FY2025),
                  (analyst decisions, versioned, rationale required),
                  anchors.json, aleph_cache.db (gitignored), *.pdf (gitignored)
 
-scripts/         run_valuation.py (full pipeline CLI), test_*.py (regression,
-                 gates, schemas, sections, multicompany, dcf_engine), probe_*.py
-                 (ad hoc measurement scripts — the "measure, don't guess" tool)
+scripts/         run_valuation.py (full pipeline CLI), test_*.py (one script
+                 per pipeline stage or module, independently runnable),
+                 probe_*.py (ad hoc measurement scripts — the "measure,
+                 don't guess" tool)
 
 app.py           Streamlit UI. Every number carries a provenance grade;
                  a composite inherits the WEAKEST grade in its chain.
 experiments/     ch01-ch13, archived course chapters. Read for reference only.
-ISSUES.md        open issues, several already fixed (#10-13 open, #1-2 closed
-                 by this capstone's extract-to-DCF wiring).
+ISSUES.md        open and closed issues, each with the measurement behind
+                 it.
 ```
 
 ## Data flow for one filing (`scripts/run_valuation.py DOC_ID [price]`)
