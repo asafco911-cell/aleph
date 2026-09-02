@@ -100,6 +100,12 @@ def build_wacc(
     # Weights use NET debt, matching the net_debt policy already recorded for
     # the equity bridge. Using gross debt here and net debt there would apply
     # two different capital structures to one company.
+    #
+    # A net-cash company (net_debt < 0) clamps to zero: Hamada's formula is
+    # not well-defined for negative leverage. Clamping is a defensible
+    # convention, but a silent one is not - #17 - so it is recorded as a
+    # note below whenever it actually changes the value, not hidden inside
+    # the arithmetic.
     debt_value = max(net_debt, 0.0)
     total = equity_value + debt_value
     equity_weight = equity_value / total
@@ -112,7 +118,15 @@ def build_wacc(
     cost_of_debt_after_tax = (risk_free + spread) * (1 - tax)
     wacc = equity_weight * cost_of_equity + debt_weight * cost_of_debt_after_tax
 
-    notes = [
+    notes = []
+    if net_debt < 0:
+        notes.append(
+            f"net debt clamped to zero for relevering: net_debt={net_debt:,.0f} "
+            "(net-cash company); Hamada's formula is not well-defined for "
+            "negative leverage, so the negative figure is not applied, only "
+            "reported here"
+        )
+    notes += [
         f"levered beta = {beta_u:.2f} x (1 + (1 - {tax:.1%}) x "
         f"{debt_value:,.0f}/{equity_value:,.0f}) = {levered_beta:.3f}",
         f"cost of equity = {risk_free:.2%} + {levered_beta:.3f} x {erp:.2%} "

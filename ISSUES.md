@@ -93,26 +93,6 @@ rates, percent for levels), rather than one global ratio.
 
 Status: open.
 
-## #17 build_wacc clamps negative net debt to zero with no note in the output
-
-wacc.py computes `debt_value = max(net_debt, 0.0)` before Hamada relevering.
-LYFT_FY2025 has net CASH: assumptions print net_debt=-834.8, but the WACC
-block prints "levered beta = 0.81 x (1 + (1 - 21.0%) x 0/7,246) = 0.810" -
-the negative net debt has silently become zero in the numerator, with
-nothing in the printed output saying so.
-
-Clamping may be the right treatment for a net-cash company (Hamada's formula
-is not well-defined for negative leverage under some conventions), but a
-silent clamp is not acceptable in a system whose entire design principle is
-that a judgement is recorded, not smoothed over.
-
-Fix direction: either print the treatment explicitly in the WACC notes
-("net debt clamped to zero for relevering: net-cash company"), or require
-an explicit market.json/override acknowledgement of the treatment before
-proceeding.
-
-Status: open.
-
 ## #19 market.json carries a leftover integration-test discount_rate in both blocks
 
 Both UBER_FY2024 and LYFT_FY2025 blocks in data/market.json carry a
@@ -531,6 +511,19 @@ at the industry beta, 21% expensive at the regression beta, no third case"
 understated the dominant variable rather than describing it. The corrected
 comparison is #29's: which year's FCFF the analyst treats as
 representative moves the answer further than any beta choice does.
+
+**#17 build_wacc clamped negative net debt to zero with no note in the output — CLOSED**
+Decided: keep the clamp, print it. `debt_value = max(net_debt, 0.0)` is a
+defensible treatment for a net-cash company - Hamada's formula is not
+well-defined for negative leverage - but a silent clamp is not, in a system
+whose whole design principle is that a judgement is recorded, not smoothed
+over. wacc.py now prints a note naming the actual net debt figure whenever
+the clamp changes the value, in the same style as the other WACC notes, and
+stays silent when it does not fire. No new blocking gate: the clamp is a
+convention, not an analyst decision, so recording it in the output is
+enough. Confirmed firing on `LYFT_FY2025` ("net debt clamped to zero for
+relevering: net_debt=-835") and `DASH_FY2025` ("net_debt=-2,782"); confirmed
+silent on `UBER_FY2024`, whose net debt is positive.
 
 **#28 derive_geographic_revenue silently merged two overlapping revenue breakdowns for UBER_FY2025 — CLOSED**
 "Pick the more granular extraction TARGET" worked only as long as a filing's
