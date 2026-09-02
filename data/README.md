@@ -1,12 +1,10 @@
 # Filing PDFs
 
 The six 10-K filings this project runs against are not distributed with the
-repository. `data/*.pdf` is gitignored; download each filing yourself and
-verify it against the sha256 already recorded in `data/manifest.json` before
-running the pipeline against it. A hash match is a stronger reproducibility
-claim than shipping the PDF itself would be - it proves the exact bytes the
-pipeline was built and tested against, rather than asking you to trust that
-a bundled file was never altered.
+repository. `data/*.pdf` is gitignored. Get each filing from SEC EDGAR at
+the source below, place it at `data/<expected file name>`, and read
+"Verifying a downloaded filing" further down before assuming a hash mismatch
+means something is broken - for these specific files, it does not.
 
 | doc_id | company | fiscal year | form | expected file name | sha256 |
 |---|---|---|---|---|---|
@@ -23,18 +21,63 @@ to disambiguate against, and left as-is since `doc_id` is the interface the
 pipeline resolves by, never the file name (see the "eight settled principles"
 in `CLAUDE.md`).
 
-Each filing is a public SEC 10-K, retrievable from EDGAR
-(https://www.sec.gov/cgi-bin/browse-edgar) or the issuer's own investor
-relations site. Place the downloaded file at `data/<expected file name>` and
-verify it before running anything against it:
+## Source on EDGAR
+
+Each filing below is the original 10-K, not an amendment - `manifest.py`
+rejects 10-K/A filings outright, and DoorDash in particular has one on file
+(filed 2026-05-06) that is not the document this project uses. The index
+page lists every exhibit; the primary document is the 10-K itself.
+
+| doc_id | CIK | accession number | index page |
+|---|---|---|---|
+| UBER_FY2025 | 1543151 | 0001543151-26-000015 | [index](https://www.sec.gov/Archives/edgar/data/1543151/000154315126000015/0001543151-26-000015-index.htm), primary doc `uber-20251231.htm` |
+| UBER_FY2024 | 1543151 | 0001543151-25-000008 | [index](https://www.sec.gov/Archives/edgar/data/1543151/000154315125000008/0001543151-25-000008-index.htm), primary doc `uber-20241231.htm` |
+| LYFT_FY2025 | 1759509 | 0001628280-26-006960 | [index](https://www.sec.gov/Archives/edgar/data/1759509/000162828026006960/0001628280-26-006960-index.htm), primary doc `lyft-20251231.htm` |
+| LYFT_FY2024 | 1759509 | 0001759509-25-000025 | [index](https://www.sec.gov/Archives/edgar/data/1759509/000175950925000025/0001759509-25-000025-index.htm), primary doc `lyft-20241231.htm` |
+| DASH_FY2025 | 1792789 | 0001792789-26-000013 | [index](https://www.sec.gov/Archives/edgar/data/1792789/000179278926000013/0001792789-26-000013-index.htm), primary doc `dash-20251231.htm` |
+| DASH_FY2024 | 1792789 | 0001628280-25-005715 | [index](https://www.sec.gov/Archives/edgar/data/1792789/000162828025005715/0001628280-25-005715-index.htm), primary doc `dash-20241231.htm` |
+
+Or browse from each company's EDGAR filing history: CIK 1543151 (Uber),
+1759509 (Lyft), 1792789 (DoorDash), at
+`https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=<CIK>&type=10-K`.
+
+## Verifying a downloaded filing
+
+The sha256 in the table above identifies the exact six PDF files this
+project's results were produced from - a real integrity guarantee for
+anyone who is given these specific files, since a byte changed anywhere
+changes the hash. **It will not match a fresh download from EDGAR.**
+
+These PDFs were produced by printing EDGAR's HTML filing to PDF from
+Microsoft Edge, and that rendering is not deterministic: a different
+browser version, a different rendering engine (Chrome, Firefox, a
+command-line tool), or different page/margin settings all produce a
+different PDF - different bytes, different embedded fonts, different page
+breaks - from the identical underlying filing text. A hash comparison
+would fail for the first person who tries it, for a reason that has
+nothing to do with getting the wrong document.
+
+So: get the filing from the EDGAR link above, render it to PDF however you
+choose, and expect its hash to differ from the table. That is not a sign
+of a broken pipeline or the wrong filing - it is a rendering artifact.
+`python scripts\build_manifest.py` does not compare against the committed
+hash at all; it computes whatever hash your PDF happens to have and writes
+it straight into `data/manifest.json`, overwriting the recorded one,
+without warning. Confirmed by reading `_sha256` and `build_manifest` in
+`src/aleph/documents/manifest.py`: nothing there reads the old value before
+writing the new one. A hash "mismatch" is not a failure state this pipeline
+detects or blocks on - it is simply what a fresh `data/manifest.json` will
+say after you build it locally.
+
+What the hash is actually good for: if you are handed the six PDFs
+directly (rather than rendering your own), verifying against this table
+confirms you have the identical files this project's committed results -
+including the `Value per share: 77.08` / `49.06` anchors - were run
+against.
 
 ```
 python -c "import hashlib; print(hashlib.sha256(open('data/uber_10k.pdf','rb').read()).hexdigest())"
 ```
-
-Compare the printed hash against the table above. A mismatch means either a
-different filing (a 10-K/A amendment, a different fiscal year) or a corrupted
-download - not a file this pipeline was built or tested against.
 
 ## data/uber_10k.pdf is still in git history
 
