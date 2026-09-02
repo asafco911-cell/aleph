@@ -17,6 +17,24 @@
       "decided_at": "2026-08-27"
     }
   },
+  "UBER_FY2025": {
+    "effective_tax_rate": {
+      "excluded_periods": [],
+      "fixed_value": 21.0,
+      "unit": "percent",
+      "rationale": "Same policy as UBER_FY2024 and LYFT_FY2025. Reported rates swing between a large deferred-tax benefit and a normal rate: FY2023 9.2 percent, FY2024 -139.6 percent on the 5.2B USD federal valuation allowance release, and FY2025 approximately -74.9 percent on the 5.0B USD Netherlands release. These are balance-sheet recognition events, not earning power. Using the 21.0 percent US federal statutory rate as the going-forward assumption. KNOWN INCOMPLETE EVIDENCE: the FY2025 rate fact was rejected by columns_undetermined (see ISSUES.md #23), so the block that prompted this decision listed only two of the three disclosed years. The FY2025 figure was computed by hand from the disclosed provision and pre-tax income and does not change the conclusion, but the decision was taken against a partial list.",
+      "decided_by": "Asi",
+      "decided_at": "2026-09-01"
+    },
+    "net_debt": {
+      "excluded_periods": [],
+      "fixed_value": 2888.0,
+      "unit": "USD millions",
+      "rationale": "Same policy as UBER_FY2024 and LYFT_FY2025. Long-term debt net of current portion 10,521 less cash and cash equivalents 7,105 less short-term investments 528. Restricted cash of 2,542 is excluded because it is not available to service debt; it is disclosed as two lines, current 631 and non-current 1,911, which is the same current-plus-non-current combination the UBER_FY2024 override already made by hand for its 2,717. Operating lease liabilities are excluded because their cost already sits inside operating cash flow. Current portion of long-term debt was not extracted and remains a known gap, as in UBER_FY2024. NOTE: derive_net_debt blocked this quantity on an ambiguous-fact collision between the two restricted cash lines rather than on the usual missing-policy path, so no component list was printed at all; the components above were read from the raw balance sheet facts.",
+      "decided_by": "Asi",
+      "decided_at": "2026-09-01"
+    }
+  },
   "LYFT_FY2025": {
     "effective_tax_rate": {
       "excluded_periods": [],
@@ -38,9 +56,35 @@
       "excluded_periods": [],
       "fixed_value": 9.2,
       "unit": "percent",
-      "rationale": "FY2024 growth of 31.4 percent and FY2025 of 9.2 percent are not draws from one distribution: Lyft moved from a mature North American ridesharing market to international expansion, acquiring Freenow in July 2025 and TBR in October 2025. Averaging them would restate the dispersion the gate correctly refused. Using the FY2025 rate of 9.2 percent as the going-forward year-one assumption. THIS IS TOTAL GROWTH, NOT ORGANIC: 9.2 percent already contains roughly half a year of Freenow and one quarter of TBR, so organic growth was lower and cannot be quantified from the filing alone. It is also directionally CONSERVATIVE for FY2026, which carries a full year of both: reported Q2 2026 revenue growth was 16.1 percent and sell-side consensus for FY2026 is about 15 percent. Those figures are deliberately excluded from the base case because UBER_FY2024 derives its growth from the filing, and importing a consensus forecast for one company and not the other would make the cross-company comparison measure the input source rather than the businesses. The consensus path belongs in sensitivity, and the reverse DCF reports what the market price implies.",
+      "rationale": "FY2024 growth of 31.4 percent and FY2025 of 9.2 percent are not draws from one distribution: Lyft moved from a mature North American ridesharing market to international expansion, acquiring Freenow in July 2025 and TBR in October 2025. Averaging them would restate the dispersion the gate correctly refused. Using the FY2025 rate of 9.2 percent as the going-forward year-one assumption. THIS IS TOTAL GROWTH, NOT ORGANIC: 9.2 percent already contains roughly half a year of Freenow and one quarter of TBR, so organic growth was lower and cannot be quantified from the filing alone. It is also directionally CONSERVATIVE for FY2026, which carries a full year of both: reported Q2 2026 revenue growth was 16.1 percent and sell-side consensus for FY2026 is about 15 percent. Those figures are deliberately excluded from the base case because the other filers derive their growth from the filing, and importing a consensus forecast for one company and not the others would make the cross-company comparison measure the input source rather than the businesses. The consensus path belongs in sensitivity, and the reverse DCF reports what the market price implies.",
       "decided_by": "Asi",
       "decided_at": "2026-08-31"
+    }
+  },
+  "DASH_FY2025": {
+    "effective_tax_rate": {
+      "excluded_periods": [],
+      "fixed_value": 21.0,
+      "unit": "percent",
+      "rationale": "Same 21.0 percent US federal statutory policy as the other two filers, so the three valuations stay comparable, but for a different reason than theirs. Uber's and Lyft's reported rates are distorted by one-off valuation allowance releases; DoorDash's are distorted by a company crossing into profitability, with rates of -5.8 percent in FY2023, 25.0 percent in FY2024 and 0.7 percent in FY2025. A summary statistic over a loss year, a first profitable year and a year of loss carryforward utilisation describes a transition, not a going-forward rate. KNOWN DIRECTIONAL ASSUMPTION: remaining carryforwards mean the near-term CASH tax rate is likely below 21 percent, so this understates value.",
+      "decided_by": "Asi",
+      "decided_at": "2026-09-01"
+    },
+    "net_debt": {
+      "excluded_periods": [],
+      "fixed_value": -2782.0,
+      "unit": "USD millions",
+      "rationale": "Same policy as the other two filers. Convertible notes, net 2,724 less cash and cash equivalents 4,378 less short-term investments 1,128, giving net CASH of 2,782. Restricted cash of 273 is excluded because it is not available to service debt. Operating lease liabilities are excluded because their cost already sits inside operating cash flow. The component list printed under the block was verified complete for this filing, with no unmatched-fact line, unlike DASH_FY2024 which prints its short-term securities under a different caption (see ISSUES.md #26). Convertible notes are DoorDash's first balance-sheet debt: 2,750 principal issued May 2025, carried net of 26 in unamortised issuance costs.",
+      "decided_by": "Asi",
+      "decided_at": "2026-09-01"
+    },
+    "interest_expense": {
+      "excluded_periods": [],
+      "fixed_value": 0.0,
+      "unit": "USD millions",
+      "rationale": "DoorDash has no interest expense to add back. Its income statement reports only Interest income, net, with no gross interest expense line, and its only debt is the 2030 Convertible Notes, which Note 9 states do not bear regular cash interest. The 0.22 percent effective rate disclosed there is the amortisation of 26 of issuance costs over the note's life, an accounting charge already inside operating cash flow, not a cash coupon. Additional interest can accrue only on specific default-type events capped at 0.50 percent, none of which had occurred at 31 December 2025. Set to zero rather than to an estimate: no dollar interest expense is disclosed anywhere in the filing, and inventing one to fill the FCFF formula's interest term would be a fabricated input. The block was correct; it reflected an absence in the company, not a failure of extraction.",
+      "decided_by": "Asi",
+      "decided_at": "2026-09-01"
     }
   }
 }
