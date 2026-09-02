@@ -1,4 +1,9 @@
 """Tests for the DCF engine. A financial engine without tests is a guess."""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path("src/aleph/valuation")))  # engine imports by bare name
+
 from dcf_engine import DCFInputs, run_dcf, validate, DCFConsistencyError
 
 
