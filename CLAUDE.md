@@ -21,6 +21,13 @@ the LYFT_FY2025 unit-scale bug and a silent net-debt clamp in WACC.
 - Before editing `src/aleph/valuation/`, `src/aleph/extraction/`,
   `data/overrides.json`, or `data/market.json`, show the diff or full file
   first. Asi reviews those personally.
+- After any `git rm --cached`, verify with `git ls-tree HEAD`, never with
+  `git status` alone. `git status` looks clean once the deletion is staged;
+  passing that same path explicitly to a later `git commit <path>` re-adds
+  the working-tree copy (still on disk - `rm --cached` never touches it)
+  and silently reverses the staged deletion, and `git status` will not show
+  it happened. Only `git ls-tree HEAD` proves the path actually left the
+  tree.
 - A fix is not finished until a command proves it. Every change reports the
   command run and its output. `python scripts\run_valuation.py UBER_FY2024
   76.95` must still print `Value per share: 77.08` after any change to
