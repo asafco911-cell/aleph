@@ -480,6 +480,43 @@ again. Five instances of the same class in one session is no longer a
 case for recommending the pre-push sweep; it is the case for treating it
 as required before this repository is public, not optional.
 
+THE SWEEP, run in full: every docstring and Pydantic field description in
+`src/aleph/` stating a guarantee, count, unit, or behaviour; every command
+CLAUDE.md, README.md or `data/README.md` tells a reader to run, actually
+run; every count, threshold or file-layout line in CLAUDE.md against the
+code; every closed-entry result in ISSUES.md that a command could
+re-verify, re-run where it could.
+
+Five instances found by accident. Thirteen more found by looking - nine of
+them in one file (CLAUDE.md), two low-stakes (`graph.py`'s unenforced
+`Node.type`/`Edge.relation`, consumed only by archived experiments), two
+in the final docstring pass (`statements.py`'s stale equity-matching
+description plus dead code, `cache.py`'s undercounted key description).
+Categories 2 and 4 (documented commands; ISSUES.md's re-runnable claims)
+came back clean everywhere sampled - the failure mode this issue names is
+concentrated in prose that describes state, not in commands or results.
+
+The cause, not just the count: nine of the thirteen were all STATUS -
+"two open tasks in the current session," "see Task 2 for where it
+breaks," "found this session, not yet numbered," "IS tracked in git" -
+each true the night it was written and false within hours, because
+CLAUDE.md mixed durable architecture with perishable state in one file,
+and state rots faster than anyone edits architecture. Fixed structurally,
+not line by line: CLAUDE.md now carries no status at all - every section
+describing what is in progress, currently broken, or found this session
+was deleted, replaced with one line pointing at ISSUES.md and git log as
+the maintained record of current state. The three remaining factual
+errors (an unreproducible number, an undercounted filer list, an
+undercounted guard list) were fixed directly. `graph.py` got a sentence
+stating its constraints are documentation, not enforcement, rather than a
+validator bolted onto types the live pipeline never touches.
+`statements.py` and `cache.py` close category 1.
+
+The count alone is a number; the cause is the finding. A durable document
+that also carries perishable status will always drift, no matter how
+carefully any one edit is checked - the fix has to be structural
+(state lives elsewhere) or the tenth instance is only a matter of time.
+
 ## Closed
 
 **#1 Connect extractor to DCF engine (Ch8 + Ch9) — CLOSED**
