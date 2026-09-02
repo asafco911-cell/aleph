@@ -356,6 +356,67 @@ single-anchor ten-year DCF is not the right instrument for a company
 whose FCFF has moved from negative to positive within its own disclosed
 history. Not a code defect to patch.
 
+## #30 sha256 is recorded as content identity but never used to detect a replaced document
+
+`schemas/documents.py` states the principle directly: `doc_id` is a
+"Human-authored stable id" (line 74) and `sha256` is "Content identity. The
+file name is metadata; this is not." (line 79). The design intent - same
+doc_id, different hash, means the document was replaced - is never checked
+anywhere in the pipeline.
+
+`_sha256(path)` and `build_manifest()` (`src/aleph/documents/manifest.py`)
+compute a fresh hash from whatever bytes currently sit at `data/<file_name>`,
+and `scripts/build_manifest.py`'s `main()` writes it straight into
+`data/manifest.json`, unconditionally. Nothing in that path reads the hash
+already committed for that `doc_id` before overwriting it, and nothing
+compares old to new. The only checks inside `inspect()` that can raise
+`DocumentError` at all are unrelated to bytes: `_exactly_one` on the
+form-type regex, `_exactly_one` on the fiscal-year regex, and
+`_check_anchors` matching specific verified-figure strings in the extracted
+text. Replace `data/uber_10k.pdf` under `UBER_FY2025` with a corrected
+filing, a re-print, or simply the wrong document - as long as it is still a
+10-K, states a parseable fiscal year, and contains the same anchor
+strings - and every one of those checks can still pass while the hash
+silently changes underneath the same doc_id.
+
+This is the second instance this session of documentation describing an
+intent the code has never executed. The first is #29's finding that
+`DCFInputs.base_cash_flow`'s field comment calls it "most recent normalized
+FCF" while nothing normalises anything. There the gap was a missing
+computation; here it is a missing check, but the shape is the same: a
+comment or a field description states what the system is supposed to
+guarantee, and no code path enforces it.
+
+Not yet observed to cause harm: no filing has actually been replaced under
+an existing doc_id in this project's history, so this has not produced a
+wrong valuation that a reader trusted. It is a latent gap in an explicitly
+stated architectural guarantee, found while answering a direct question
+about README wording (see build_manifest's behaviour on a re-rendered PDF,
+data/README.md), not from a failure in the field.
+
+Fix direction: `build_manifest()` (or its caller) should read the
+already-committed `data/manifest.json` before writing the new one, compare
+the new sha256 against the old one for each doc_id, and treat a mismatch as
+a decision rather than a silent overwrite - consistent with principle #5 (a
+library raises; the CLI decides the exit code). The library signals the
+mismatch; `scripts/build_manifest.py` decides whether that means `exit(1)`
+or a printed warning that still allows the new manifest to be written when
+the replacement was deliberate (a corrected 10-K/A superseding an
+original, for instance).
+
+Status: open. Not implemented, per instruction - this is a design decision
+about which failure mode is correct (hard block vs. warn), not a bug to
+patch reflexively.
+
+Two instances in one session make this a class worth naming, not a
+coincidence: a docstring, field comment or schema description states a
+guarantee, and no code path enforces it. Both were found by reading the
+code to answer an unrelated question, not by a failing test - nothing in
+the suite can detect the gap, because the suite tests what the code does,
+not what the documentation claims it does. A sweep of the remaining
+docstrings and field descriptions against the code they describe is worth
+doing before this repository is public.
+
 ## Closed
 
 **#1 Connect extractor to DCF engine (Ch8 + Ch9) — CLOSED**
