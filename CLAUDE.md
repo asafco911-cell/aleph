@@ -59,6 +59,9 @@ required. The LLM copies; Python checks that copying happened and that what
 was copied is right. The LLM never searches, navigates, computes, or chooses
 a source.
 
+Decisions with a real rejected alternative are recorded in `docs/adr/`, one
+file each.
+
 ## Eight settled principles — do not relitigate
 
 1. File names are not an interface; `doc_id` is. `data/uber_10k.pdf` is
