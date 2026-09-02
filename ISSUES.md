@@ -427,6 +427,22 @@ instructions file is the cheapest possible version of this bug - no
 runtime consequence, caught by an outline instead of a test - and it
 strengthens rather than weakens the case for the sweep above.
 
+A fourth instance is a variant of the same class, not a docstring this
+time: CLAUDE.md's "Commands that verify the system works" documents
+`python scripts\test_dcf_engine.py` as one of nine commands that prove the
+pipeline works. Run exactly as written, it raised `ModuleNotFoundError: No
+module named 'dcf_engine'` - the script never added `src/aleph/valuation`
+to `sys.path` itself, unlike `run_valuation.py`, which imports the same
+module by the same bare name. Found the same way as the other three:
+auditing CLAUDE.md's own claims against what actually runs, before writing
+the README's running-it section, not by a test catching it - there is no
+test of the test runner. Fixed on its own, adding the same
+`sys.path.insert` line `run_valuation.py` already uses; verified passing
+with no `PYTHONPATH` set, exactly as documented. This widens the sweep
+already recommended above: not only docstrings and field descriptions
+against their code, but every command CLAUDE.md tells a reader to run,
+against what happens when it is actually run.
+
 ## Closed
 
 **#1 Connect extractor to DCF engine (Ch8 + Ch9) — CLOSED**
