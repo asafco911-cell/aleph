@@ -178,18 +178,26 @@ is exactly how a real problem could sit unexamined.
 
 Status: open, unmeasured.
 
-## #24 DoorDash has never been valued
+## #24 DASH_FY2024 has never been valued
 
-Extraction and gates pass for all six filings (`test_multicompany.py`
-exercises DASH_FY2024 and DASH_FY2025 alongside Uber and Lyft), but
-`run_valuation.py` has only ever been run end to end for UBER_FY2024 and
-LYFT_FY2025. DASH_FY2024 and DASH_FY2025 have no market.json block, no
-overrides.json entries (net_debt, effective_tax_rate would both block), and
-no confirmed value per share. The cross-company comparison this project
-argues for (see CLAUDE.md, "Cross-company comparability") has one data point
-fewer than the manifest suggests.
+DASH_FY2025 is resolved: it has a `market.json` block and `overrides.json`
+entries (`effective_tax_rate`, `net_debt`, `interest_expense`), has been
+run end to end repeatedly (`python scripts\run_valuation.py DASH_FY2025
+231.89`), and appears in `README.md`'s own three-company table alongside
+UBER_FY2025 and LYFT_FY2025. The cross-company comparison this project
+argues for (see CLAUDE.md, "Cross-company comparability") now has all
+three FY2025 data points the manifest suggests.
 
-Status: open.
+DASH_FY2024 does not. It has no `market.json` block and no
+`overrides.json` entries (`net_debt`, `effective_tax_rate` would both
+block), and `run_valuation.py` has never been run against it end to end.
+Extraction and gates do pass for it (`test_multicompany.py` exercises it
+alongside the other five filings), so the remaining gap is entirely in
+the judgement layer - market inputs and override policy - not extraction.
+
+Status: open, narrowed. Retitled from "DoorDash has never been valued" -
+found stale while checking a README claim about ISSUES.md's own honesty,
+not while looking for it.
 
 ## #26 Derivation queries match on wording measured against two filers only
 
@@ -356,6 +364,18 @@ single-anchor ten-year DCF is not the right instrument for a company
 whose FCFF has moved from negative to positive within its own disclosed
 history. Not a code defect to patch.
 
+The reverse DCF is not an independent check on this instability - it
+inherits the same base_cash_flow dependency rather than escaping it.
+`run_valuation.py` calls `reverse_dcf(bridged.inputs, market_price)`,
+which holds `base_cash_flow` fixed at the latest-period value and searches
+only over `growth_rates`; the base is never varied. The implied growth
+rate it reports is conditional on which year's FCFF happened to be the
+latest-period basis, same as the point valuation is. Confirmed by reading
+`reverse_dcf` (`dcf_engine.py`) and its call site directly, after an
+initial claim to the contrary - that it "doesn't touch the contaminated
+cash-flow base at all" - turned out to be wrong and was caught before it
+reached the README.
+
 ## #30 sha256 is recorded as content identity but never used to detect a replaced document
 
 `schemas/documents.py` states the principle directly: `doc_id` is a
@@ -442,6 +462,23 @@ with no `PYTHONPATH` set, exactly as documented. This widens the sweep
 already recommended above: not only docstrings and field descriptions
 against their code, but every command CLAUDE.md tells a reader to run,
 against what happens when it is actually run.
+
+A fifth instance surfaced one hour after the fourth, in the same
+verification block, this time in CLAUDE.md itself rather than a script:
+the working-agreement bullet ("...must still print `Value per share:
+77.08`...") and the "Commands that verify the system works" comments
+("# must print Value per share: 77.08") were stale, not just quoted stale
+by the README. Since the RESULT block was rewritten to lead with the range
+(`99172d9`), `run_valuation.py` has never printed a bare "Value per share:
+77.08" line - it prints "Latest-period basis: 77.08" inside a labelled
+range. The README's own copy of the same two lines, written as "verbatim
+from CLAUDE.md," faithfully reproduced CLAUDE.md's staleness rather than
+inventing a new one of its own. Fixed in both places at once - the
+working-agreement bullet, the verification-commands block, and the
+README's copy of the same two lines - so "verbatim from CLAUDE.md" is true
+again. Five instances of the same class in one session is no longer a
+case for recommending the pre-push sweep; it is the case for treating it
+as required before this repository is public, not optional.
 
 ## Closed
 
