@@ -280,6 +280,92 @@ loss happened one layer downstream, in derivation, not here.
 
 Status: open, unmeasured beyond the synthetic proof above.
 
+## #29 A ten-year DCF anchored on one year's FCFF is the wrong instrument for a company mid-inflection
+
+base_cash_flow is a LEVEL quantity (build_level, assumptions.py), taken
+from the single most recent period by design. For operating_cash_flow,
+this means one year's entire CFO flows into FCFF and the DCF at full
+value, with no normalisation step anywhere in the pipeline.
+dcf_engine.py's own field comment calls it "most recent normalized FCF"
+(DCFInputs.base_cash_flow); nothing normalises anything - the comment
+describes an intent the code has never executed. Separately,
+base_cash_flow's only tornado bound is built from capex dispersion alone
+(build_dcf_inputs, bridge.py) - the sensitivity analysis this project
+relies on to surface risk does not carry this risk at all.
+
+MEASURED, not assumed: UBER_FY2024 and UBER_FY2025 value the same
+company, at the same $76.95 market price, on the same day, one filing
+apart - $77.08 versus $119.95, a 56% move. In the same year: revenue grew
+18.3%, net income grew 2.5%, CFO grew 41.5% - three different pictures of
+one company. Decomposed directly from the cash flow statement, the whole
+gap is non-cash reconciliation: net income and working capital each moved
+under 3% of CFO; nearly the entire +2,962 CFO increase (7,137 -> 10,099)
+is two lines - deferred income taxes (+1,248) and unrealized gain/loss on
+marketable securities (+1,929). These are the SAME valuation-allowance
+mechanics already documented as forcing the effective_tax_rate override
+(Note 11) - one accounting event distorts two separate inputs to this
+valuation, and only one of them was ever blocked pending analyst judgement.
+
+TESTED WHETHER AVERAGING FIXES IT. IT DOES NOT - IT MAKES THE INSTABILITY
+WORSE, NOT BETTER: Uber's own four-year FCFF series is -957 (2022), 1,927
+(2023), 5,512 (2024), 8,285 (2025). Latest-period basis: 77.08 (FY2024
+filing) -> 119.95 (FY2025 filing), +56%. Three-year-average basis: 30.22
+-> 75.89, +151%. This is not a general property of averages - it is the
+specific composition of this window: moving from the FY2024 filing's
+average to the FY2025 filing's, -957 (2022) leaves the three-year window
+and +8,285 (2025) enters it, a swing of 9,242 across the window, against
+a 2,773 swing in the latest single point alone (5,512 -> 8,285). The
+window's composition amplifies the swing already present in the series;
+it does not smooth it. There is no stable base to normalise to. Uber's
+FCFF went from negative to +8,285 in four years - that is real business
+inflection, not measurement noise, and a ten-year DCF anchored on any
+single year (or any short average) is the wrong instrument for it.
+
+Computed directly from each quantity's own per-period observations
+(CFO, interest, capex, SBC - all already extracted, all already
+period-aligned within each filing) and re-run through run_dcf with only
+base_cash_flow varied, holding the discount rate, terminal growth, shares
+and net debt fixed: UBER_FY2025's three disclosed years imply a value-per-
+share range of $26.86 to $119.95. LYFT_FY2025: -$39.37 to $49.06 - the low
+bound is negative, because Lyft's FY2023 CFO was itself negative.
+DASH_FY2025: $54.85 to $124.27 - the narrowest range of the three, both in
+FCFF terms and as a share of the base case.
+
+THE CONTRAST MATTERS: DoorDash does not show this pattern. Its CFO growth
+(+299, FY2024->FY2025) is real net income growth (+815) net of a
+working-capital drag (-661), not a non-cash swing. Uber's CFO growth is
+~97% two non-cash lines. Lyft's reported $1.168B CFO rests on net income
+built almost entirely from a $2.897B non-cash tax benefit against a
+disclosed PRE-TAX LOSS of $53M, with insurance reserves (41% of CFO) and
+accrued/other liabilities (33%) accounting for roughly three-quarters of
+the reported figure.
+
+The three FY2025 valuations, at the SAME market date, rank as: Uber
+$76.95 market / $119.95 model = 0.64x; Lyft $17.35 / $49.06 = 0.35x;
+DoorDash $231.89 / $124.27 = 1.87x. This is the SAME order as CFO
+contamination, most to least: Lyft (nearly all of reported CFO is
+non-operating) > Uber (nearly all of the YEAR-OVER-YEAR INCREASE is
+non-operating) > DoorDash (CFO growth is real). The more contaminated the
+base year, the further the model's answer sits below market price. Three
+data points is not proof, and this is flagged as a pattern worth
+investigating, not a established relationship - but it should be stated,
+not left for a reader to notice on their own.
+
+This is not a bug in any single component. Every extraction gate passed,
+every unit converted correctly, every override applied as intended - SBC
+subtraction, the geography reconciliation, and derive_net_debt's
+override-ordering all worked exactly as designed on these same runs. It
+is a modelling choice - one year of CFO stands for sustainable owner
+earnings - that was never stated as a choice and carries no sensitivity
+analysis that would reveal how much the answer depends on it.
+
+Status: open. This is Asi's judgement: whether the honest output is a
+range this wide (computed above, from data already in the pipeline), some
+other treatment of the disclosed one-off items, or a conclusion that a
+single-anchor ten-year DCF is not the right instrument for a company
+whose FCFF has moved from negative to positive within its own disclosed
+history. Not a code defect to patch.
+
 ## Closed
 
 **#1 Connect extractor to DCF engine (Ch8 + Ch9) — CLOSED**
