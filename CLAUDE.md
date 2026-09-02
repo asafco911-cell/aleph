@@ -3,8 +3,11 @@
 Capstone of a 14-chapter course (chapters 1-13 archived, read-only, under
 `experiments/`). Owner: Asi, 23, Tel Aviv, building toward running a fund.
 Status: capstone nearly done. Remaining work is correctness, then packaging
-for GitHub. Two open tasks are tracked in the current session, not here:
-the LYFT_FY2025 unit-scale bug and a silent net-debt clamp in WACC.
+for GitHub.
+
+Current state lives in ISSUES.md and git log, both of which are maintained;
+this file is architecture and working agreement only. Nothing that can go
+stale in a week belongs here.
 
 ## Working agreement (non-negotiable)
 
@@ -43,12 +46,6 @@ removed `temperature`/`top_p`/`top_k` from `messages.create()` — passing them
 raises `TypeError`. Model in use: `claude-sonnet-5`. `.env` holds
 `ANTHROPIC_API_KEY`, gitignored. `data/aleph_cache.db` (SQLite, content-
 addressed LLM cache) is gitignored. Never commit either.
-
-The DCF engine's internal unit is MILLIONS. Filings declare their own unit —
-Uber reports in millions, Lyft in thousands — and `bridge.py` is responsible
-for converting every quantity from its declared unit to millions before it
-reaches the engine. This is the intended contract, not a description of
-current behaviour: see Task 2 in the working session for where it breaks.
 
 ## Architecture, and why
 
@@ -205,39 +202,9 @@ python scripts\test_assumptions.py
 against the golden dataset on PRs to main (separate from the capstone gates
 above — it evaluates the ch05 retrieval work, not the valuation pipeline).
 
-## Known open issues (see ISSUES.md for full detail)
+## Documented residual risk (deliberate scope boundaries)
 
-- #13: dispersion limit (`MAX_RELATIVE_SPREAD = 1.0` in `assumptions.py`) is
-  a single global ratio; scale-dependent for rate quantities near zero.
-- #12: column detection is note-scoped, not table-scoped (year columns from
-  one table can misapply to a same-note segment table with matching cell count).
-- #11: BM25 tokenisation of typographic apostrophes is unmeasured.
-- #10: section ordering only enforces `page >= floor`, not offset, within a
-  shared page.
-
-Found this session, not yet numbered in ISSUES.md:
-- `data/market.json` UBER_FY2024 `country_risk_premium`: the rationale opens
-  "ASSUMED ZERO" but the value is 0.0064, and it cites the Note 13 geographic
-  split (US 48% / UK 19% / other 32%) while the pipeline now selects the
-  more granular Note 2 split (US&CAN 54%). A committed file whose rationale
-  contradicts its own value.
-- `data/market.json`: `discount_rate` 0.09 with source "integration test" is
-  still present in both `UBER_FY2024` and `LYFT_FY2025` blocks. Determine
-  whether the loader requires the key; if not, delete it from both.
-- Revenue now has two independent sources (`statement:operations` total
-  revenue, and the Total row in the segment note). They agree for Uber. If
-  they ever disagree, no gate would see it. Candidate for a cross-source
-  consistency check.
-- LYFT_FY2025 `revenue_growth` is an override at 9.2%, which is TOTAL, not
-  organic: it contains roughly half a year of Freenow and one quarter of
-  TBR. Reported Q2 2026 growth was 16.1% and sell-side consensus for FY2026
-  is about 15%. Both are deliberately excluded from the base case because
-  UBER_FY2024 derives its growth from the filing; importing a consensus
-  forecast for one company and not the other would break comparability.
-  They belong in sensitivity.
-
-Documented residual risk from the unit-scale fix (not a to-do — deliberate
-scope boundaries, recorded so they are not mistaken for oversights):
+Not a to-do — recorded so these are not mistaken for oversights:
 - Share-count facts are exempt from unit-scale verification by name
   (`check_unit_matches_source` in `gates.py` skips any fact whose name
   contains "share"). Measured reason: Uber's operations statement caption
@@ -253,23 +220,3 @@ scope boundaries, recorded so they are not mistaken for oversights):
   scale. Not exercised today — both UBER_FY2024 and LYFT_FY2025 state the
   rate directly as a percentage, so this computed branch never runs for
   either — but latent for a future filer that does not state the rate.
-
-## Repository hygiene
-
-Checked before this repo is made public (`git log --all --full-history --
-.env` and `git ls-files | Select-String "aleph_cache.db|\.env|\.pdf"`):
-
-- `.env` was never committed. Clean.
-- `data/uber_10k.pdf` (1.77 MB) IS tracked in git, added in the chapter 2
-  commit (`24454c7`), before `data/*.pdf` existed in `.gitignore`. The
-  ignore rule does not retroactively untrack it.
-- `experiments/ch12_production/aleph_cache.db` (20 KB) IS tracked in git,
-  added in the chapter 12 commit (`a3a9be5`). Not covered by the
-  `data/aleph_cache.db` ignore rule, which only names the path under `data/`.
-
-Neither contains a secret, but both are exactly the kind of file this
-project's own gitignore says should never be committed, and a public repo
-should not ship a full 10-K PDF or a cache database as tracked history. This
-needs Asi's decision before any history rewrite — untracking going forward
-(`git rm --cached`) is not the same as removing them from history, and
-rewriting history is not something to do without being asked.
