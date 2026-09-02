@@ -7,7 +7,12 @@ from pydantic import BaseModel, Field, model_validator
 class Node(BaseModel):
     """An entity. Sharing a node means IDENTITY, not similarity."""
     id: str = Field(description="Canonical name, e.g. 'Uber', 'Freight', 'Adjusted EBITDA'.")
-    type: str = Field(description="One of: Company, Segment, Metric, Risk, Event, Period.")
+    type: str = Field(
+        description="One of: Company, Segment, Metric, Risk, Event, Period. "
+                    "Documentation, not enforcement - a plain str, no validator "
+                    "restricts it. Consumed only by experiments/ch07 and ch08, "
+                    "never by the live valuation pipeline."
+    )
 
 
 class Edge(BaseModel):
@@ -20,7 +25,12 @@ class Edge(BaseModel):
     A point in time has start == end.
     """
     source: str
-    relation: str = Field(description="Uppercase relation type, e.g. HAS_SEGMENT, REPORTED.")
+    relation: str = Field(
+        description="Uppercase relation type, e.g. HAS_SEGMENT, REPORTED. "
+                    "Documentation, not enforcement - nothing checks case. "
+                    "Consumed only by experiments/ch07 and ch08, never by the "
+                    "live valuation pipeline."
+    )
     target: str
 
     period_start: Optional[str] = Field(default=None, description="e.g. 'FY2024'")
