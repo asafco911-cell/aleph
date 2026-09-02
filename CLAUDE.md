@@ -80,7 +80,7 @@ a source.
    removed it anyway.
 7. Value is a range derived from explicit judgements, never a point with a
    caveat. Uber moves between $80.51 and $114.99 on two decisions alone.
-8. Five gates check that what was copied is correct; one gate (`coverage`)
+8. Six gates check that what was copied is correct; one gate (`coverage`)
    checks that copying finished. Reporting `accepted=4 rejected=0` while
    silently omitting a required quantity is the worst failure mode here.
 
@@ -128,7 +128,7 @@ ISSUES.md #25.
 src/aleph/
   documents/     structure.py (TOC + Item ranges), notes.py, statements.py
                  (page-classified statutory headings), manifest.py, errors.py
-  extraction/    extractor.py (bounded LLM call), gates.py (5 validation +
+  extraction/    extractor.py (bounded LLM call), gates.py (6 correctness +
                  1 coverage gate), targets.py (resolve targets per filing,
                  by title/keyword, never by number)
   schemas/       documents.py (DocumentRecord, versioned, crosses time —

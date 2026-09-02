@@ -417,6 +417,16 @@ not what the documentation claims it does. A sweep of the remaining
 docstrings and field descriptions against the code they describe is worth
 doing before this repository is public.
 
+A third instance turned up while drafting the README's outline, not while
+looking for one: CLAUDE.md stated the extraction gate count as "5
+validation + 1 coverage gate" (file layout) and "Five gates check that
+what was copied is correct" (principle 8), both stale since
+`check_unit_matches_source` was added earlier this session, making the
+true count six correctness gates plus coverage. A stale count in a project
+instructions file is the cheapest possible version of this bug - no
+runtime consequence, caught by an outline instead of a test - and it
+strengthens rather than weakens the case for the sweep above.
+
 ## Closed
 
 **#1 Connect extractor to DCF engine (Ch8 + Ch9) — CLOSED**
