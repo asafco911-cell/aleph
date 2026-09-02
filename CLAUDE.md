@@ -76,7 +76,8 @@ a source.
    mechanism. `temperature=0` never guaranteed determinism, and the SDK
    removed it anyway.
 7. Value is a range derived from explicit judgements, never a point with a
-   caveat. Uber moves between $80.51 and $114.99 on two decisions alone.
+   caveat. UBER_FY2024's own tornado moves between -$14.13 and $77.08
+   depending on which disclosed year's FCFF is treated as representative.
 8. Six gates check that what was copied is correct; one gate (`coverage`)
    checks that copying finished. Reporting `accepted=4 rejected=0` while
    silently omitting a required quantity is the worst failure mode here.
@@ -103,13 +104,14 @@ of 49%, and a valuation off by a factor of one thousand.
 
 Any input that is a METHOD choice rather than a company fact must be held
 identical across filers, or the comparison measures the choice instead of
-the businesses. Currently held identical between UBER_FY2024 and
-LYFT_FY2025: unlevered industry beta (0.81, Damodaran Business and Consumer
-Services), risk-free rate, ERP, terminal growth, effective tax rate policy
-(21% statutory), and net-debt policy (LT debt net of current portion, less
-cash and equivalents, less short-term investments; restricted cash and
-operating leases excluded). Company facts that legitimately differ: share
-price, country risk premium, growth.
+the businesses. Currently held identical across all four valued filings
+(UBER_FY2024, UBER_FY2025, LYFT_FY2025, DASH_FY2025): unlevered industry
+beta (0.81, Damodaran Business and Consumer Services), risk-free rate, ERP,
+terminal growth, effective tax rate policy (21% statutory), and net-debt
+policy (debt net of current portion, less cash and equivalents, less
+short-term investments; restricted cash and operating leases excluded).
+Company facts that legitimately differ: share price, country risk premium,
+growth.
 
 Holding beta identical is deliberate even when it produces a WACC ranking
 that looks wrong: LYFT_FY2025's bottom-up WACC (8.10%) sits below
@@ -181,8 +183,9 @@ ISSUES.md        open issues, several already fixed (#10-13 open, #1-2 closed
    quantity to millions from its **declared unit**; blocks on a placeholder
    discount rate.
 6. `run_dcf` / `sensitivity_tornado` / `reverse_dcf` — pure arithmetic,
-   `dcf_engine.py`, three consistency guards (terminal growth < discount
-   rate, terminal growth <= 3%, FCFE never carries net debt).
+   `dcf_engine.py`, four consistency guards (terminal growth < discount
+   rate, terminal growth <= 3%, FCFE never carries net debt, shares
+   outstanding must be positive).
 
 ## Commands that verify the system works
 
