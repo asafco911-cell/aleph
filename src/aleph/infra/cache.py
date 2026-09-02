@@ -3,8 +3,9 @@
 Caching here is about reproducibility before cost: without it, the same filing
 yields different numbers on different days and a track record becomes noise
 with timestamps. The key therefore includes every input that can change an
-answer - document bytes, prompt version, model, and target. A partial key is
-worse than no cache, because it returns a stale answer that looks current.
+answer - document bytes, prompt version, model, target, and question. A
+partial key is worse than no cache, because it returns a stale answer that
+looks current.
 """
 import hashlib
 import json

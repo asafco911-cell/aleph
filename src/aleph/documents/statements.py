@@ -6,7 +6,10 @@ not a boundary-search problem: a page belongs to a statement if it carries that
 statement's header.
 
 Equity statement wording varies by filer (redeemable non-controlling interests
-vs stockholders' equity), so several alternatives map to one canonical name.
+vs stockholders' equity). An enumerated list of variants failed on the third
+filer tested, so the equity heading is matched with one loose pattern instead
+- see STATEMENT_PATTERNS below - and everything else still maps by exact
+phrase.
 """
 import re
 from pathlib import Path
@@ -84,13 +87,6 @@ def find_statements(
             name=name, heading=heading, pdf_page=page_number, end_page=end
         ))
     return ranges
-
-    return [
-        StatementRange(
-            name=name, heading=heading, pdf_page=min(pages), end_page=max(pages)
-        )
-        for name, (pages, heading) in sorted(hits.items(), key=lambda kv: min(kv[1][0]))
-    ]
 
 
 def extract_statement(path: Path, statements: list[StatementRange], name: str) -> str:
