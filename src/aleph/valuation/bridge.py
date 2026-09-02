@@ -27,7 +27,7 @@ Four consistency rules are enforced here because the engine cannot see them:
 """
 from dataclasses import dataclass
 
-from ..infra.units import matching_scales
+from ..infra.units import matching_scales, resolve_scale
 from ..schemas.valuation import AssumptionRange, MarketAssumption
 
 PLACEHOLDER_SOURCES = ("placeholder", "todo", "tbd")
@@ -113,6 +113,72 @@ def _market(market: dict[str, MarketAssumption], name: str) -> MarketAssumption:
     return found
 
 
+def _per_period_fcff(
+    ranges: dict[str, AssumptionRange], tax: float
+) -> tuple[dict[str, float] | None, str]:
+    """Reconstruct FCFF for every period the filing discloses, not the
+    latest one alone - see ISSUES.md #29. Each observation is converted
+    through its OWN declared unit via resolve_scale, the same mechanism
+    that converts the AssumptionRange itself - a raw, unconverted value
+    produced a nonsense five-figure Lyft result once already, by hand,
+    while measuring the numbers that led to this function.
+
+    interest_expense with no observations at all - an override built from
+    no disclosed per-period figure, e.g. a filer with no gross interest
+    expense line - is applied as that flat value to every period, and the
+    substitution is named in the returned note so it is never mistaken for
+    measured data.
+
+    Returns (fcff_by_period, note) with fcff_by_period non-None on success;
+    note is "" unless a substitution was made. Returns (None, reason) when
+    fewer than two periods reconcile across all four quantities - never a
+    silent fallback to a narrower bound.
+    """
+    def periods_millions(name: str) -> dict[str, float]:
+        result = {}
+        for o in ranges[name].observations:
+            scale = resolve_scale(o.unit)
+            if scale is not None:
+                result[o.period] = o.value * scale
+        return result
+
+    cfo_p = periods_millions("operating_cash_flow")
+    capex_p = periods_millions("capex")
+    sbc_p = periods_millions("stock_based_compensation")
+    interest_p = periods_millions("interest_expense")
+
+    note = ""
+    if not interest_p:
+        interest_range = ranges["interest_expense"]
+        if interest_range.base is None:
+            return None, (
+                f"interest_expense is {interest_range.status} with no "
+                f"per-period observations and no fixed value to fall back "
+                f"to; a multi-year bound needs at least one"
+            )
+        flat_interest = abs(to_millions(interest_range))
+        common = set(cfo_p) & set(capex_p) & set(sbc_p)
+        interest_p = {p: flat_interest for p in common}
+        note = (
+            f"interest_expense has no per-period disclosure; the flat "
+            f"override value ({flat_interest:,.0f}) was applied to every "
+            f"period tested, not measured data"
+        )
+
+    periods = sorted(set(cfo_p) & set(capex_p) & set(sbc_p) & set(interest_p))
+    if len(periods) < 2:
+        return None, (
+            f"only {len(periods)} period(s) reconcile across CFO, interest, "
+            f"capex and SBC; a bound needs at least two"
+        )
+
+    fcff_by_period = {
+        p: cfo_p[p] + abs(interest_p[p]) * (1 - tax) - abs(capex_p[p]) - abs(sbc_p[p])
+        for p in periods
+    }
+    return fcff_by_period, note
+
+
 def build_dcf_inputs(
     ranges: dict[str, AssumptionRange],
     market: dict[str, MarketAssumption],
@@ -187,15 +253,31 @@ def build_dcf_inputs(
         if span:
             tornado["growth_rates_shift"] = (-span, span)
 
-    # Level quantities carry no historical band by construction, so a bound for
-    # cash flow must come from the volatile component rather than from prior
-    # years of the level itself.
-    capex_scale = to_millions(ranges["capex"]) / (ranges["capex"].base or 1.0)
-    capex_values = [abs(o.value) * capex_scale for o in ranges["capex"].observations]
-    if capex_values and max(capex_values) != min(capex_values):
-        tornado["base_cash_flow"] = (
-            cfo + interest * (1 - tax) - max(capex_values) - sbc,
-            cfo + interest * (1 - tax) - min(capex_values) - sbc,
+    # Level quantities carry no historical band by construction. The bound
+    # for cash flow comes from years the filing itself discloses, not from
+    # capex dispersion alone, which does not carry the risk that made this
+    # necessary - see ISSUES.md #29: the same company, same market price,
+    # same day, valued 56% differently one filing apart, because CFO
+    # inherits one year's deferred-tax and unrealized-investment swings in
+    # full. base_cash_flow's BASE stays the latest period, unchanged - that
+    # is the most current information and is not in question; only the
+    # BOUND now reflects the years on record. A negative low bound is a
+    # real result when a disclosed year's CFO was itself negative, and is
+    # reported as such, not clamped - confirmed separately that run_dcf has
+    # no guard on base_cash_flow's sign, so nothing downstream rejects it.
+    fcff_by_period, fcff_note = _per_period_fcff(ranges, tax)
+    if fcff_by_period is None:
+        base_cash_flow_bound_note = f"base_cash_flow multi-year bound unavailable: {fcff_note}"
+    else:
+        low_period = min(fcff_by_period, key=fcff_by_period.get)
+        high_period = max(fcff_by_period, key=fcff_by_period.get)
+        tornado["base_cash_flow"] = (fcff_by_period[low_period], fcff_by_period[high_period])
+        detail = "; ".join(f"{p}={v:,.0f}" for p, v in sorted(fcff_by_period.items()))
+        base_cash_flow_bound_note = (
+            f"base_cash_flow bound from FCFF by period ({detail}): low "
+            f"{low_period}={fcff_by_period[low_period]:,.0f}, high "
+            f"{high_period}={fcff_by_period[high_period]:,.0f}"
+            + (f". {fcff_note}" if fcff_note else "")
         )
 
     # The discount rate dominated the tornado in ch09 and must never be absent.
@@ -212,6 +294,7 @@ def build_dcf_inputs(
         f"adjustment - already tax-affected inside net income) = {fcff:,.0f}",
         f"Share count held flat at {shares:,.0f} despite the SBC subtraction "
         "above: modelling dilution as well would double-count the same cost",
+        base_cash_flow_bound_note,
         f"Growth fades {growth:.1%} -> {terminal:.1%} over {forecast_years} years "
         "(linear; a modelling choice, not a derivation)",
         f"discount_rate {discount:.2%} from {discount_input.source} "
