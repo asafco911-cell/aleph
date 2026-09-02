@@ -29,6 +29,16 @@ finding - not a beta chosen to close it.
 
 Decided by Asi, 2026-09-01. See CLAUDE.md, "Cross-company comparability."
 
+STRENGTHENED, not reversed, once #16's tornado fix landed: LYFT_FY2025's
+discount_rate swing measured 39% - the figure this decision was made
+against - and looked like the dominant driver only because
+base_cash_flow's own bound tested capex dispersion, which carries none of
+the risk #16 measures. With that fixed, base_cash_flow's own swing is
+180%, the largest of any driver in any of the four runs tested. Bending
+beta to close a 39% gap while the real, larger driver went unmeasured
+would have hidden the actual problem, not solved it - the decision to
+hold beta constant stands on firmer evidence now than when it was made.
+
 ## Quality improvements
 
 **#3 Golden dataset is 14 questions, target 30 (Ch5)**
@@ -511,6 +521,16 @@ reserves, working capital) against a pre-tax loss. This also settles the
 industry-beta decision (#25) after the fact: bending Lyft's beta to close
 this gap would have concealed exactly this result, since the answer is
 demonstrably not inside that band.
+
+REVISED once #29's fix landed (see #29): this framing was written against
+a tornado whose base_cash_flow bound only tested capex dispersion, so
+discount_rate's 39% swing looked like the largest lever there was. With
+the real bound in place, base_cash_flow's own swing is 78% for Uber and
+180% for Lyft - larger than discount_rate in every run - so "fairly priced
+at the industry beta, 21% expensive at the regression beta, no third case"
+understated the dominant variable rather than describing it. The corrected
+comparison is #29's: which year's FCFF the analyst treats as
+representative moves the answer further than any beta choice does.
 
 **#28 derive_geographic_revenue silently merged two overlapping revenue breakdowns for UBER_FY2025 — CLOSED**
 "Pick the more granular extraction TARGET" worked only as long as a filing's
