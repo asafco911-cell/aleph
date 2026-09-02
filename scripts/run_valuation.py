@@ -8,6 +8,7 @@ between filers, so a fixed number reads the wrong note without complaint.
 """
 import json
 import sys
+from copy import deepcopy
 from pathlib import Path
 
 sys.path.insert(0, str(Path("src/aleph/valuation")))  # engine imports by bare name
@@ -123,14 +124,51 @@ except DCFConsistencyError as exc:
     print(f"\nENGINE GUARD FIRED: {exc}")
     sys.exit(1)
 
+def _range_position(price, low, high):
+    """Describe where a market price sits relative to a value-per-share
+    range - inside it, or how far outside on either side. "Inside" is
+    measured as a share of the range's own width; outside either end is
+    measured as a plain ratio to that end, since there is no range width
+    left to measure against beyond it.
+    """
+    if low <= price <= high:
+        span = high - low
+        pct = (price - low) / span * 100 if span else 0.0
+        return f"inside the range, {pct:.1f}% of the way up"
+    if price > high:
+        pct = (price / high - 1) * 100 if high else float("inf")
+        return f"{pct:.1f}% ABOVE the top of the range"
+    pct = (1 - price / low) * 100 if low else float("inf")
+    return f"{pct:.1f}% BELOW the bottom of the range"
+
+
 print("\n" + "=" * 74)
 print("RESULT")
 print("=" * 74)
+
+bound = bridged.base_cash_flow_bound
+if bound["available"]:
+    low_trial, high_trial = deepcopy(bridged.inputs), deepcopy(bridged.inputs)
+    low_trial.base_cash_flow = bound["low_fcff"]
+    high_trial.base_cash_flow = bound["high_fcff"]
+    low_vps = run_dcf(low_trial).value_per_share
+    high_vps = run_dcf(high_trial).value_per_share
+    print(f"  Value per share      : {low_vps:>7,.2f} to {high_vps:<7,.2f}  "
+          f"(range across {bound['low_period']}-{bound['high_period']} FCFF)")
+    print(f"  Latest-period basis  : {result.value_per_share:>17,.2f}  "
+          f"({bound['high_period']} FCFF, the base case)")
+    if market_price:
+        position = _range_position(market_price, min(low_vps, high_vps), max(low_vps, high_vps))
+        print(f"  Market price         : {market_price:>17,.2f}  {position}")
+    print("  (PV, enterprise, and equity value below use the latest-period basis)")
+else:
+    print(f"  Value per share      : {result.value_per_share:>14,.2f}")
+    print(f"  (multi-year range unavailable: {bound['reason']})")
+
 print(f"  PV explicit forecast : {result.pv_explicit:>14,.0f}")
 print(f"  PV terminal value    : {result.pv_terminal:>14,.0f}")
 print(f"  Enterprise value     : {result.enterprise_or_equity_value:>14,.0f}")
 print(f"  Equity value         : {result.equity_value:>14,.0f}")
-print(f"  Value per share      : {result.value_per_share:>14,.2f}")
 print(f"  Terminal value is {result.terminal_pct:.0%} of total")
 
 if bridged.tornado_ranges:

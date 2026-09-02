@@ -42,6 +42,14 @@ class Bridged:
     inputs: object            # DCFInputs, imported lazily to keep layers apart
     tornado_ranges: dict
     notes: list[str]
+    # Structured form of the base_cash_flow bound, for callers that need the
+    # period labels rather than just the two numbers already in
+    # tornado_ranges - the RESULT block prints "range across FY2023-FY2025",
+    # not just two figures, and a string is not something to re-parse for it.
+    # {"available": True, "low_period", "low_fcff", "high_period",
+    # "high_fcff", "note"} on success; {"available": False, "reason"} when
+    # the multi-year bound could not be reconstructed at all.
+    base_cash_flow_bound: dict = None
 
 
 def require(ranges: dict[str, AssumptionRange], name: str) -> AssumptionRange:
@@ -268,6 +276,7 @@ def build_dcf_inputs(
     fcff_by_period, fcff_note = _per_period_fcff(ranges, tax)
     if fcff_by_period is None:
         base_cash_flow_bound_note = f"base_cash_flow multi-year bound unavailable: {fcff_note}"
+        base_cash_flow_bound = {"available": False, "reason": fcff_note}
     else:
         low_period = min(fcff_by_period, key=fcff_by_period.get)
         high_period = max(fcff_by_period, key=fcff_by_period.get)
@@ -279,6 +288,12 @@ def build_dcf_inputs(
             f"{high_period}={fcff_by_period[high_period]:,.0f}"
             + (f". {fcff_note}" if fcff_note else "")
         )
+        base_cash_flow_bound = {
+            "available": True,
+            "low_period": low_period, "low_fcff": fcff_by_period[low_period],
+            "high_period": high_period, "high_fcff": fcff_by_period[high_period],
+            "note": fcff_note,
+        }
 
     # The discount rate dominated the tornado in ch09 and must never be absent.
     # Bounds are declared judgment, not derivation: plus or minus 200bp around
@@ -302,4 +317,5 @@ def build_dcf_inputs(
         "Tornado bounds for discount_rate and terminal_growth are declared "
         "judgment; the others come from observed dispersion",
     ]
-    return Bridged(inputs=inputs, tornado_ranges=tornado, notes=notes)
+    return Bridged(inputs=inputs, tornado_ranges=tornado, notes=notes,
+                   base_cash_flow_bound=base_cash_flow_bound)
