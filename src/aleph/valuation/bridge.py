@@ -192,7 +192,9 @@ def build_dcf_inputs(
     market: dict[str, MarketAssumption],
     forecast_years: int = 10,
 ) -> Bridged:
-    from dcf_engine import Assumption, DCFInputs  # engine stays independent
+    # Imported here rather than at module scope to keep the import graph
+    # acyclic: dcf_engine is a leaf and must not pull the bridge back in.
+    from aleph.valuation.dcf_engine import Assumption, DCFInputs
 
     tax = as_decimal(require(ranges, "effective_tax_rate"))
     growth = as_decimal(require(ranges, "revenue_growth"))

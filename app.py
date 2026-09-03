@@ -7,12 +7,9 @@ anchors the reader on the point; a range labelled with the judgements that
 produce its ends does not.
 """
 import json
-import sys
 from pathlib import Path
 
 import streamlit as st
-
-sys.path.insert(0, str(Path("src/aleph/valuation")))
 
 from aleph.extraction import extract
 from aleph.extraction.targets import resolve_targets
@@ -21,7 +18,7 @@ from aleph.schemas.valuation import MarketAssumption, Override
 from aleph.valuation import build_wacc, derive_all
 from aleph.valuation.bridge import BridgeError, build_dcf_inputs
 
-from dcf_engine import reverse_dcf, run_dcf, sensitivity_tornado
+from aleph.valuation.dcf_engine import reverse_dcf, run_dcf, sensitivity_tornado
 
 # Ordered weakest-last. A composite inherits the weakest grade in its chain.
 GRADES = {

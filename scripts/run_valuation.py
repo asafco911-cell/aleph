@@ -11,8 +11,6 @@ import sys
 from copy import deepcopy
 from pathlib import Path
 
-sys.path.insert(0, str(Path("src/aleph/valuation")))  # engine imports by bare name
-
 from aleph.extraction import extract
 from aleph.extraction.targets import resolve_targets
 from aleph.schemas import DocumentRecord
@@ -20,7 +18,12 @@ from aleph.schemas.valuation import MarketAssumption, Override
 from aleph.valuation import build_wacc, derive_all
 from aleph.valuation.bridge import BridgeError, build_dcf_inputs
 
-from dcf_engine import DCFConsistencyError, reverse_dcf, run_dcf, sensitivity_tornado
+from aleph.valuation.dcf_engine import (
+    DCFConsistencyError,
+    reverse_dcf,
+    run_dcf,
+    sensitivity_tornado,
+)
 
 doc_id = sys.argv[1]
 market_price = float(sys.argv[2]) if len(sys.argv) > 2 else None
