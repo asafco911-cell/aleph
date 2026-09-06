@@ -55,14 +55,6 @@
       "as_of": "2026-08-27",
       "source": "NYSE close",
       "rationale": "Closing price on August 27, 2026, for market-value capital structure. Shares an as_of with the risk-free rate to within one trading day."
-    },
-    "discount_rate": {
-      "name": "discount_rate",
-      "value": 0.09,
-      "unit": "decimal",
-      "as_of": "2026-08-28",
-      "source": "integration test",
-      "rationale": "NOT A VALUATION INPUT. Round-number rate proving the pipeline runs end to end. Superseded the moment build_wacc is wired into run_valuation."
     }
   },
   "UBER_FY2025": {
@@ -121,14 +113,6 @@
       "as_of": "2026-08-27",
       "source": "NYSE close",
       "rationale": "Closing price on August 27, 2026, the same trading day as LYFT_FY2025 and DASH_FY2025, so all three FY2025 valuations share one market state."
-    },
-    "discount_rate": {
-      "name": "discount_rate",
-      "value": 0.09,
-      "unit": "decimal",
-      "as_of": "2026-08-28",
-      "source": "integration test",
-      "rationale": "NOT A VALUATION INPUT. Present only because it is unclear whether the loader requires the key; run_valuation overwrites it with the derived bottom-up figure. See ISSUES.md #19: delete from every block once confirmed optional."
     }
   },
   "LYFT_FY2025": {
@@ -187,14 +171,6 @@
       "as_of": "2026-08-27",
       "source": "NASDAQ close",
       "rationale": "Closing price on August 27, 2026, the same trading day as the UBER_FY2024 price and within one day of the risk-free rate, so the two valuations share a market state."
-    },
-    "discount_rate": {
-      "name": "discount_rate",
-      "value": 0.09,
-      "unit": "decimal",
-      "as_of": "2026-08-28",
-      "source": "integration test",
-      "rationale": "NOT A VALUATION INPUT. Carried over from UBER_FY2024 only because it is unclear whether the loader requires the key. Superseded by build_wacc and should be deleted from both blocks once confirmed optional."
     }
   },
   "DASH_FY2025": {
@@ -253,14 +229,6 @@
       "as_of": "2026-08-27",
       "source": "NASDAQ close",
       "rationale": "Closing price on August 27, 2026, the same trading day as UBER_FY2025 and LYFT_FY2025, so all three FY2025 valuations share one market state."
-    },
-    "discount_rate": {
-      "name": "discount_rate",
-      "value": 0.09,
-      "unit": "decimal",
-      "as_of": "2026-08-28",
-      "source": "integration test",
-      "rationale": "NOT A VALUATION INPUT. Present only because it is unclear whether the loader requires the key; run_valuation overwrites it with the derived bottom-up figure. See ISSUES.md #19: delete from every block once confirmed optional."
     }
   }
 }

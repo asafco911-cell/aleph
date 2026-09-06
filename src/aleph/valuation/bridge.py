@@ -13,9 +13,18 @@ Four consistency rules are enforced here because the engine cannot see them:
      per-share value wrong by a factor of 1000 with no arithmetic error to
      detect.
 
-  3. A placeholder discount rate blocks the run. It is the largest single
-     driver of the result, so a run on an invented rate produces a number that
-     looks like a valuation and is not.
+  3. A placeholder discount rate blocks the run. It is a large driver of the
+     result, so a run on an invented rate produces a number that looks like a
+     valuation and is not.
+
+     The discount rate is DERIVED, by build_wacc, and written into the market
+     dict by the caller. data/market.json therefore carries no discount_rate
+     key at all: when WACC cannot be built, the absence of the key is what
+     stops the run here. Measured before this was true (ISSUES.md #19): with
+     a discount_rate present, a failed build_wacc fell through to it and
+     valued UBER_FY2024 at $73.54/share on a 0.09 rate whose own rationale
+     read "NOT A VALUATION INPUT", behind a single warning line above a full
+     result block.
 
   4. Stock-based compensation is a cash cost, not an accounting add-back to
      ignore. CFO already adds SBC back to net income, so it silently counts
@@ -30,7 +39,11 @@ from dataclasses import dataclass
 from ..infra.units import matching_scales, resolve_scale
 from ..schemas.valuation import AssumptionRange, MarketAssumption
 
-PLACEHOLDER_SOURCES = ("placeholder", "todo", "tbd")
+# "integration test" is here because it was the one that got through: four
+# market.json blocks carried a 0.09 discount_rate under that source, and
+# _market's own error message named it as the string to use to bypass this
+# check. A guard that advertises its own escape hatch is not a guard.
+PLACEHOLDER_SOURCES = ("placeholder", "todo", "tbd", "integration test")
 
 
 class BridgeError(ValueError):
@@ -108,15 +121,28 @@ def fade(start: float, end: float, years: int) -> list[float]:
 def _market(market: dict[str, MarketAssumption], name: str) -> MarketAssumption:
     found = market.get(name)
     if found is None:
+        if name == "discount_rate":
+            # Telling the reader to add this to market.json is what caused
+            # #19. It is derived, never authored: the caller writes it in
+            # after build_wacc succeeds, so its absence means WACC failed.
+            raise BridgeError(
+                "'discount_rate' is DERIVED by build_wacc, not authored. Its "
+                "absence means WACC could not be built - fix the missing WACC "
+                "input it named. Do NOT add a discount_rate to data/market.json: "
+                "a hand-written one silently values the filing off an invented "
+                "rate (ISSUES.md #19)."
+            )
         raise BridgeError(
             f"'{name}' is a market or judgment input and is not derivable from "
             "the filing; supply it with an as_of date in data/market.json"
         )
     if found.source.strip().lower() in PLACEHOLDER_SOURCES:
         raise BridgeError(
-            f"'{name}' is marked as a placeholder. Change source to something "
-            "truthful only once the value is real, or to 'integration test' to "
-            "acknowledge that the output is not a valuation."
+            f"'{name}' is marked as a placeholder (source: '{found.source}'). "
+            "Give it a real source, with an as_of date and a rationale, in "
+            "data/market.json. There is no source string that lets a "
+            "placeholder through - naming one here is what let an "
+            "'integration test' discount rate value four filings (ISSUES.md #19)."
         )
     return found
 
