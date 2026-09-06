@@ -10,9 +10,6 @@ from pathlib import Path
 
 from pypdf import PdfReader
 
-from aleph.documents.notes import find_notes
-from aleph.documents.statements import find_statements
-
 from ..infra.textnorm import contains
 from ..schemas.documents import DocumentRecord, VerifiedFigure
 from .errors import DocumentError

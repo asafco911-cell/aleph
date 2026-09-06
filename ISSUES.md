@@ -58,12 +58,61 @@ The critic kept finding medium-severity issues while the plan grew
 Fix options: constrain the mandate to available data, or accept when
 the issue count stops falling between rounds.
 
+## #31 eval-gate.yml could only ever fail on a fresh clone — CLOSED
+
+`.github/workflows/eval-gate.yml` ran `experiments/ch05_evaluation/02_ab_test.py`
+on every pull request to main. That script opens `data/uber_10k.pdf` at module
+level, line 34, unconditionally - and the filings are deliberately not
+distributed (docs/adr/0006), a decision made true of every commit when history
+was rewritten on 2026-09-06.
+
+MEASURED on a fresh `git clone` of the public repository, not on a local
+working copy: `PdfReader("data/uber_10k.pdf")` raises `FileNotFoundError`. The
+script dies before any evaluation runs and before its dependencies matter.
+
+The workflow's only successful run is `eb8940f3`, 2026-08-13. The PDF was
+untracked in `350ac47` on 2026-09-02, AFTER that run, so the green result
+predates the condition that breaks it - and neither SHA exists in this history
+any more, since the rewrite changed all of them. The sole evidence this gate
+ever worked points at a history that is gone.
+
+DELETED, not taught to skip. A conditional step would have put a green
+"Evaluation Gate" check on pull requests where nothing was evaluated, which is
+this project's own worst failure mode wearing a tick mark. `pipeline-tests.yml`
+already states the same position for the three tests it cannot run, and
+`test_manifest.py` for shallow clones. Reasoning and both rejected
+alternatives in docs/adr/0008.
+
+`experiments/ch05_evaluation/02_ab_test.py` is NOT modified: `experiments/` is
+archived course work, read-only by the working agreement, and editing an
+archived chapter to accommodate a CI decision would falsify what that chapter
+was. `requirements-eval.txt` is kept - it is how the evaluation is run locally,
+which is still supported.
+
+The gap is now checked, not just recorded.
+`test_docs_consistency.py::test_no_workflow_needs_a_file_the_repository_does_not_ship`
+walks every script any workflow runs and fails on a referenced path that exists
+locally but is untracked - the exact shape of this bug, and the exact reason it
+survived: it worked on the author's machine. Deliberately narrow: a path that
+exists nowhere is a fixture string, not this bug, and the first version of the
+check flagged `test_manifest.py`'s own `"data/does-not-exist"` before that was
+fixed. Verified by reintroducing the deleted workflow verbatim - caught, exit 1
+- and removing it again.
+
+Note for anyone reinstating this: #3, #4 and #5, the findings this gate would
+protect, are all in the retrieval layer, which README.md states is course work
+and not part of the capstone pipeline.
+
 ## #11 Typographic look-alikes break raw string matching across the pipeline
 
 Documents printed from SEC HTML contain U+2019 (right single quotation mark),
 not U+0027. Measured: `"Management's Discussion and Analysis"` returns False
 against `uber_10k_fy2024.pdf` page 3 with raw matching and True after
-normalisation. `scripts/textnorm.py` now handles this for manifest work.
+normalisation. `src/aleph/infra/textnorm.py` now handles this for manifest
+work. (This line said `scripts/textnorm.py` until 2026-09-06 - the module
+moved into the package during the src/ layout change and the reference did
+not follow. Found by a sweep that resolved every documented script path
+against the filesystem; it was the only one of fifteen that did not exist.)
 
 Unverified: whether the BM25 index built in ch04 tokenises `management's` and
 `management's` as distinct terms. If so, every query containing an apostrophe

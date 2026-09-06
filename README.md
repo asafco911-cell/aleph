@@ -230,6 +230,14 @@ mean the anchor above still holds. That check is local and manual, and the
 workflow says so in its own comments rather than leaving the badge to
 imply otherwise.
 
+It is the only workflow. A second one ran the ch05 retrieval evaluation
+on pull requests until 2026-09-06; it opened `data/uber_10k.pdf`, which
+this repository does not distribute, so it could only ever fail. It was
+deleted rather than taught to skip - a green "Evaluation Gate" on a run
+that evaluated nothing is the failure this project exists to avoid. See
+[docs/adr/0008](docs/adr/0008-eval-gate-removed-from-ci.md); run that
+evaluation locally with `pip install -r requirements-eval.txt`.
+
 `streamlit run app.py` opens the same pipeline in a browser.
 
 ## Licence

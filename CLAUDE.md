@@ -240,9 +240,13 @@ test_regression exit 1 with FileNotFoundError, so their absence from CI is a
 stated coverage gap, not a silent pass. The 77.08 anchor is NOT verified by
 CI - it stays a local check before any release.
 
-`.github/workflows/eval-gate.yml` runs `experiments/ch05_evaluation/02_ab_test.py`
-against the golden dataset on PRs to main (separate from the capstone gates
-above — it evaluates the ch05 retrieval work, not the valuation pipeline).
+There is no second workflow. `eval-gate.yml` ran the ch05 retrieval
+evaluation on PRs to main until 2026-09-06 and was deleted: it opens
+`data/uber_10k.pdf`, which this repository does not distribute, so it could
+only ever fail. Making it skip instead would have put a green
+"Evaluation Gate" check on pull requests where nothing was evaluated. See
+docs/adr/0008. Run it locally, with the filings present, via
+`pip install -r requirements-eval.txt`.
 
 ## Documented residual risk (deliberate scope boundaries)
 

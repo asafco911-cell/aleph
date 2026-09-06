@@ -20,6 +20,7 @@ Nothing here checks prose.
 No PDFs, no API key, no imports from aleph - it reads files. Runs in CI.
 """
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -124,6 +125,45 @@ def test_ci_coverage_claims_match_what_it_runs(commands, ci_scripts):
           f"{total} documented - {covered} covered = {total - covered} uncovered")
 
 
+def test_no_workflow_needs_a_file_the_repository_does_not_ship():
+    """A workflow that reads an undistributed file can only ever fail.
+
+    eval-gate.yml ran `experiments/ch05_evaluation/02_ab_test.py` on every
+    pull request; that script opens data/uber_10k.pdf at module level, and
+    the filings are deliberately not distributed (docs/adr/0006). It was
+    guaranteed to fail on the first PR, for a reason unrelated to the change
+    under review. Deleted in docs/adr/0008.
+
+    This walks every script a workflow runs and fails if it references a
+    path that git does not track - which is what "not distributed" means to
+    a CI runner.
+    """
+    tracked = set(subprocess.run(
+        ["git", "ls-files"], capture_output=True, text=True
+    ).stdout.splitlines())
+
+    for workflow in sorted(Path(".github/workflows").glob("*.yml")):
+        text = workflow.read_text(encoding="utf-8")
+        for script in re.findall(r"run: python (\S+\.py)", text):
+            check(f"{workflow.name} runs {script}, which exists",
+                  Path(script).exists())
+            if not Path(script).exists():
+                continue
+            source = Path(script).read_text(encoding="utf-8")
+            for ref in re.findall(r'["\']((?:data|experiments)/[\w./-]+)["\']', source):
+                # Only a path that EXISTS locally but is not tracked is
+                # the bug: it works on the author's machine and is absent
+                # on a runner. A path that exists nowhere is a fixture
+                # string - test_manifest.py deliberately passes
+                # "data/does-not-exist" to prove a missing manifest is
+                # not an error.
+                if not Path(ref).exists() or ref in tracked:
+                    continue
+                check(f"{script} reads {ref}, which the repository ships",
+                      False,
+                      "exists locally, untracked: a CI runner lacks it")
+
+
 def test_gate_count_is_not_stale():
     """#30's instance 3: CLAUDE.md said five correctness gates after a sixth
     was added. The count lives in two prose files and one module."""
@@ -165,6 +205,7 @@ if __name__ == "__main__":
     test_ci_coverage_claims_match_what_it_runs(commands, ci_scripts)
 
     print("Counts stated in two places:")
+    test_no_workflow_needs_a_file_the_repository_does_not_ship()
     test_gate_count_is_not_stale()
     test_adr_count_matches_the_directory()
 
