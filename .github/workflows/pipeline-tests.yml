@@ -26,13 +26,15 @@ jobs:
       # list is wrong, this step or the next one fails - which is the point
       # of installing from it rather than from a frozen environment.
       - name: Install the package from pyproject.toml
-        run: pip install -e .
+        run: pip install -e .[dev]
 
       - name: Import the package
         run: python -c "from aleph.valuation.pipeline import value_filing; print('ok')"
 
-      # These five run on fixtures and pure arithmetic: no ANTHROPIC_API_KEY,
-      # no PDFs, no cache database. Each exits non-zero on failure.
+      # These run on fixtures and pure arithmetic: no ANTHROPIC_API_KEY, no
+      # PDFs, no cache database. Each exits non-zero on failure. The exact
+      # count is asserted by test_docs_consistency.py rather than stated here,
+      # because a hand-written count in a comment is what ISSUES.md #30 is.
       - name: DCF engine (arithmetic and consistency guards)
         run: python scripts/test_dcf_engine.py
 
@@ -53,6 +55,12 @@ jobs:
 
       - name: Market inputs (shared vs per-filing, and the drift guard)
         run: python scripts/test_market.py
+
+      # tests/ - pytest over the pure modules added for the normalisation,
+      # sensitivity and cross-statement work. Separate from the scripts
+      # above, which are standalone commands README.md documents by name.
+      - name: pytest (normalization, identities, sensitivity)
+        run: python -m pytest tests/
 
       # The structural fix ISSUES.md #30 asks for. It cannot tell whether a
       # sentence is true, only whether a count stated in two places still

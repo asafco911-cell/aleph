@@ -21,6 +21,10 @@ dependencies = [
 # app.py only. The pipeline and every scripts/test_*.py run without it.
 ui = ["streamlit>=1.40"]
 
+# tests/ only. The thirteen documented scripts/test_*.py commands are
+# standalone and need none of this; pytest covers the newer pure modules.
+dev = ["pytest>=8.0"]
+
 # experiments/ch01-ch13 only - archived course chapters, not the capstone.
 # Kept declared rather than undeclared so a reader who wants to run one is
 # not left guessing, and separate so `pip install -e .` stays small.
@@ -43,3 +47,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Only tests/ - scripts/test_*.py are standalone commands documented in
+# README.md, run directly and in CI, and are deliberately not collected here.
+python_files = ["test_*.py"]
+addopts = "-q"
