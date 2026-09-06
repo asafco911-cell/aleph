@@ -27,6 +27,7 @@ from aleph.valuation.dcf_engine import reverse_dcf
 from aleph.valuation.pipeline import (
     BlockedError,
     DCFConsistencyError,
+    load_market,
     range_position,
     value_filing,
 )
@@ -59,16 +60,18 @@ def load_manifest() -> list[dict]:
 
 @st.cache_data(show_spinner=False)
 def load_share_price(doc_id: str) -> float | None:
-    """The filing's own recorded share price, with its as_of date.
+    """The filing's own recorded share price.
 
     Defaulting the reverse-DCF input to one company's price for every filing
     invites comparing Lyft against Uber's price without noticing.
+
+    Goes through pipeline.load_market rather than reading the JSON directly:
+    that file has a shared/per_filing structure with a collision guard, and a
+    second reader that flattened it its own way would be a second opinion
+    about what a filing's market inputs are.
     """
-    market = json.loads(
-        Path("data/market.json").read_text(encoding="utf-8")
-    ).get(doc_id, {})
-    entry = market.get("share_price")
-    return float(entry["value"]) if entry else None
+    entry = load_market(doc_id).get("share_price")
+    return float(entry.value) if entry else None
 
 
 # cache_resource, not cache_data: a ValuationRun holds Pydantic models and

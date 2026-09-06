@@ -125,7 +125,12 @@ terminal growth, effective tax rate policy (21% statutory), and net-debt
 policy (debt net of current portion, less cash and equivalents, less
 short-term investments; restricted cash and operating leases excluded).
 Company facts that legitimately differ: share price, country risk premium,
-growth.
+debt spread, growth.
+
+This is now STRUCTURAL, not discipline. `data/market.json` separates a
+`shared` block from `per_filing` blocks, and `load_market` raises if a
+filing redefines a shared input. It was discipline until 2026-09-06, and
+one input had already drifted - see ISSUES.md #21.
 
 Holding beta identical is deliberate even when it produces a WACC ranking
 that looks wrong: LYFT_FY2025's bottom-up WACC (8.10%) sits below
@@ -217,12 +222,14 @@ python scripts\test_multicompany.py
 python scripts\test_assumptions.py
 python scripts\test_pipeline_callback.py
 python scripts\test_manifest.py
+python scripts\test_market.py
 python scripts\test_docs_consistency.py
 ```
 
-Seven of these run in CI on every push (`.github/workflows/pipeline-tests.yml`):
+Eight of these run in CI on every push (`.github/workflows/pipeline-tests.yml`):
 test_dcf_engine, test_schemas, test_gates, test_assumptions,
-test_pipeline_callback, test_manifest, test_docs_consistency - the ones
+test_pipeline_callback, test_manifest, test_market,
+test_docs_consistency - the ones
 needing only fixtures and
 arithmetic. The other five need the filings, which are not in the repository. Measured: with
 `data/*.pdf` moved aside, test_sections, test_multicompany and

@@ -223,7 +223,7 @@ differing by a full million is caught.
 Does not close the geography-note case, which #28 already closed by a
 different mechanism (reconciling components against the stated total).
 
-## #21 market.json is keyed by doc_id, duplicating pure market inputs per company
+## #21 market.json is keyed by doc_id, duplicating pure market inputs per company — CLOSED
 
 risk_free_rate and equity_risk_premium are properties of the market on a
 given date, not of the company being valued, but market.json's schema keys
@@ -239,7 +239,62 @@ equity_risk_premium - dated, not company-keyed) and company-level inputs
 (unlevered_industry_beta, debt_spread, country_risk_premium, share_price -
 each its own judgement per company).
 
-Status: open.
+FIXED - but the split is drawn in a different place than that direction
+proposed, and the direction was wrong on one input. It put
+`unlevered_industry_beta` in the company-level group, "each its own
+judgement per company". ADR 0001 and #25 say the opposite: the beta is held
+identical across every filer ON PURPOSE, and a per-company block for it
+would reintroduce exactly the drift this issue is about.
+
+The line that actually matters is not "market data vs company data" but
+"held identical by policy vs legitimately different", which is what
+CLAUDE.md's Cross-company comparability section already says:
+
+  shared      risk_free_rate, equity_risk_premium, terminal_growth,
+              unlevered_industry_beta
+  per_filing  country_risk_premium, debt_spread, share_price
+
+`debt_spread` is per-filing even though all four currently carry 0.0111: it
+is a company's own credit spread and is not on CLAUDE.md's held-identical
+list, so making it shared would be a policy change, not a refactor.
+
+`load_market` merges shared into per_filing and RAISES `MarketDriftError`
+if a per-filing block redefines a shared key. The structure now enforces
+what discipline used to.
+
+THE DRIFT THIS ISSUE PREDICTED HAD ALREADY HAPPENED, and the migration's
+own assertion found it rather than a person looking for it. LYFT_FY2025's
+`unlevered_industry_beta` cited "Aswath Damodaran - Betas by Sector (US),
+Business and Consumer Services" while the other three cited the same table's
+"unlevered beta corrected for cash" column. All four carry 0.81 - which IS
+the cash-corrected figure; Damodaran's plain unlevered beta is 0.77, as
+UBER_FY2024's own rationale states. Lyft's citation, read literally, pointed
+at the column that gives the other number. The value was never wrong; the
+provenance was, silently, in a committed file.
+
+Migrated programmatically, never by hand: this issue itself records that a
+full-file paste dropped a required source field once already (#15). The
+script asserted every shared input identical on name/value/unit/source/as_of
+before moving anything, and asserted afterwards that merging reproduces each
+original block field for field. The four shared rationales are MERGED from
+the four originals - every clause is from one of them - minus the sentence
+saying the value is "duplicated here only because market.json is keyed by
+doc_id, which is a known structural gap", which this change makes false.
+
+Verified. All eleven test scripts pass. Both anchors hold. app.py runs
+through AppTest and reproduces README's UBER_FY2025 row. `capture_baseline.py`
+against the pre-session baseline differs on exactly FOUR lines out of four
+files - the terminal_growth rationale text, in the ASSUMPTIONS block - and
+the RESULT, TORNADO, REVERSE DCF and WACC blocks are byte-identical on all
+four filings. No number moved.
+
+`scripts/test_market.py` (7 tests, in CI) holds the structure, including a
+negative control that writes a redefinition into the file and requires
+`load_market` to raise - without it every other assertion would pass against
+a loader that merged a collision silently, which is the behaviour this issue
+exists to remove.
+
+Status: CLOSED.
 
 ## #22 Item 1A sentence-retention rate is a cross-filer signal, not a calibrated metric
 

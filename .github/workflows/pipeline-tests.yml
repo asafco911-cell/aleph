@@ -45,6 +45,9 @@ jobs:
       - name: Manifest (a filing replaced under an existing doc_id)
         run: python scripts/test_manifest.py
 
+      - name: Market inputs (shared vs per-filing, and the drift guard)
+        run: python scripts/test_market.py
+
       # The structural fix ISSUES.md #30 asks for. It cannot tell whether a
       # sentence is true, only whether a count stated in two places still
       # agrees with the thing it counts - which is the shape all eighteen
@@ -53,7 +56,7 @@ jobs:
         run: python scripts/test_docs_consistency.py
 
       # WHAT THIS JOB DOES NOT PROVE, stated rather than left to a green
-      # badge to imply. Five of the twelve commands in README.md cannot run
+      # badge to imply. Five of the thirteen commands in README.md cannot run
       # here, because the filings are not distributed with this repository
       # (data/*.pdf is gitignored; see data/README.md for the EDGAR source):
       #
@@ -74,7 +77,7 @@ jobs:
       # is a gap in coverage and not a hidden false green.
       - name: State what this job does not cover
         run: |
-          echo "Covered:     7 of the 12 documented commands (fixtures and arithmetic only)."
+          echo "Covered:     8 of the 13 documented commands (fixtures and arithmetic only)."
           echo "NOT covered: test_sections, test_multicompany, test_regression - all need"
           echo "             the six 10-K PDFs, which this repository does not distribute."
           echo "NOT covered: run_valuation.py's 77.08 anchor. Verify locally before release."

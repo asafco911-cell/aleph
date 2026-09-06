@@ -117,12 +117,48 @@ def load_overrides(doc_id: str) -> dict[str, Override]:
     }
 
 
+class MarketDriftError(RuntimeError):
+    """A per-filing block redefines an input that must be held identical."""
+
+
 def load_market(doc_id: str) -> dict[str, MarketAssumption]:
+    """Merge the shared market inputs with this filing's own.
+
+    data/market.json separates inputs that MUST be identical across filers -
+    risk-free rate, ERP, terminal growth, the unlevered industry beta - from
+    those that legitimately differ per company: country risk premium, debt
+    spread, share price. Holding the first group constant is what makes the
+    cross-company comparison measure the businesses rather than the method
+    choice (CLAUDE.md, "Cross-company comparability"; docs/adr/0001).
+
+    Before this split the file was keyed by doc_id alone and the four blocks
+    carried those inputs identically by DISCIPLINE, with nothing to stop one
+    from drifting. Something already had: LYFT_FY2025 cited a different
+    Damodaran source string for the same 0.81 beta, naming the sector table
+    without its cash-corrected column - the column the 0.81 actually comes
+    from (ISSUES.md #21).
+
+    A per-filing block that redefines a shared key raises rather than
+    quietly winning, so the structure enforces what discipline used to.
+    """
+    payload = json.loads(MARKET.read_text(encoding="utf-8"))
+    shared = payload.get("shared", {})
+    per_filing = payload.get("per_filing", {}).get(doc_id, {})
+
+    collisions = sorted(set(shared) & set(per_filing))
+    if collisions:
+        raise MarketDriftError(
+            f"{doc_id} redefines shared market input(s) {collisions} in its "
+            "per_filing block. These are held identical across every filer on "
+            "purpose; a per-filing override would make the cross-company "
+            "comparison measure the choice instead of the businesses. Change "
+            "the shared value if the method changed, and say so in its "
+            "rationale."
+        )
+
     return {
-        name: MarketAssumption(**payload)
-        for name, payload in json.loads(
-            MARKET.read_text(encoding="utf-8")
-        ).get(doc_id, {}).items()
+        name: MarketAssumption(**entry)
+        for name, entry in {**shared, **per_filing}.items()
     }
 
 

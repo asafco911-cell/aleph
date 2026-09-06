@@ -2,7 +2,7 @@
 
 [![Pipeline tests](https://github.com/asafco911-cell/aleph/actions/workflows/pipeline-tests.yml/badge.svg)](https://github.com/asafco911-cell/aleph/actions/workflows/pipeline-tests.yml)
 
-The badge covers seven of the twelve commands below - the ones needing only
+The badge covers eight of the thirteen commands below - the ones needing only
 fixtures and arithmetic. It does NOT cover the 77.08 anchor or the three
 tests that need the filings; see "Running it".
 
@@ -202,7 +202,7 @@ are not distributed with this repository - see
 and read its hash-verification section before assuming a mismatch means
 something is broken.
 
-Twelve commands prove the pipeline works, verbatim from
+Thirteen commands prove the pipeline works, verbatim from
 [CLAUDE.md](CLAUDE.md#commands-that-verify-the-system-works):
 
 ```
@@ -217,10 +217,11 @@ python scripts\test_multicompany.py
 python scripts\test_assumptions.py
 python scripts\test_pipeline_callback.py
 python scripts\test_manifest.py
+python scripts\test_market.py
 python scripts\test_docs_consistency.py
 ```
 
-Seven of those twelve run in CI on every push
+Eight of those thirteen run in CI on every push
 ([pipeline-tests.yml](.github/workflows/pipeline-tests.yml)) - the ones
 that need only fixtures and arithmetic. The other five need the filings,
 which this repository does not distribute, so a green badge here does not
