@@ -251,12 +251,83 @@ def _doc_ids(facts: list[Fact]) -> list[str]:
     return sorted({f.source.doc_id for f in facts if f.source})
 
 
+def _total_revenue_by_source(facts: list[Fact]) -> dict[str, dict[str, tuple]]:
+    """Every 'total revenue' fact, grouped period -> target_key -> (value, unit).
+
+    Deliberately excludes nothing. This is the one place that WANTS the
+    restatements derive_growth filters out, because agreement between them
+    is the thing being checked.
+    """
+    grouped: dict[str, dict[str, tuple]] = {}
+    for fact in facts:
+        if fact.period is None or not fact.source:
+            continue
+        if "total revenue" not in fact.name.lower():
+            continue
+        key = fact.source.target_key or f"{fact.source.kind}:{fact.source.ref}"
+        grouped.setdefault(fact.period, {})[key] = (fact.value, fact.unit)
+    return grouped
+
+
+def _revenue_source_disagreements(facts: list[Fact]) -> list[str]:
+    """Compare total revenue across the independent sources that state it.
+
+    A filing states total revenue in at least two places: the income
+    statement, and the Total row of the segment and geography notes. They
+    agree on every filing measured (all six, every period) - which is the
+    point. This check costs nothing while they agree and is the only thing
+    that would see the day they do not; derive_growth excludes the note
+    totals rather than reconciling them, so a disagreement there is
+    currently invisible to every other step (ISSUES.md #20).
+
+    The tolerance is the filing's OWN reported precision, not an invented
+    constant (the failure #13 names): two values agree when they differ by
+    less than one unit of the COARSER of the two declared scales. A figure
+    printed in millions cannot distinguish anything finer than a million.
+    """
+    problems = []
+    for period, sources in sorted(_total_revenue_by_source(facts).items()):
+        if len(sources) < 2:
+            continue
+        scaled = {}
+        for key, (value, unit) in sources.items():
+            scale = resolve_scale(unit)
+            if scale is None:            # unresolved unit: not comparable
+                continue
+            scaled[key] = (value * scale, scale, value, unit)
+        if len(scaled) < 2:
+            continue
+        coarsest = max(entry[1] for entry in scaled.values())
+        values = [entry[0] for entry in scaled.values()]
+        if max(values) - min(values) < coarsest:
+            continue
+        listing = "; ".join(
+            f"{key} states {value:,.0f} {unit}"
+            for key, (_, _, value, unit) in sorted(scaled.items())
+        )
+        problems.append(f"{period}: {listing}")
+    return problems
+
+
 def derive_growth(facts, overrides) -> AssumptionRange:
     """Year-over-year revenue growth from the income statement total.
 
     Geographic and segment breakdowns restate the same total under different
     labels, so they are excluded here rather than allowed to collide with it.
+    Excluding them means nothing else compares them, so they are cross-checked
+    against the statement total first - see _revenue_source_disagreements.
     """
+    disagreements = _revenue_source_disagreements(facts)
+    if disagreements:
+        return _blocked(
+            "revenue_growth", "percent", [], [],
+            "BLOCKED: the filing's independent statements of total revenue do "
+            "not agree, so which one growth is measured on changes the answer. "
+            + " | ".join(disagreements)
+            + ". Resolve which source is authoritative before deriving growth.",
+            _doc_ids(facts),
+        )
+
     totals, collisions = _observations(
         facts, "total revenue", exclude_targets=("geography",)
     )

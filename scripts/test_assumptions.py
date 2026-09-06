@@ -1,16 +1,34 @@
-"""Tests for the geographic-revenue reconciliation in assumptions.py.
+"""Tests for the reconciliations in assumptions.py.
 
 _split_geographic_partitions decides whether a filing has disclosed one
 geographic breakdown of revenue or several overlapping ones, by reconciling
 against the stated total rather than trusting note or target boundaries.
+
+_revenue_source_disagreements compares the independent places a filing
+states total revenue against each other (ISSUES.md #20).
+
 A financial derivation without tests is a guess.
 """
+from aleph.schemas.evidence import Fact, FactSource
 from aleph.schemas.valuation import Observation
-from aleph.valuation.assumptions import _split_geographic_partitions
+from aleph.valuation.assumptions import (
+    _revenue_source_disagreements,
+    _split_geographic_partitions,
+)
 
 
 def obs(name, value):
     return Observation(period="FY2025", value=value, fact_name=name)
+
+
+def revenue_fact(target_key, period, value, unit="USD millions"):
+    """A gate-passed 'Total revenue' fact, as one target would produce it."""
+    return Fact(
+        name="Total revenue", value=value, unit=unit, period=period,
+        quote=f"Total revenue $ {value:,.0f}",
+        source=FactSource(doc_id="TEST_FY2025", kind="statement",
+                          ref="operations", target_key=target_key, pages=[1]),
+    )
 
 
 def test_single_breakdown_needs_no_split():
@@ -87,10 +105,72 @@ def test_no_stated_total_blocks():
     print("PASS test_no_stated_total_blocks")
 
 
+def test_agreeing_sources_report_nothing():
+    """The measured case: all six filings agree on every period.
+
+    This is the negative control for the three tests below. Without it they
+    would pass just as well against a function that flagged everything.
+    """
+    facts = [
+        revenue_fact("operations", "FY2024", 43978),
+        revenue_fact("segments", "FY2024", 43978),
+        revenue_fact("geography_n13", "FY2024", 43978),
+        revenue_fact("operations", "FY2025", 52017),
+        revenue_fact("segments", "FY2025", 52017),
+    ]
+    assert _revenue_source_disagreements(facts) == []
+    print("PASS test_agreeing_sources_report_nothing")
+
+
+def test_disagreeing_sources_are_reported():
+    """A segment note whose Total differs from the income statement."""
+    facts = [
+        revenue_fact("operations", "FY2025", 52017),
+        revenue_fact("segments", "FY2025", 51900),
+    ]
+    problems = _revenue_source_disagreements(facts)
+    assert len(problems) == 1, problems
+    assert "FY2025" in problems[0]
+    assert "52,017" in problems[0] and "51,900" in problems[0], problems[0]
+    print("PASS test_disagreeing_sources_are_reported")
+
+
+def test_a_single_source_cannot_disagree():
+    """LYFT_FY2024's real shape: no geography or segment note resolved, so
+    total revenue has exactly one source. That is not a disagreement."""
+    facts = [revenue_fact("operations", "FY2024", 5786016, "USD thousands")]
+    assert _revenue_source_disagreements(facts) == []
+    print("PASS test_a_single_source_cannot_disagree")
+
+
+def test_tolerance_is_the_coarser_declared_scale():
+    """Two sources in different scales, agreeing to the coarser one's own
+    precision, are not a disagreement - a figure printed in millions cannot
+    resolve anything finer than a million. A difference of a full million
+    is, and must be caught.
+    """
+    within = [
+        revenue_fact("operations", "FY2025", 52017, "USD millions"),
+        revenue_fact("segments", "FY2025", 52_017_400, "USD thousands"),
+    ]
+    assert _revenue_source_disagreements(within) == [], _revenue_source_disagreements(within)
+
+    beyond = [
+        revenue_fact("operations", "FY2025", 52017, "USD millions"),
+        revenue_fact("segments", "FY2025", 52_019_000, "USD thousands"),
+    ]
+    assert len(_revenue_source_disagreements(beyond)) == 1
+    print("PASS test_tolerance_is_the_coarser_declared_scale")
+
+
 if __name__ == "__main__":
     test_single_breakdown_needs_no_split()
     test_unequal_split_resolves_to_the_larger_half()
     test_equal_size_split_resolves_not_blocks()
     test_unreconcilable_blocks()
     test_no_stated_total_blocks()
+    test_agreeing_sources_report_nothing()
+    test_disagreeing_sources_are_reported()
+    test_a_single_source_cannot_disagree()
+    test_tolerance_is_the_coarser_declared_scale()
     print("\nAll tests passed.")
