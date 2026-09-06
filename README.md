@@ -1,5 +1,11 @@
 # Aleph — Autonomous Multi-Document Financial Analyst
 
+[![Pipeline tests](https://github.com/asafco911-cell/aleph/actions/workflows/pipeline-tests.yml/badge.svg)](https://github.com/asafco911-cell/aleph/actions/workflows/pipeline-tests.yml)
+
+The badge covers seven of the twelve commands below - the ones needing only
+fixtures and arithmetic. It does NOT cover the 77.08 anchor or the three
+tests that need the filings; see "Running it".
+
 Aleph reads 10-K filings and produces a defensible valuation range: an LLM
 copies figures from bounded regions of the document, deterministic Python
 gates check that the copying is correct, and everything downstream - the
