@@ -165,7 +165,9 @@ src/aleph/
                  every input that can change an answer)
 
 data/            manifest.json (6 filings: UBER/LYFT/DASH x FY2024/FY2025),
-                 market.json (WACC market inputs, per doc_id), overrides.json
+                 market.json (WACC market inputs: a `shared` block held
+                 identical across filers, plus `per_filing` blocks;
+                 load_market raises on a collision), overrides.json
                  (analyst decisions, versioned, rationale required),
                  anchors.json, aleph_cache.db (gitignored), *.pdf (gitignored)
 
@@ -198,7 +200,8 @@ ISSUES.md        open and closed issues, each with the measurement behind
 4. `build_wacc(ranges, market)` — bottom-up: Hamada-relevered industry beta,
    CAPM cost of equity + country risk premium, after-tax cost of debt,
    market-value weights. Every market input requires a source + as_of date
-   in `data/market.json`; a "placeholder"/"todo"/"tbd" source blocks the run.
+   in `data/market.json`; a source of "placeholder", "todo", "tbd" or
+   "integration test" blocks the run (ISSUES.md #19).
 5. `build_dcf_inputs(ranges, market)` — rebuilds FCFF from CFO (a levered
    figure) so WACC discounting doesn't double-count interest; converts every
    quantity to millions from its **declared unit**; blocks on a placeholder

@@ -171,7 +171,8 @@ scripts/          run_valuation.py (the CLI), test_*.py (one per stage),
                   guess" tool), capture_baseline.py, build_manifest.py
 app.py            Streamlit UI over the same pipeline. Every number carries
                   a provenance grade; a composite inherits the weakest.
-data/             manifest.json, market.json, overrides.json, anchors.json.
+data/             manifest.json, market.json (shared + per-filing market
+                  inputs), overrides.json, anchors.json.
                   The PDFs and the cache are gitignored - see data/README.md
 docs/adr/         six decisions that had a real rejected alternative
 experiments/      ch01-ch13, archived course chapters. Reference only; see

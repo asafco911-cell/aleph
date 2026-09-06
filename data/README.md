@@ -79,18 +79,38 @@ against.
 python -c "import hashlib; print(hashlib.sha256(open('data/uber_10k.pdf','rb').read()).hexdigest())"
 ```
 
-## data/uber_10k.pdf is still in git history
+## No filing is anywhere in git history
 
-The gitignore rule for `data/*.pdf` was added after `data/uber_10k.pdf` was
-first committed (chapter 2, `24454c7`), so it does not retroactively remove
-the file from history - only from future commits. The same is true of
-`experiments/ch12_production/aleph_cache.db` (chapter 12, `a3a9be5`), now
-covered by a gitignore rule broad enough to match a cache database at any
-depth in the tree, not only under `data/`.
+This section previously said the opposite, and said it correctly at the
+time. `data/uber_10k.pdf` was committed in chapter 2, before the
+`data/*.pdf` gitignore rule existed, and `git rm --cached` untracked it
+going forward without touching history. Two cache databases were in the
+same position. The decision recorded here was to leave them: neither is a
+secret, and rewriting a fourteen-chapter commit lineage to scrub two files
+would cost more than it fixes.
 
-Both were untracked going forward (`git rm --cached`), but history was
-deliberately **not** rewritten to remove them. This repository's commit
-lineage across fourteen course chapters is part of what it demonstrates -
-rewriting it to scrub two files would cost more than it fixes. Neither file
-contains a secret: the PDF is a public SEC filing, and the cache database is
-a content-addressed store of LLM responses to that same public text.
+That decision was reversed on 2026-09-06, immediately before this
+repository was first pushed to GitHub, because the cost calculation was
+different than it looked. Nothing had been published yet, so a rewrite was
+free - no one held the old history. And the claim at stake was not "is
+this a secret" but "is what the repository says about itself true":
+`docs/adr/0006`, `README.md` and this file all state that the filings are
+not distributed here. Pushing with the PDF in history would have made all
+three false on the day they became public.
+
+`git filter-repo` removed every `data/*.pdf` and every `aleph_cache.db`
+blob from all 84 commits. One commit disappeared - the one whose entire
+content was untracking those two files, which became empty. The tracked
+file list at HEAD was identical before and after, and `.git` went from
+4.2 MB to 674 KB.
+
+Verified from a fresh `git clone` of the public repository, not from the
+local copy: `git rev-list --objects --all` matches no `.pdf`, no
+`aleph_cache.db` and no `.env`. The commit hashes cited by the old version
+of this section no longer exist in this history - every SHA changed, which
+is what a rewrite means.
+
+Neither statement was ever about secrecy. The PDFs are public SEC filings
+and the cache holds LLM responses to that same public text. It is about a
+repository whose entire argument is that a documented guarantee should be
+enforced, not merely asserted.

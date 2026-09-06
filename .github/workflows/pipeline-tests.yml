@@ -10,7 +10,13 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth: 0, not the default shallow clone. test_manifest.py walks
+      # every commit to prove no filing is anywhere in history (docs/adr/0006),
+      # and refuses to run on a shallow clone rather than passing without
+      # having seen the history it is checking.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
