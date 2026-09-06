@@ -93,36 +93,92 @@ rates, percent for levels), rather than one global ratio.
 
 Status: open.
 
-## #19 market.json carries a leftover integration-test discount_rate in both blocks
+## #19 A failed WACC valued the filing off the leftover integration-test discount rate — CLOSED
 
-Both UBER_FY2024 and LYFT_FY2025 blocks in data/market.json carry a
-discount_rate of 0.09 with source "integration test," each rationale noting
-it is "NOT A VALUATION INPUT" and superseded once build_wacc is wired in -
-which it now is; run_valuation.py overwrites market["discount_rate"] with the
-derived bottom-up figure before use. Whether the loader or any other caller
-requires the key to be present at all has not been checked.
+Retitled on measurement. This was filed as a cosmetic leftover of unknown
+necessity - four market.json blocks carrying discount_rate 0.09 under source
+"integration test", each rationale reading "NOT A VALUATION INPUT",
+superseded because run_valuation.py overwrites the key with the derived
+bottom-up figure. The open question was whether any caller needed the key
+at all.
 
-Fix direction: determine whether MarketAssumption construction or
-build_dcf_inputs requires a discount_rate key to exist even though it is
-always overwritten; if not, delete both.
+It was not cosmetic. pipeline.py overwrites market["discount_rate"] only
+`if wacc:`, then calls build_dcf_inputs unconditionally. When build_wacc
+raised, the run fell through to the 0.09 sitting in the JSON.
 
-Status: open, unmeasured.
+MEASURED, not inferred: removing debt_spread from UBER_FY2024's market block
+makes build_wacc fail. The pipeline printed one warning line - "WACC NOT
+BUILT" - and then a complete RESULT block valuing the filing at $73.54 per
+share against its real $77.08, on an invented rate, with every gate passed
+and every unit converted correctly. The project's own named failure mode, in
+its own pipeline: a result that sounds right and is not, carrying no red
+flag.
 
-## #20 Revenue has two independent sources with no cross-check between them
+The root cause was not the key. `_market`'s placeholder message told the
+reader, in the error text itself, to set a source to 'integration test' to
+get past the placeholder check - which is exactly what all four blocks did.
+A guard that advertises its own escape hatch is not a guard.
+
+FIXED, three parts:
+  - discount_rate deleted from all four market.json blocks (32 lines, the
+    only deletions in the file). It is derived, never authored, so its
+    absence is now what stops a run whose WACC failed.
+  - PLACEHOLDER_SOURCES gained "integration test". It appears on no other
+    input in market.json, checked before adding it.
+  - Both of `_market`'s messages rewritten. The placeholder message names no
+    bypass. The missing-key message special-cases discount_rate to say it is
+    derived and must NOT be added to market.json - the old text instructed
+    the reader to do the thing that caused this.
+
+Verified four ways: the anchor still prints 77.08 with WACC 7.87/8.72/10.26%
+at the beta bounds; the same crippled-market reproduction now raises
+BridgeError instead of valuing; `_market` blocks 'integration test', 'TODO'
+and 'placeholder' while still accepting 'NYSE close'; capture_baseline.py
+diffed against a pre-change baseline is identical byte for byte on all four
+filings.
+
+This is a fourth member of the class named in #26 and #30: a mechanism that
+looks like protection and is not. #26 was a block printing incomplete
+evidence; #30 was a documented guarantee no code enforced; this was a guard
+naming its own bypass in its error message.
+
+## #20 Revenue has two independent sources with no cross-check between them — CLOSED
 
 Total revenue is available from two places: the statement:operations target
-(the income statement total) and the Total row in the segment note. They
-agree for Uber. If they ever disagreed for some filer, no gate or derivation
-step would see it - derive_growth excludes the geography/segment target
-explicitly to avoid a collision with the statement total, rather than
-reconciling the two.
+(the income statement total) and the Total row in the segment and geography
+notes. derive_growth excludes the note targets to avoid a collision with the
+statement total rather than reconciling them, so nothing compared the two.
 
-Fix direction: a cross-source consistency check, analogous to cross-footing
-within one table, comparing the two totals per period and blocking or
-flagging on disagreement.
+MEASURED FIRST, across all six filings and every period: they agree
+everywhere. UBER_FY2024 across four targets (operations, segments,
+geography_n2, geography_n13), UBER_FY2025 across three, LYFT_FY2025 across
+two, DASH_FY2025 and DASH_FY2024 across three each. LYFT_FY2024 has one
+source only - no geography note resolves for it, pre-existing and unrelated,
+noted in #28.
 
-Status: open, unmeasured (not observed to disagree on either registrant
-tested so far).
+FIXED. `_revenue_source_disagreements` (assumptions.py) groups every
+'total revenue' fact by period and target and blocks revenue_growth on a
+mismatch, naming each source and what it stated. It excludes nothing
+deliberately: it wants exactly the restatements derive_growth filters out.
+
+The tolerance is not an invented constant - the failure #13 names in
+MAX_RELATIVE_SPREAD. Two values agree when they differ by less than one unit
+of the COARSER of the two declared scales, because a figure printed in
+millions cannot resolve anything finer than a million. The bound is the
+filing's own reported precision.
+
+So this check is a no-op today, which is the point: it costs nothing while
+the sources agree and is the only thing that would see the day they do not.
+
+Four tests in test_assumptions.py, one a negative control
+(test_agreeing_sources_report_nothing, on the real UBER_FY2025 figures)
+requiring silence - without it the other three would pass equally against a
+function that flagged everything. The tolerance test checks both directions:
+millions against thousands differing by 400 thousand passes, the same pair
+differing by a full million is caught.
+
+Does not close the geography-note case, which #28 already closed by a
+different mechanism (reconciling components against the stated total).
 
 ## #21 market.json is keyed by doc_id, duplicating pure market inputs per company
 
@@ -160,7 +216,7 @@ numbers... validity of the comparison is the analyst's responsibility, not
 the tool's"); this issue makes that caution concrete for this specific
 number.
 
-## #23 Three unexplained rejections in the multi-company gate run
+## #23 Three "unexplained" rejections are one fact, one cause, and three correct gates — CLOSED
 
 `test_multicompany.py` passes overall but three targets carry a rejection
 nobody has investigated, none of them unit-related:
@@ -176,9 +232,53 @@ All three are on tax-reconciliation tables and all three ultimately pass
 their target's minimum threshold, so they have never blocked a run - which
 is exactly how a real problem could sit unexamined.
 
-Status: open, unmeasured.
+CLOSED, measured. The three are not three problems. They are one fact -
+`Effective income tax rate FY2025` - rejected in three filings for one
+reason, and the gates are RIGHT in all three cases.
 
-## #24 DASH_FY2024 has never been valued
+All three FY2025 filers adopted ASU 2023-09, which changed the tax-rate
+reconciliation disclosure. Each FY2025 note therefore contains TWO tables:
+a new-format one for FY2025 alone, and a legacy one for the earlier years,
+introduced verbatim as "in accordance with the guidance prior to the
+adoption of ASU 2023-09". Read directly from the note text:
+
+  UBER_FY2025  "...for the years ended December 31, 2023 and 2024:"
+               row: 'Effective income tax rate 9.2 % (139.6)%'   (2 cells)
+               "...for the years ended December 31, 2025 (in millions):"
+               row: 'Effective income tax rate $ (4,346) (74.8)%'
+  LYFT_FY2025  same shape, legacy table for 2024 and 2023
+  DASH_FY2025  new format only, columns literally ['Amount', 'Percent']
+
+The FY2025 row is not two years. It is an amount and a percentage, which is
+why DASH_FY2025 rejects on `column_alignment` against ['Amount', 'Percent']
+and the other two on `columns_undetermined` for a 2-cell row. Compare
+UBER_FY2024, one filing year earlier, whose single table gives a clean
+3-cell row and three accepted facts.
+
+LYFT_FY2025's is the informative one: the nearest header above the row
+reported `years=['FY2025', 'FY2024', 'FY2023']` while the row held two
+cells. A laxer gate would have mapped 10.1% to FY2025 when the filing means
+FY2024 - a year-shifted tax rate, with nothing downstream able to see it.
+The gate prevented a wrong number, not a cosmetic one.
+
+Measured downstream effect: none. effective_tax_rate blocks for every filing
+regardless, on sign change across periods (UBER_FY2024 1.9/9.2/-139.6,
+LYFT_FY2025 -2.6/10.1, DASH_FY2025 -5.8/25.0/0.7), and is supplied by
+override as 21% statutory by cross-company policy. Confirmed by running
+derive_all with NO overrides on all five filings: every one blocks.
+CLAUDE.md's residual-risk note that derive_tax_rate's computed branch never
+runs still holds.
+
+Deliberately NOT fixed. Teaching extraction the Amount/Percent format would
+change no valuation, since the quantity is overridden by policy in every
+filing. Per #26's own reasoning, the fix applies where harm was measured,
+not to every latent risk of the same shape. What this issue produced instead
+is a sixth entry for CLAUDE.md's "10-K facts that were actually Uber facts"
+list: one reconciliation table per note, with columns that are years. An
+accounting standard adoption broke it, mid-filer, between two years of the
+same company.
+
+## #24 DASH_FY2024 has never been valued — CLOSED as out of scope
 
 DASH_FY2025 is resolved: it has a `market.json` block and `overrides.json`
 entries (`effective_tax_rate`, `net_debt`, `interest_expense`), has been
@@ -195,7 +295,23 @@ Extraction and gates do pass for it (`test_multicompany.py` exercises it
 alongside the other five filings), so the remaining gap is entirely in
 the judgement layer - market inputs and override policy - not extraction.
 
-Status: open, narrowed. Retitled from "DoorDash has never been valued" -
+CLOSED as out of scope, not as done. DASH_FY2024 is deliberately not valued.
+
+The comparison this project argues for is three companies at ONE market
+date on ONE method - UBER_FY2025, LYFT_FY2025, DASH_FY2025, all priced at
+the 2026-08-27 close. UBER_FY2024 exists alongside them for a different and
+stated reason: it is the evidence against the model, the same company one
+filing year apart producing $77.08 against $119.95 (#29). DASH_FY2024 serves
+neither purpose, and valuing it would require two new analyst judgements -
+a share price at a date nobody has chosen, and a country risk premium
+weighted on its own geographic mix - manufactured to fill a gap in a table
+rather than to answer a question.
+
+What was never in doubt: extraction and gates pass for DASH_FY2024, and
+test_multicompany.py exercises it alongside the other five on every run. The
+gap was only ever in the judgement layer, and the judgement is to leave it.
+
+Decided by Asi, 2026-09-06. Retitled from "DoorDash has never been valued" -
 found stale while checking a README claim about ISSUES.md's own honesty,
 not while looking for it.
 
@@ -376,7 +492,7 @@ initial claim to the contrary - that it "doesn't touch the contaminated
 cash-flow base at all" - turned out to be wrong and was caught before it
 reached the README.
 
-## #30 sha256 is recorded as content identity but never used to detect a replaced document
+## #30 sha256 is recorded as content identity but never used to detect a replaced document — CLOSED
 
 `schemas/documents.py` states the principle directly: `doc_id` is a
 "Human-authored stable id" (line 74) and `sha256` is "Content identity. The
@@ -424,9 +540,31 @@ or a printed warning that still allows the new manifest to be written when
 the replacement was deliberate (a corrected 10-K/A superseding an
 original, for instance).
 
-Status: open. Not implemented, per instruction - this is a design decision
-about which failure mode is correct (hard block vs. warn), not a bug to
-patch reflexively.
+DECIDED and IMPLEMENTED, 2026-09-06: raise, and require an explicit flag.
+build_manifest() reads the committed manifest, compares per doc_id, and
+raises DocumentError naming both hashes; build_manifest.py turns that into
+exit(1), or proceeds with --allow-replacement while still printing every
+replacement it waved through. A missing manifest is not a mismatch, and a
+new doc_id is not a replacement. Reasoning and the rejected alternative
+(hard block with no override, which forces hand-editing the very file whose
+integrity is being protected) in docs/adr/0007.
+
+The first attempt to prove it measured the wrong thing and is worth
+recording: substituting a DIFFERENT filing at the path was caught by
+DocumentRecord's fiscal-year validator before sha256 was ever compared,
+which demonstrates nothing about this issue. The real case is a document
+that passes every other check. Re-serialising data/uber_10k_fy2024.pdf
+through pypdf gives exactly that - identical text, still a 10-K, still
+fiscal year 2024, all four anchors present - and a different hash:
+ab5f074a -> e29543aa. That run exits 1 and prints both hashes; with
+--allow-replacement it exits 0 and prints REPLACED UBER_FY2024. Everything
+restored afterwards, all six hashes re-verified.
+
+That attempt also found a live defect it was not looking for:
+build_manifest.py caught DocumentError but not pydantic's ValidationError,
+which DocumentRecord's own validators raise, so a bad filing ended in a
+traceback rather than a decision - not what principle 5 means by "the CLI
+decides the exit code". Fixed in the same commit.
 
 Two instances in one session make this a class worth naming, not a
 coincidence: a docstring, field comment or schema description states a
@@ -516,6 +654,45 @@ The count alone is a number; the cause is the finding. A durable document
 that also carries perishable status will always drift, no matter how
 carefully any one edit is checked - the fix has to be structural
 (state lives elsewhere) or the tenth instance is only a matter of time.
+
+THE SECOND STRUCTURAL FIX, 2026-09-06. Moving state out of CLAUDE.md
+addressed the nine status instances. It does nothing for the other kind:
+a count stated in two places, where neither place is status and both are
+durable. `scripts/test_docs_consistency.py` checks those mechanically, on
+every push:
+
+  - README's command list is byte-identical to CLAUDE.md's, which is what
+    the word "verbatim" in README claims (this was instance 5).
+  - Every documented `scripts\*.py` command exists (instance 4).
+  - README's prose count matches the length of the list it introduces.
+  - CI runs only scripts that exist and appear in the documented list.
+  - CI's own statement of what it does NOT cover matches what it runs.
+  - The gate count in README, CLAUDE.md twice, and gates.py agree
+    (instance 3).
+
+It cannot tell whether a sentence is true. It checks whether a number
+stated in two places still agrees with the thing it counts - which is the
+shape every instance above had.
+
+The tenth instance arrived on schedule and was caught by the checker rather
+than by accident, twice within one commit: adding test_manifest.py to the
+command list left "Ten commands" stale, and adding the checker itself to CI
+left three coverage counts stale.
+
+Six drifts were then injected one at a time to prove it has teeth, each
+confirmed to have actually landed in the file before the checker ran -
+diverged command lists, a documented script that does not exist, a stale
+gate count, an inflated CI coverage number, a wrong uncovered count, a
+wrong prose count. All six caught; with no drift, clean. A first attempt at
+this control used a shell heredoc that silently collapsed a backslash, so
+the "passing" run had never modified anything - a negative control that
+does not verify its own injection proves nothing, which is the same lesson
+as the fiscal-year validator above.
+
+Status: CLOSED. The sha256 half is enforced; the documentation half has a
+test instead of a recommendation. What remains uncovered is prose that
+states a guarantee no count can express - that class is still checked by
+reading, and the ADRs in docs/adr/ are where those guarantees now live.
 
 ## Closed
 

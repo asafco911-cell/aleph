@@ -2,12 +2,17 @@
 
 Capstone of a 14-chapter course (chapters 1-13 archived, read-only, under
 `experiments/`). Owner: Asi, 23, Tel Aviv, building toward running a fund.
-Status: capstone nearly done. Remaining work is correctness, then packaging
-for GitHub.
+
+Scope is deliberately narrower than the course syllabus: this is the
+valuation pipeline - documents, extraction, gates, assumptions, WACC, DCF,
+language forensics. Retrieval, the knowledge graph and the agent team are
+course work under `experiments/` and are NOT wired in. See README, "What
+this is, and what it is not."
 
 Current state lives in ISSUES.md and git log, both of which are maintained;
 this file is architecture and working agreement only. Nothing that can go
-stale in a week belongs here.
+stale in a week belongs here - the "Status:" line that used to sit in this
+paragraph is exactly what ISSUES.md #30 counted nine instances of.
 
 ## Working agreement (non-negotiable)
 
@@ -85,7 +90,7 @@ file each.
    checks that copying finished. Reporting `accepted=4 rejected=0` while
    silently omitting a required quantity is the worst failure mode here.
 
-## Five "10-K facts" that were actually "Uber facts"
+## Six "10-K facts" that were actually "Uber facts"
 
 Every rule below is now resolved by title, never by number or position,
 because of these:
@@ -95,6 +100,12 @@ because of these:
   stockholders' equity"`).
 - A fixed page offset (three companies, three different values).
 - Geography inside the segment note (DoorDash puts it in the revenue note).
+- One reconciliation table per note, with columns that are years. All three
+  FY2025 filers adopted ASU 2023-09 and now print TWO tax-rate tables: a
+  new-format one for the latest year, whose columns are Amount and Percent,
+  and a legacy one for the earlier years. The gates reject the latest-period
+  rate in all three, correctly - see ISSUES.md #23. The other five broke
+  across filers; this one broke across two years of the SAME filer.
 
 The recurring failure across the whole course, in one sentence: **a result
 that sounds right and is not is the most dangerous outcome, because it
