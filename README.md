@@ -232,6 +232,16 @@ imply otherwise.
 
 ## Licence
 
-[MIT](LICENSE), covering the code only. The SEC filings are not distributed
-here and the licence grants no rights to them. Nothing this code prints is
-investment advice.
+[MIT](LICENSE), covering the code in this repository and nothing else.
+
+It does not cover the SEC filings the pipeline reads. Those are not
+distributed here - see [data/README.md](data/README.md) for the EDGAR source
+of each - and nothing in this repository grants any right to them.
+
+Nothing this code prints is investment advice. The valuations are not
+recommendations; read [ISSUES.md](ISSUES.md) before trusting any number.
+
+(These three paragraphs live here rather than appended to `LICENSE`, where
+they previously sat: GitHub's licence detector matches a file that is the
+licence and nothing else, and the addendum made it report NOASSERTION
+instead of MIT.)

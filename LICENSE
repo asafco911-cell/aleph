@@ -19,14 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-This license covers the code in this repository only.
-
-It does not cover the SEC filings the pipeline reads. Those are not
-distributed here (see data/README.md for the EDGAR source of each), and
-nothing in this repository grants any right to them.
-
-It is not investment advice, and the valuations this code produces are not
-recommendations. Read ISSUES.md before trusting any number it prints.
