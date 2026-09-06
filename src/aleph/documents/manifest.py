@@ -108,7 +108,57 @@ def inspect(doc_id: str, entry: dict, data_dir: Path) -> DocumentRecord:
     )
 
 
-def build_manifest(data_dir: Path) -> list[DocumentRecord]:
+def committed_hashes(data_dir: Path) -> dict[str, str]:
+    """doc_id -> sha256, from the manifest already on disk.
+
+    Missing or unreadable is not an error: the first build has no previous
+    manifest to compare against, and a corrupt one is not evidence that a
+    document was replaced.
+    """
+    path = data_dir / "manifest.json"
+    if not path.exists():
+        return {}
+    try:
+        committed = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return {}
+    return {
+        row["doc_id"]: row["sha256"]
+        for row in committed
+        if isinstance(row, dict) and "doc_id" in row and "sha256" in row
+    }
+
+
+def replaced_documents(
+    records: list[DocumentRecord], previous: dict[str, str]
+) -> list[tuple[str, str, str]]:
+    """Return (doc_id, committed_sha256, new_sha256) for each replacement.
+
+    schemas/documents.py states the principle: doc_id is the stable id and
+    sha256 is "Content identity. The file name is metadata; this is not."
+    Same doc_id with a different hash therefore means the document was
+    replaced - and until this function existed, nothing checked it
+    (ISSUES.md #30). None of inspect()'s own checks can catch it: the form
+    type, the fiscal year and the anchor strings can all still match while
+    the bytes change underneath.
+    """
+    return [
+        (record.doc_id, previous[record.doc_id], record.sha256)
+        for record in records
+        if record.doc_id in previous and previous[record.doc_id] != record.sha256
+    ]
+
+
+def build_manifest(
+    data_dir: Path, allow_replacement: bool = False
+) -> list[DocumentRecord]:
+    """Build every record, raising if a document was replaced under its doc_id.
+
+    A library raises; the CLI decides the exit code (principle 5). This
+    raises DocumentError on a replacement so the decision is forced; the
+    caller passes allow_replacement=True once the replacement is deliberate
+    - a corrected 10-K/A superseding an original, or a re-rendered PDF.
+    """
     anchors = json.loads((data_dir / "anchors.json").read_text(encoding="utf-8"))
 
     records, seen = [], {}
@@ -120,4 +170,20 @@ def build_manifest(data_dir: Path) -> list[DocumentRecord]:
             )
         seen[record.sha256] = doc_id
         records.append(record)
+
+    replaced = replaced_documents(records, committed_hashes(data_dir))
+    if replaced and not allow_replacement:
+        listing = "\n".join(
+            f"  {doc_id}\n    committed {old}\n    on disk   {new}"
+            for doc_id, old, new in replaced
+        )
+        raise DocumentError(
+            f"{len(replaced)} document(s) changed content under an existing "
+            f"doc_id:\n{listing}\n"
+            "sha256 is content identity, so this means the file at that path is "
+            "not the document the committed results were produced from. Every "
+            "other check here can still pass while this is true.\n"
+            "If the replacement is deliberate, re-run with --allow-replacement "
+            "and record why in data/README.md."
+        )
     return records

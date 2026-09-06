@@ -196,7 +196,7 @@ are not distributed with this repository - see
 and read its hash-verification section before assuming a mismatch means
 something is broken.
 
-Ten commands prove the pipeline works, verbatim from
+Twelve commands prove the pipeline works, verbatim from
 [CLAUDE.md](CLAUDE.md#commands-that-verify-the-system-works):
 
 ```
@@ -210,9 +210,11 @@ python scripts\test_sections.py
 python scripts\test_multicompany.py
 python scripts\test_assumptions.py
 python scripts\test_pipeline_callback.py
+python scripts\test_manifest.py
+python scripts\test_docs_consistency.py
 ```
 
-Five of those ten run in CI on every push
+Seven of those twelve run in CI on every push
 ([pipeline-tests.yml](.github/workflows/pipeline-tests.yml)) - the ones
 that need only fixtures and arithmetic. The other five need the filings,
 which this repository does not distribute, so a green badge here does not
