@@ -17,6 +17,7 @@ contained in "restricted cash and cash equivalents". Two different facts
 matching one query in one period is an ambiguous query, and silently keeping
 the last one drops the figure that matters. Collisions therefore block.
 """
+from dataclasses import dataclass
 from itertools import combinations
 from statistics import median
 
@@ -24,7 +25,59 @@ from ..infra.units import resolve_scale
 from ..schemas.evidence import Fact
 from ..schemas.valuation import AssumptionRange, Observation, Override
 
-MAX_RELATIVE_SPREAD = 1.0  # see ISSUES.md #13: scale-dependent, per-quantity limits pending
+
+@dataclass(frozen=True)
+class DispersionLimit:
+    """How far a quantity's observations may spread before a summary is unsafe.
+
+    In the QUANTITY'S OWN UNITS - percentage points for a rate - never as a
+    ratio to the median. A relative limit divides by the median, so it tightens
+    without limit as the median approaches zero and says nothing about
+    economic materiality: under the old global MAX_RELATIVE_SPREAD = 1.0,
+    tax rates of 1.9% and 9.2% (7.3 points apart) exceeded the limit at 1.3x
+    while 45% and 52% would have passed comfortably (ISSUES.md #13).
+
+    The span is a judgement, and is written here with its reasoning rather
+    than left as a bare number, which is the whole difference from the
+    constant it replaces - nobody ever recorded why that one was 1.0.
+    """
+    span: float
+    unit: str
+    rationale: str
+
+
+# One limit per TREND quantity, declared beside the derivation that uses it.
+DISPERSION_LIMITS = {
+    "revenue_growth": DispersionLimit(
+        span=12.0, unit="percentage points",
+        rationale=(
+            "Calibrated against every filing this project derives growth from, "
+            "not chosen in the abstract. Observed spans: UBER_FY2025 0.3, "
+            "UBER_FY2024 1.0, DASH_FY2025 3.8, DASH_FY2024 7.0, LYFT_FY2025 "
+            "22.2, LYFT_FY2024 23.9 percentage points. Nothing lands between "
+            "7.0 and 22.2 - a factor of three with no filing in it - so 12.0 "
+            "sits in an empty gap with 5 points of margin below and 10 above, "
+            "and is not knife-edge on anything measured. It reproduces the "
+            "existing behaviour exactly: Uber and DoorDash derive, Lyft blocks "
+            "in both years. Lyft's own override already records why that block "
+            "is right - 31.4% and 9.2% are not draws from one distribution."
+        ),
+    ),
+    "effective_tax_rate": DispersionLimit(
+        span=21.0, unit="percentage points",
+        rationale=(
+            "Anchored on the US federal statutory rate: periods spanning more "
+            "than the entire statutory rate are not describing one tax regime, "
+            "and a median across them would be arithmetic, not a rate. "
+            "NEVER REACHED on any filing measured - UBER_FY2024/FY2025, "
+            "LYFT_FY2024/FY2025 and DASH_FY2025 all block on sign change "
+            "first, which is checked before any span. #13's own motivating "
+            "example (1.9% and 9.2% blocked at 1.3x) no longer reproduces for "
+            "that reason. Declared anyway rather than omitted, so a future "
+            "filer with same-signed rates meets a stated limit instead of none."
+        ),
+    ),
+}
 
 # Rounding slack when checking a set of components against a stated total.
 # Measured on every geography breakdown extracted this session (Uber's two
@@ -80,19 +133,33 @@ def _observations(
     return [found[period] for period in sorted(found)], collisions
 
 
-def _dispersion_problem(values: list[float]) -> str | None:
-    """Return why a set of observations cannot be summarised, or None."""
+def _dispersion_problem(name: str, values: list[float]) -> str | None:
+    """Return why a set of observations cannot be summarised, or None.
+
+    Sign change is checked first and needs no limit: a set spanning zero has
+    no meaningful median regardless of how wide it is. The span check that
+    follows is absolute, in the quantity's own units, so a median near zero
+    no longer makes the test arbitrarily strict - the "median is zero" branch
+    the relative test needed is gone with the division that required it.
+
+    A quantity with no declared limit does not silently pass. Declaring the
+    limit is part of declaring the derivation.
+    """
     if len(values) < 2:
         return None
     if any(v > 0 for v in values) and any(v < 0 for v in values):
         return "values change sign across periods"
-    centre = median(values)
-    if centre == 0:
-        return "median is zero; relative spread is undefined"
-    spread = (max(values) - min(values)) / abs(centre)
-    if spread > MAX_RELATIVE_SPREAD:
-        return (f"relative spread is {spread:.1f}x the median "
-                f"(limit {MAX_RELATIVE_SPREAD:.1f}x)")
+
+    limit = DISPERSION_LIMITS.get(name)
+    if limit is None:
+        return (f"no dispersion limit is declared for '{name}'. Add one to "
+                "DISPERSION_LIMITS, in the quantity's own units, with the "
+                "reasoning that sets it")
+
+    span = max(values) - min(values)
+    if span > limit.span:
+        return (f"observations span {span:,.1f} {limit.unit} "
+                f"(limit {limit.span:,.1f}). {limit.rationale}")
     return None
 
 
@@ -192,7 +259,7 @@ def build_trend(name, unit, observations, collisions, override, doc_ids) -> Assu
         return _blocked(name, unit, observations, excluded, mismatch, doc_ids)
 
     values = [o.value for o in kept]
-    problem = _dispersion_problem(values)
+    problem = _dispersion_problem(name, values)
     if problem:
         return _blocked(
             name, unit, observations, excluded,

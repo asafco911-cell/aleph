@@ -12,6 +12,8 @@ A financial derivation without tests is a guess.
 from aleph.schemas.evidence import Fact, FactSource
 from aleph.schemas.valuation import Observation
 from aleph.valuation.assumptions import (
+    DISPERSION_LIMITS,
+    _dispersion_problem,
     _revenue_source_disagreements,
     _split_geographic_partitions,
 )
@@ -163,6 +165,72 @@ def test_tolerance_is_the_coarser_declared_scale():
     print("PASS test_tolerance_is_the_coarser_declared_scale")
 
 
+def test_dispersion_is_no_longer_scale_dependent():
+    """ISSUES.md #13's exact example, both halves.
+
+    Under the old relative limit these two sets got opposite verdicts for a
+    reason that had nothing to do with economics: 1.9 and 9.2 are 7.3 points
+    apart and were blocked at 1.3x the median, while 45 and 52 are 7.0 points
+    apart and passed comfortably. Nearly the same spread, opposite outcomes,
+    because the divisor differed. An absolute limit gives them the same
+    answer, which is the whole point of the change.
+    """
+    near_zero = _dispersion_problem("effective_tax_rate", [1.9, 9.2])
+    mid_range = _dispersion_problem("effective_tax_rate", [45.0, 52.0])
+    assert near_zero is None, f"1.9/9.2 (7.3pp) should pass: {near_zero}"
+    assert mid_range is None, f"45/52 (7.0pp) should pass: {mid_range}"
+    print("PASS test_dispersion_is_no_longer_scale_dependent")
+
+
+def test_a_median_near_zero_no_longer_blocks_a_narrow_spread():
+    """The mechanism behind #13: relative spread divides by the median.
+
+    0.1 and 0.2 are a tenth of a percentage point apart - immaterial - but
+    sit at 0.67x, 1.0x, 2.0x the median depending only on how close the
+    median is to zero. The old test had to special-case a zero median for
+    exactly this reason; the absolute test has no divisor to protect.
+    """
+    assert _dispersion_problem("effective_tax_rate", [0.1, 0.2]) is None
+    assert _dispersion_problem("revenue_growth", [0.0, 0.05]) is None
+    print("PASS test_a_median_near_zero_no_longer_blocks_a_narrow_spread")
+
+
+def test_a_genuinely_wide_spread_still_blocks():
+    """The negative control. Every test above requires silence; without this
+    one they would all pass against a function that never blocks."""
+    problem = _dispersion_problem("revenue_growth", [9.16, 31.39])   # LYFT_FY2025
+    assert problem is not None
+    assert "22.2" in problem and "percentage points" in problem, problem
+    assert "limit 12.0" in problem, problem
+    print("PASS test_a_genuinely_wide_spread_still_blocks")
+
+
+def test_sign_change_is_checked_before_any_span():
+    """A set spanning zero has no meaningful median however narrow it is, so
+    it must block on sign change rather than on a span comparison."""
+    problem = _dispersion_problem("effective_tax_rate", [-0.4, 0.4])
+    assert problem == "values change sign across periods", problem
+    print("PASS test_sign_change_is_checked_before_any_span")
+
+
+def test_an_undeclared_quantity_blocks_rather_than_passing():
+    """Declaring the limit is part of declaring the derivation. A quantity
+    with no entry must not slip through the check unexamined."""
+    problem = _dispersion_problem("some_new_quantity", [1.0, 2.0])
+    assert problem is not None and "no dispersion limit is declared" in problem
+    print("PASS test_an_undeclared_quantity_blocks_rather_than_passing")
+
+
+def test_every_limit_states_its_own_reasoning():
+    """The difference from MAX_RELATIVE_SPREAD is not the number, it is that
+    the number is written down with why. A bare limit is the old bug."""
+    for name, limit in DISPERSION_LIMITS.items():
+        assert limit.span > 0, name
+        assert limit.unit, name
+        assert len(limit.rationale) > 120, f"{name}: rationale too thin to review"
+    print(f"PASS test_every_limit_states_its_own_reasoning ({len(DISPERSION_LIMITS)} limits)")
+
+
 if __name__ == "__main__":
     test_single_breakdown_needs_no_split()
     test_unequal_split_resolves_to_the_larger_half()
@@ -173,4 +241,10 @@ if __name__ == "__main__":
     test_disagreeing_sources_are_reported()
     test_a_single_source_cannot_disagree()
     test_tolerance_is_the_coarser_declared_scale()
+    test_dispersion_is_no_longer_scale_dependent()
+    test_a_median_near_zero_no_longer_blocks_a_narrow_spread()
+    test_a_genuinely_wide_spread_still_blocks()
+    test_sign_change_is_checked_before_any_span()
+    test_an_undeclared_quantity_blocks_rather_than_passing()
+    test_every_limit_states_its_own_reasoning()
     print("\nAll tests passed.")

@@ -75,7 +75,7 @@ Fix (pending measurement): route all BM25 indexing and query text through
 
 Status: open, unmeasured.
 
-## #13 Dispersion test is scale-dependent for rate quantities
+## #13 Dispersion test is scale-dependent for rate quantities — CLOSED
 
 MAX_RELATIVE_SPREAD = 1.0 in valuation/assumptions.py is an invented constant,
 the same class of error as the fixed header-search window already corrected in
@@ -91,7 +91,50 @@ Fix direction: dispersion limits should be per-quantity and declared alongside
 the derivation, expressed in the quantity's own units (percentage points for
 rates, percent for levels), rather than one global ratio.
 
-Status: open.
+FIXED, exactly as that direction specified. `DispersionLimit` (span, unit,
+rationale) with one entry per TREND quantity in `DISPERSION_LIMITS`, declared
+beside the derivations that use them. `_dispersion_problem` takes the
+quantity name, checks sign change first, then compares an ABSOLUTE span
+against that quantity's own limit. `MAX_RELATIVE_SPREAD` is gone, and with
+it the "median is zero; relative spread is undefined" branch, which only ever
+existed to guard the division the relative test needed.
+
+MEASURED FIRST, before choosing any number - the real spans on every filing:
+UBER_FY2025 0.3, UBER_FY2024 1.0, DASH_FY2025 3.8, DASH_FY2024 7.0,
+LYFT_FY2025 22.2, LYFT_FY2024 23.9 percentage points. Nothing lands between
+7.0 and 22.2 - a factor of three with no filing in it - so revenue_growth's
+limit of 12.0 points sits in an empty gap with 5 points of margin below and
+10 above. That is a calibration against observed data with the reasoning
+recorded, not a number chosen in the abstract; the difference from the
+constant it replaces is that nobody ever wrote down why that one was 1.0.
+
+TWO FINDINGS THE ISSUE DID NOT ANTICIPATE:
+
+Its own motivating example no longer reproduces. `effective_tax_rate` never
+reaches the span check on any filing - UBER_FY2024/FY2025, LYFT_FY2024/FY2025
+and DASH_FY2025 all block on SIGN CHANGE first (1.9/9.2/-139.6,
+-2.6/10.1, -5.8/25.0/0.7). The "1.9 and 9.2 blocked at 1.3x" case described a
+two-value set that the current extraction no longer produces. A limit is
+declared for it anyway (21.0 points, anchored on the US federal statutory
+rate: periods spanning more than the entire statutory rate are not one tax
+regime), so a future filer with same-signed rates meets a stated limit rather
+than none - and it is labelled in the code as never reached.
+
+An undeclared quantity now BLOCKS rather than passing. The old global
+constant applied to everything by default, so adding a TREND quantity
+silently inherited a limit nobody chose for it. Declaring the limit is now
+part of declaring the derivation.
+
+Verified. All twelve status outcomes are unchanged across six filings and
+both TREND quantities - Uber and DoorDash derive growth, Lyft blocks in both
+years, every tax rate blocks on sign change. `capture_baseline.py` diffed
+against the pre-session baseline: identical, byte for byte. Six new tests in
+test_assumptions.py, including #13's exact example in both halves (1.9/9.2 at
+7.3 points apart and 45/52 at 7.0 points apart now get the SAME answer, which
+is the whole point), a near-zero median that no longer blocks a tenth of a
+point, a negative control requiring LYFT_FY2025's real 22.2-point spread to
+still block, and a check that every declared limit carries reviewable
+reasoning - a bare number is the old bug.
 
 ## #19 A failed WACC valued the filing off the leftover integration-test discount rate — CLOSED
 
