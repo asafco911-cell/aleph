@@ -318,6 +318,34 @@ def _doc_ids(facts: list[Fact]) -> list[str]:
     return sorted({f.source.doc_id for f in facts if f.source})
 
 
+def _unmatched_note(facts: list[Fact], target_key: str, matched: set[str],
+                    where: str) -> str:
+    """Name the facts a derivation's queries did not match, so a block prints
+    the whole evidentiary basis rather than only the part it recognised.
+
+    ISSUES.md #26: a block is not protection if the evidence it prints is
+    incomplete. DoorDash's balance sheet says "Short-term marketable
+    securities" where Uber and Lyft say "short-term investments", and its
+    tax note says "Total provision for (benefit from) income taxes" where the
+    query looks for "provision for income taxes". In both cases the fact was
+    extracted and gate-verified and simply invisible to a substring written
+    against two filers' wording.
+
+    The queries are DELIBERATELY not widened to match those spellings. A
+    longer substring list only relocates the bug to the next filer that
+    phrases it a third way. Surfacing the miss is the fix; the query stays
+    exactly as narrow, and exactly as fallible, as it was.
+    """
+    unmatched = [
+        f for f in facts
+        if f.source and f.source.target_key == target_key and f.name not in matched
+    ]
+    if not unmatched:
+        return ""
+    return (f" Extracted from {where} but matched by none of the queries "
+            "above: " + "; ".join(f"{f.name}={f.value:,.0f}" for f in unmatched))
+
+
 def _total_revenue_by_source(facts: list[Fact]) -> dict[str, dict[str, tuple]]:
     """Every 'total revenue' fact, grouped period -> target_key -> (value, unit).
 
@@ -416,6 +444,9 @@ def derive_tax_rate(facts, overrides) -> AssumptionRange:
     rate, so it is filer-independent and is used whenever the components are
     available.
     """
+    QUERIES = ("effective income tax rate", "provision for income taxes",
+               "before income taxes")
+
     stated, collisions = _observations(facts, "effective income tax rate")
     if stated:
         return build_trend("effective_tax_rate", "percent", stated, collisions,
@@ -432,9 +463,30 @@ def derive_tax_rate(facts, overrides) -> AssumptionRange:
         for p in provision
         if p.period in by_period and by_period[p.period].value
     ]
+
+    override = overrides.get("effective_tax_rate")
+    if not computed and not override:
+        # Without this, build_trend reports "no facts extracted for this
+        # quantity; check extraction gates" - which sends the analyst to the
+        # gates when the gates worked and a substring did not. Measured on
+        # DASH_FY2024: three "Total provision for (benefit from) income taxes"
+        # facts are extracted and gate-verified, and no query sees them.
+        matched = {
+            f.name for q in QUERIES for f in facts if q in f.name.lower()
+        }
+        return _blocked(
+            "effective_tax_rate", "percent", [], [],
+            "no tax rate could be stated or computed. Queries tried: "
+            + "; ".join(repr(q) for q in QUERIES) + "."
+            + _unmatched_note(facts, "taxes", matched, "the tax note")
+            + ". Facts listed there were extracted and passed every gate - a "
+            "query did not match their wording, so this is not an extraction "
+            "failure. Set fixed_value in data/overrides.json with a rationale.",
+            _doc_ids(facts),
+        )
+
     return build_trend("effective_tax_rate", "percent", computed,
-                       clash_a + clash_b, overrides.get("effective_tax_rate"),
-                       _doc_ids(facts))
+                       clash_a + clash_b, override, _doc_ids(facts))
 
 
 def derive_operating_cash_flow(facts, overrides) -> AssumptionRange:
@@ -709,15 +761,8 @@ def derive_net_debt(facts, overrides) -> AssumptionRange:
         if all(token.lower() in fact.name.lower() for token in name_contains)
         and not any(token.lower() in fact.name.lower() for token in exclude)
     }
-    unmatched = [
-        f for f in facts
-        if f.source and f.source.target_key == "balance_sheet"
-        and f.name not in matched_names
-    ]
-    unmatched_note = (
-        " Extracted from the balance sheet but matched by none of the "
-        "queries above: " + "; ".join(f"{f.name}={f.value:,.0f}" for f in unmatched)
-        if unmatched else ""
+    unmatched_note = _unmatched_note(
+        facts, "balance_sheet", matched_names, "the balance sheet"
     )
 
     return _blocked(

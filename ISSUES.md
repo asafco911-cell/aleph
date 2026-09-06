@@ -358,7 +358,7 @@ Decided by Asi, 2026-09-06. Retitled from "DoorDash has never been valued" -
 found stale while checking a README claim about ISSUES.md's own honesty,
 not while looking for it.
 
-## #26 Derivation queries match on wording measured against two filers only
+## #26 Derivation queries match on wording measured against two filers only — CLOSED
 
 `derive_net_debt` (assumptions.py) looked for the substring
 "short-term investments". DoorDash's FY2024 10-K prints "Short-term
@@ -413,10 +413,43 @@ only where it was measured to have caused real harm (a wrong number an
 analyst could have acted on), not to every derivation with the same shape
 of latent risk.
 
-Status: open - the net_debt instance is fixed; the derive_tax_rate instance
-is not, and the general pattern (a derivation query written against wording
-measured on too few filers) remains a real risk in any derive_* function
-not yet audited this way.
+THE derive_tax_rate INSTANCE IS NOW FIXED TOO, 2026-09-06, and the harm was
+worse than "no unmatched-evidence line". Reproduced on DASH_FY2024: three
+`Total provision for (benefit from) income taxes` facts (FY2022=-31,
+FY2023=31, FY2024=39) are extracted and pass every gate, and none of
+derive_tax_rate's three queries sees them. The rate then blocked through
+build_trend's generic path with the message **"no facts extracted for this
+quantity; check extraction gates"** - which is false twice over: facts WERE
+extracted, and the gates are exactly where the problem is not. It sent the
+analyst to audit a component that had worked perfectly.
+
+derive_tax_rate now blocks on its own when nothing resolves, naming the
+queries it tried, listing every fact from the taxes target that none of them
+matched, and saying in words that this is not an extraction failure.
+
+The query is still NOT widened to match "(benefit from)", for the same
+reason net_debt's was not: a longer substring list only relocates the bug to
+the next filer that phrases it a third way. A test asserts the block, so
+"fixing" it by broadening the query fails the suite.
+
+The mechanism is now shared rather than copied. `_unmatched_note(facts,
+target_key, matched, where)` is used by both derivations; the second
+instance would otherwise have been a second inline implementation that could
+drift from the first. net_debt's output was captured before the refactor and
+compared after: byte-for-byte identical on DASH_FY2024, UBER_FY2024 and
+LYFT_FY2025.
+
+Status: CLOSED for both measured instances. The general pattern - a
+derivation query written against wording measured on too few filers -
+remains a real risk in any derive_* function not yet audited this way, and
+is deliberately not swept: per this issue's own rule, the fix applies where
+harm was measured. `_unmatched_note` exists to make that fix cheap the next
+time harm IS measured.
+
+Six tests in test_assumptions.py, including a negative control
+(test_matching_wording_still_computes_a_rate) that requires a derivation to
+SUCCEED on ordinary wording - every other assertion here demands a block,
+and without it they would all pass against a derivation that never works.
 
 ## #27 check_coverage cannot see a row the model never quoted
 

@@ -14,6 +14,8 @@ from aleph.schemas.valuation import Observation
 from aleph.valuation.assumptions import (
     DISPERSION_LIMITS,
     _dispersion_problem,
+    _unmatched_note,
+    derive_tax_rate,
     _revenue_source_disagreements,
     _split_geographic_partitions,
 )
@@ -221,6 +223,82 @@ def test_an_undeclared_quantity_blocks_rather_than_passing():
     print("PASS test_an_undeclared_quantity_blocks_rather_than_passing")
 
 
+def tax_fact(name, period, value, target_key="taxes"):
+    return Fact(
+        name=f"{name} {period}", value=value, unit="USD millions", period=period,
+        quote=f"{name} $ {value:,.0f}",
+        source=FactSource(doc_id="TEST_FY2024", kind="note", ref="12",
+                          target_key=target_key, pages=[1]),
+    )
+
+
+def test_unmatched_tax_facts_are_named_in_the_block():
+    """DASH_FY2024's real shape (ISSUES.md #26, second instance).
+
+    "Total provision for (benefit from) income taxes" is extracted and
+    gate-verified; the query "provision for income taxes" does not match it,
+    because of the inserted "(benefit from)". The block must name it.
+    """
+    facts = [
+        tax_fact("Total provision for (benefit from) income taxes", "FY2024", 39.0),
+        tax_fact("Income (loss) before income taxes", "FY2024", 156.0),
+    ]
+    result = derive_tax_rate(facts, {})
+    assert result.status == "blocked", result.status
+    assert "Total provision for (benefit from) income taxes" in result.rationale
+    assert "39" in result.rationale
+    # The old message sent the analyst to the wrong place.
+    assert "check extraction gates" not in result.rationale, result.rationale
+    assert "not an extraction failure" in result.rationale
+    print("PASS test_unmatched_tax_facts_are_named_in_the_block")
+
+
+def test_the_query_is_not_widened_to_match_doordash():
+    """Deliberately still fallible. Widening the substring would only move the
+    bug to the next filer that phrases it a third way; surfacing the miss is
+    the fix. If someone "fixes" this by broadening the query, this fails.
+    """
+    facts = [
+        tax_fact("Total provision for (benefit from) income taxes", "FY2024", 39.0),
+        tax_fact("Income (loss) before income taxes", "FY2024", 156.0),
+    ]
+    assert derive_tax_rate(facts, {}).status == "blocked"
+    print("PASS test_the_query_is_not_widened_to_match_doordash")
+
+
+def test_matching_wording_still_computes_a_rate():
+    """The negative control. Every assertion above requires a BLOCK; without
+    this, they would all pass against a derivation that never succeeds."""
+    facts = [
+        tax_fact("Provision for income taxes", "FY2023", 21.0),
+        tax_fact("Income before income taxes", "FY2023", 100.0),
+        tax_fact("Provision for income taxes", "FY2024", 22.0),
+        tax_fact("Income before income taxes", "FY2024", 100.0),
+    ]
+    result = derive_tax_rate(facts, {})
+    assert result.status == "derived", f"{result.status}: {result.rationale}"
+    assert abs(result.base - 21.5) < 0.01, result.base
+    print("PASS test_matching_wording_still_computes_a_rate")
+
+
+def test_unmatched_note_is_silent_when_nothing_is_unmatched():
+    """UBER_FY2024 and LYFT_FY2025 must see no extra line."""
+    assert _unmatched_note([], "taxes", set(), "the tax note") == ""
+    facts = [tax_fact("Provision for income taxes", "FY2024", 39.0)]
+    matched = {f.name for f in facts}
+    assert _unmatched_note(facts, "taxes", matched, "the tax note") == ""
+    print("PASS test_unmatched_note_is_silent_when_nothing_is_unmatched")
+
+
+def test_unmatched_note_ignores_other_targets():
+    """A balance-sheet fact is not evidence about the tax note."""
+    facts = [tax_fact("Cash and cash equivalents", "FY2024", 4019.0,
+                      target_key="balance_sheet")]
+    assert _unmatched_note(facts, "taxes", set(), "the tax note") == ""
+    assert "Cash" in _unmatched_note(facts, "balance_sheet", set(), "the balance sheet")
+    print("PASS test_unmatched_note_ignores_other_targets")
+
+
 def test_every_limit_states_its_own_reasoning():
     """The difference from MAX_RELATIVE_SPREAD is not the number, it is that
     the number is written down with why. A bare limit is the old bug."""
@@ -246,5 +324,10 @@ if __name__ == "__main__":
     test_a_genuinely_wide_spread_still_blocks()
     test_sign_change_is_checked_before_any_span()
     test_an_undeclared_quantity_blocks_rather_than_passing()
+    test_unmatched_tax_facts_are_named_in_the_block()
+    test_the_query_is_not_widened_to_match_doordash()
+    test_matching_wording_still_computes_a_rate()
+    test_unmatched_note_is_silent_when_nothing_is_unmatched()
+    test_unmatched_note_ignores_other_targets()
     test_every_limit_states_its_own_reasoning()
     print("\nAll tests passed.")
