@@ -2,8 +2,40 @@
 name = "aleph"
 version = "0.1.0"
 description = "Autonomous multi-document financial analyst"
+readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.11"
-dependencies = ["pydantic>=2.0", "pypdf>=6.0"]
+
+# The capstone pipeline's real imports, and only those. Every name here is
+# imported by something under src/aleph/: anthropic and python-dotenv by
+# extraction/extractor.py, pydantic by schemas/, pypdf by documents/.
+# Nothing else in src/ imports a third-party package.
+dependencies = [
+    "anthropic>=1.0.0",
+    "pydantic>=2.0",
+    "pypdf>=6.0",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+# app.py only. The pipeline and every scripts/test_*.py run without it.
+ui = ["streamlit>=1.40"]
+
+# experiments/ch01-ch13 only - archived course chapters, not the capstone.
+# Kept declared rather than undeclared so a reader who wants to run one is
+# not left guessing, and separate so `pip install -e .` stays small.
+experiments = [
+    "chromadb>=0.5",
+    "sentence-transformers>=3.0",
+    "rank-bm25>=0.2",
+    "instructor>=1.0",
+    "langgraph>=0.2",
+    "networkx>=3.0",
+    "numpy>=1.26",
+    "scikit-learn>=1.4",
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+]
 
 [build-system]
 requires = ["setuptools>=68"]

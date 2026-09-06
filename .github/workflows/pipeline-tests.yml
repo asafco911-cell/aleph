@@ -1,0 +1,67 @@
+name: Pipeline tests
+
+# Every push and PR. Free: no API key, no filings, no network.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # `pip install -e .` and nothing else. If pyproject.toml's dependency
+      # list is wrong, this step or the next one fails - which is the point
+      # of installing from it rather than from a frozen environment.
+      - name: Install the package from pyproject.toml
+        run: pip install -e .
+
+      - name: Import the package
+        run: python -c "from aleph.valuation.pipeline import value_filing; print('ok')"
+
+      # These five run on fixtures and pure arithmetic: no ANTHROPIC_API_KEY,
+      # no PDFs, no cache database. Each exits non-zero on failure.
+      - name: DCF engine (arithmetic and consistency guards)
+        run: python scripts/test_dcf_engine.py
+
+      - name: Schemas (validators, period intervals, reference gate)
+        run: python scripts/test_schemas.py
+
+      - name: Extraction gates (six correctness gates, on fixtures)
+        run: python scripts/test_gates.py
+
+      - name: Assumptions (geography reconciliation, dispersion blocks)
+        run: python scripts/test_assumptions.py
+
+      - name: Pipeline callback (during-loop reporting, with its negative control)
+        run: python scripts/test_pipeline_callback.py
+
+      # WHAT THIS JOB DOES NOT PROVE, stated rather than left to a green
+      # badge to imply. Three of the eight commands in README.md cannot run
+      # here, because the filings are not distributed with this repository
+      # (data/*.pdf is gitignored; see data/README.md for the EDGAR source):
+      #
+      #   scripts/test_sections.py      needs all six PDFs
+      #   scripts/test_multicompany.py  needs all six PDFs
+      #   scripts/test_regression.py    needs the PDFs and a warm cache
+      #
+      # Nor does it run scripts/run_valuation.py, so the anchor CLAUDE.md
+      # requires ("Latest-period basis: 77.08") is NOT verified by CI. All
+      # four remain a local, manual check before a release.
+      #
+      # Measured, not assumed: with data/*.pdf and data/aleph_cache.db moved
+      # away, those three scripts exit 1 with FileNotFoundError. They fail
+      # loudly rather than passing vacuously, which is why omitting them here
+      # is a gap in coverage and not a hidden false green.
+      - name: State what this job does not cover
+        run: |
+          echo "Covered:     5 of 8 documented test commands (fixtures and arithmetic only)."
+          echo "NOT covered: test_sections, test_multicompany, test_regression - all need"
+          echo "             the six 10-K PDFs, which this repository does not distribute."
+          echo "NOT covered: run_valuation.py's 77.08 anchor. Verify locally before release."

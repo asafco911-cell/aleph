@@ -1,17 +1,23 @@
+# Environment
 venv/
 .env
+src/*.egg-info/
+
+# Python
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
 *.log
+
+# The filings are not distributed - see data/README.md for the EDGAR
+# source of each, with its sha256.
 data/*.pdf
 
-src/*.egg-info/
-
-schemas_dump.txt
-
-schemas_dump.txt
-
+# Content-addressed LLM cache. Reproducibility inside one machine, not a
+# fact about the repository - it is rebuilt on demand from the filings.
 aleph_cache.db
 
+# Generated locally by scripts/dump_schemas.py and
+# scripts/capture_baseline.py, for reading and diffing, never committed.
+schemas_dump.txt
 baseline_*/
