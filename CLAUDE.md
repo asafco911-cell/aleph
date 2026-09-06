@@ -204,7 +204,17 @@ python scripts\test_schemas.py
 python scripts\test_sections.py
 python scripts\test_multicompany.py
 python scripts\test_assumptions.py
+python scripts\test_pipeline_callback.py
 ```
+
+Five of these run in CI on every push (`.github/workflows/pipeline-tests.yml`):
+test_dcf_engine, test_schemas, test_gates, test_assumptions,
+test_pipeline_callback - the ones needing only fixtures and arithmetic. The
+other five need the filings, which are not in the repository. Measured: with
+`data/*.pdf` moved aside, test_sections, test_multicompany and
+test_regression exit 1 with FileNotFoundError, so their absence from CI is a
+stated coverage gap, not a silent pass. The 77.08 anchor is NOT verified by
+CI - it stays a local check before any release.
 
 `.github/workflows/eval-gate.yml` runs `experiments/ch05_evaluation/02_ab_test.py`
 against the golden dataset on PRs to main (separate from the capstone gates

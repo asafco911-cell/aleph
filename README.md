@@ -1,7 +1,44 @@
 # Aleph — Autonomous Multi-Document Financial Analyst
 
+Aleph reads 10-K filings and produces a defensible valuation range: an LLM
+copies figures from bounded regions of the document, deterministic Python
+gates check that the copying is correct, and everything downstream - the
+assumption ranges, the bottom-up WACC, the DCF - is arithmetic with no model
+in the loop.
+
 Built with AI assistance (Claude) throughout, under the working discipline
 recorded in [CLAUDE.md](CLAUDE.md).
+
+## What this is, and what it is not
+
+This repository is the capstone of a fourteen-chapter course, and the name
+covers less than the course syllabus does. Stating that plainly is cheaper
+than letting a reader discover it.
+
+**What runs in `src/aleph/`** is a valuation pipeline, end to end, on six
+real filings: document structure (table of contents, Item ranges, statements
+and notes resolved by title), bounded extraction with seven gates, assumption
+derivation that blocks rather than guesses, a bottom-up WACC, a DCF that
+reports a range with a tornado and a reverse DCF, and year-over-year language
+forensics on MD&A and Risk Factors. Four filings are valued end to end.
+
+**What is course work, not the capstone**, lives in
+[`experiments/`](experiments/) - thirteen archived chapters covering
+embeddings, chunking, vector stores, hybrid retrieval and re-ranking, RAG
+evaluation, grounding, knowledge graphs, multi-agent orchestration, forensic
+scores, cross-document comparison, production concerns and CI. Each chapter
+runs and has a reference document. **None of it is wired into the pipeline
+above.** Aleph does not do retrieval, does not build a knowledge graph, and
+is not a multi-agent system - by design, since principle 5 of its
+architecture is that the LLM never searches, navigates, computes or chooses
+a source. That is a narrower system than the chapter list implies, and the
+narrowing was the point.
+
+**What it is not, at all**: investment advice. It is a measurement
+instrument with documented and material limitations, the largest of which
+([ISSUES.md #29](ISSUES.md)) is that a ten-year DCF anchored on one year's
+cash flow is arguably the wrong instrument for the companies it is pointed
+at. That finding is in the repository because the system produced it.
 
 ## The result
 
@@ -115,6 +152,29 @@ or a concrete reproduction, not a feeling: a wrong count, a specific
 filing that breaks a rule, a swing computed from real runs. Read it before
 trusting any number this pipeline produces.
 
+## Repository layout
+
+```
+src/aleph/        the pipeline. documents/ (structure, notes, statements),
+                  extraction/ (bounded LLM call, gates, per-filing targets),
+                  valuation/ (assumptions, bridge, wacc, dcf_engine,
+                  pipeline), forensics/ (language), schemas/, infra/
+                  (textnorm, cache, units)
+scripts/          run_valuation.py (the CLI), test_*.py (one per stage),
+                  probe_*.py (ad hoc measurement - the "measure, don't
+                  guess" tool), capture_baseline.py, build_manifest.py
+app.py            Streamlit UI over the same pipeline. Every number carries
+                  a provenance grade; a composite inherits the weakest.
+data/             manifest.json, market.json, overrides.json, anchors.json.
+                  The PDFs and the cache are gitignored - see data/README.md
+docs/adr/         six decisions that had a real rejected alternative
+experiments/      ch01-ch13, archived course chapters. Reference only; see
+                  "What this is, and what it is not" above
+CLAUDE.md         architecture and working agreement. Carries no status
+ISSUES.md         the honest state, open and closed, each with its
+                  measurement
+```
+
 ## Running it
 
 ```
@@ -123,13 +183,20 @@ venv\Scripts\activate
 pip install -e .
 ```
 
-Requires Python 3.14.3 and a `.env` with `ANTHROPIC_API_KEY`. The six
-filing PDFs are not distributed with this repository - see
+That installs four packages: `anthropic`, `pydantic`, `pypdf`,
+`python-dotenv`. Add the UI with `pip install -e .[ui]` (Streamlit), or the
+archived chapters with `pip install -e .[experiments]`.
+
+Built and verified on Python 3.14.3; `pip install -e .` needs 3.11 or
+later. Extraction needs a `.env` with `ANTHROPIC_API_KEY` - though not on a
+warm cache, since [infra/cache.py](src/aleph/infra/cache.py) is
+content-addressed and a cached target makes no call. The six filing PDFs
+are not distributed with this repository - see
 [data/README.md](data/README.md) for the source on SEC EDGAR for each one,
 and read its hash-verification section before assuming a mismatch means
 something is broken.
 
-Nine commands prove the pipeline works, verbatim from
+Ten commands prove the pipeline works, verbatim from
 [CLAUDE.md](CLAUDE.md#commands-that-verify-the-system-works):
 
 ```
@@ -142,4 +209,21 @@ python scripts\test_schemas.py
 python scripts\test_sections.py
 python scripts\test_multicompany.py
 python scripts\test_assumptions.py
+python scripts\test_pipeline_callback.py
 ```
+
+Five of those ten run in CI on every push
+([pipeline-tests.yml](.github/workflows/pipeline-tests.yml)) - the ones
+that need only fixtures and arithmetic. The other five need the filings,
+which this repository does not distribute, so a green badge here does not
+mean the anchor above still holds. That check is local and manual, and the
+workflow says so in its own comments rather than leaving the badge to
+imply otherwise.
+
+`streamlit run app.py` opens the same pipeline in a browser.
+
+## Licence
+
+[MIT](LICENSE), covering the code only. The SEC filings are not distributed
+here and the licence grants no rights to them. Nothing this code prints is
+investment advice.
