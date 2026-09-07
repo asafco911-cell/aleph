@@ -318,6 +318,12 @@ def build_dcf_inputs(
         )
         base_cash_flow_bound = {
             "available": True,
+            # The whole series, not only its ends. The min/max pair bounds
+            # the tornado; historical_fcff.py needs every period to report
+            # what each starting-point METHOD implies, and recomputing it
+            # there would be a second FCFF definition able to disagree
+            # with this one.
+            "fcff_by_period": dict(fcff_by_period),
             "low_period": low_period, "low_fcff": fcff_by_period[low_period],
             "high_period": high_period, "high_fcff": fcff_by_period[high_period],
             "note": fcff_note,
