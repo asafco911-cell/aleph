@@ -31,6 +31,7 @@ from enum import Enum
 
 __all__ = [
     "State",
+    "Reason",
     "Kind",
     "Status",
     "Requirement",
@@ -46,9 +47,9 @@ __all__ = [
 class State(str, Enum):
     """Lifecycle of one required observation. None of these is None.
 
-    EXPECTED       declared by the contract; extraction has not run yet.
-    LOCATED        a region was resolved for it, but nothing extracted yet.
-    EXTRACTED      the model returned it; gates have not accepted it yet.
+    EXPECTED       declared by the contract and not yet resolved. Also the
+                   state of a field derived later in the run whose own inputs
+                   are all satisfied.
     VERIFIED       extracted AND gate-accepted AND unit and period resolved.
                    Only this state may reach a valuation.
     DERIVED        computed from other VERIFIED observations, not read.
@@ -61,17 +62,43 @@ class State(str, Enum):
     NOT_APPLICABLE the filer does not report it and the methodology does not
                    need it. Different from MISSING, and never inferred from
                    absence alone.
+
+    LOCATED and EXTRACTED were declared here and removed on 2026-09-07. The
+    adapter reads post-gate state, so nothing in this pipeline ever observed
+    either one: they were documented lifecycle stages no code could reach. A
+    state that exists only in a docstring is the failure class ISSUES.md #30
+    counted eighteen instances of, and manufacturing a transition to make them
+    appear would have been worse. They come back when extraction actually
+    reports region resolution and pre-gate return, and not before.
     """
 
     EXPECTED = "EXPECTED"
-    LOCATED = "LOCATED"
-    EXTRACTED = "EXTRACTED"
     VERIFIED = "VERIFIED"
     DERIVED = "DERIVED"
     MISSING = "MISSING"
     AMBIGUOUS = "AMBIGUOUS"
     BLOCKED = "BLOCKED"
     NOT_APPLICABLE = "NOT_APPLICABLE"
+
+
+class Reason(str, Enum):
+    """WHY a field is unusable. The status may have to be BLOCKED; the cause
+    must not be lost with it.
+
+    A reader has to be able to tell "the extractor never returned this" from
+    "two conflicting values came back" from "the periods do not line up" from
+    "the unit is not convertible". Those are four different problems with four
+    different fixes, and collapsing them into one BLOCKED is how a diagnostic
+    stops being a diagnostic.
+    """
+
+    MISSING = "MISSING"
+    AMBIGUOUS = "AMBIGUOUS"
+    PERIOD_MISMATCH = "PERIOD_MISMATCH"
+    INVALID_UNIT = "INVALID_UNIT"
+    DEPENDENCY_UNMET = "DEPENDENCY_UNMET"
+    INSUFFICIENT_HISTORY = "INSUFFICIENT_HISTORY"
+    DERIVATION_BLOCKED = "DERIVATION_BLOCKED"
 
 
 class Kind(str, Enum):
@@ -211,6 +238,8 @@ class Observed:
     quote: str = ""
     source_ref: str = ""
     detail: str = ""
+    reason: "Reason | None" = None
+    frequency: str = "annual"
     override: bool = False
     override_reason: str = ""
     candidates: tuple[str, ...] = ()
@@ -255,6 +284,65 @@ def requirements_for(paths: tuple[str, ...]) -> tuple[Requirement, ...]:
 
 _BAD = {State.MISSING, State.AMBIGUOUS, State.BLOCKED}
 
+# Which requirement kinds carry a fiscal period at all. Market data is dated
+# by as_of, not by fiscal year, and an analyst assumption is a policy - neither
+# participates in period alignment, and forcing them to would block every run.
+_PERIODIC_KINDS = {Kind.DIRECT_FACT, Kind.DERIVED_FACT}
+
+
+def _period_problems(
+    rows: list[Observed], needed: tuple[Requirement, ...]
+) -> dict[str, str]:
+    """Return {field: detail} for every filing-derived row out of alignment.
+
+    Delegates the alignment decision to
+    extraction.identities.check_period_alignment rather than reimplementing
+    it - one definition of "these periods do not line up", used by the
+    cross-statement checks and by this gate.
+
+    Frequency is checked here because identities works on labels, not on
+    annual-versus-quarterly: FY2025 and Q3FY2025 are both present and both
+    dated, and combining them into one FCFF is the mismatch the contract has
+    to refuse.
+    """
+    from ..extraction.identities import Figure, check_period_alignment
+
+    kinds = {r.field: r.kind for r in needed}
+    periodic = [
+        r for r in rows
+        if kinds.get(r.field) in _PERIODIC_KINDS
+        and r.state in (State.VERIFIED, State.DERIVED)
+        and r.period
+    ]
+    if len(periodic) < 2:
+        return {}
+
+    problems: dict[str, str] = {}
+
+    frequencies = {r.frequency for r in periodic}
+    if len(frequencies) > 1:
+        listing = "; ".join(f"{r.field}={r.period} ({r.frequency})"
+                            for r in periodic)
+        for r in periodic:
+            problems[r.field] = (
+                f"mixes reporting frequencies: {listing}. A single-period FCFF "
+                "cannot combine annual and quarterly figures")
+        return problems
+
+    # One Figure per field, each its own "statement", so identities reports a
+    # breach exactly when no period is shared by all of them.
+    breaches = check_period_alignment([
+        Figure(name=r.field, value=r.value or 0.0, period=r.period,
+               unit=r.unit or "", statement=r.field)
+        for r in periodic
+    ])
+    if breaches:
+        listing = "; ".join(f"{r.field}={r.period}" for r in periodic)
+        detail = f"{breaches[0].detail} | observed: {listing}"
+        for r in periodic:
+            problems[r.field] = detail
+    return problems
+
 
 def evaluate(
     observed: dict[str, Observed],
@@ -296,23 +384,39 @@ def evaluate(
             else:
                 row = Observed(
                     field=req.field, state=State.BLOCKED,
+                    reason=Reason.DEPENDENCY_UNMET,
                     detail=("cannot be derived: depends on "
                             f"{', '.join(unmet)}, which are not verified"),
                 )
         if row is None:
             row = Observed(
                 field=req.field, state=State.MISSING,
+                reason=Reason.MISSING,
                 detail=("expected by the contract and never returned by "
                         f"extraction. Required for: {', '.join(req.required_for)}"),
             )
         rows.append(row)
 
+    for field_name, detail in _period_problems(rows, needed).items():
+        index = next(i for i, r in enumerate(rows) if r.field == field_name)
+        rows[index] = Observed(
+            field=field_name, state=State.BLOCKED,
+            value=rows[index].value, unit=rows[index].unit,
+            period=rows[index].period, frequency=rows[index].frequency,
+            detail=detail, reason=Reason.PERIOD_MISMATCH,
+            override=rows[index].override,
+            override_reason=rows[index].override_reason,
+        )
+
+    for row in rows:
+        req = next(r for r in needed if r.field == row.field)
         if row.state in _BAD:
             for path in req.required_for:
                 if path in paths:
                     blocked_paths.add(path)
+            label = row.reason.value if row.reason else row.state.value
             reasons.append(
-                f"{req.field} is {row.state.value}"
+                f"{req.field} is {row.state.value} ({label})"
                 + (f" - {row.detail}" if row.detail else "")
                 + f". Blocks: {', '.join(p for p in req.required_for if p in paths)}"
             )

@@ -257,7 +257,18 @@ def value_filing(
     if blocked:
         raise BlockedError(blocked, facts=facts, rejected=rejected)
 
-    # THE CONTRACT GATE. Runs before WACC, before the bridge, before the
+    # THE CONTRACT GATE. The execution order is load-bearing and asserted
+    # against this source by test_contract_hardening:
+    #
+    #   requirements declared -> extract -> derive -> CONTRACT GATE
+    #      -> WACC -> FCFF bridge -> DCF
+    #
+    # The invariant: no MISSING, AMBIGUOUS, PERIOD_MISMATCH or INVALID_UNIT
+    # observation can reach build_wacc, build_dcf_inputs or run_dcf. Spies
+    # on all three prove they never execute on a blocked contract, with a
+    # negative control proving the spies would fire on a valid run.
+    #
+    # Runs before WACC, before the bridge, before the
     # engine. The blocked-assumption check above can only see quantities
     # derive_all produced; this sees quantities the contract EXPECTED and
     # nothing produced, which is the state gates.py structurally cannot

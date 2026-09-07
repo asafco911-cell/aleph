@@ -6,9 +6,33 @@ of what is needed should not move because the way it is observed did.
 """
 from __future__ import annotations
 
-from .contract import KNOWN_UNITS, Observed, State
+import re
 
-__all__ = ["row_for_range", "row_for_market", "row_for_series", "observe"]
+from .contract import KNOWN_UNITS, Observed, Reason, State
+
+__all__ = ["row_for_range", "row_for_market", "row_for_series", "observe",
+           "frequency_of"]
+
+# "ambiguous fact selection" is the exact phrase _observations raises when two
+# different captions match one query in one period. The upstream collision
+# check already refuses to choose between them, and the architecture requires
+# the aggregate status to be BLOCKED - but the CAUSE must survive, so a reader
+# can tell two conflicting values from nothing having been returned.
+_AMBIGUITY_MARKERS = ("ambiguous fact selection", "both match")
+
+_QUARTERLY = re.compile(r"Q[1-4]", re.I)
+
+
+def frequency_of(period: str | None) -> str:
+    """annual or quarterly, from the period label.
+
+    FY2025 and Q3FY2025 are both dated and both present; combining them into
+    one FCFF is a mismatch no amount of label-matching catches, so frequency
+    is read separately and compared by the gate.
+    """
+    if not period:
+        return "annual"
+    return "quarterly" if _QUARTERLY.search(period) else "annual"
 
 
 def _unit_ok(unit: str | None) -> bool:
@@ -39,8 +63,12 @@ def row_for_range(field: str, assumption) -> Observed:
     reason = (assumption.rationale or "")[:200]
 
     if assumption.status == "blocked":
+        lowered = reason.lower()
+        if any(m in lowered for m in _AMBIGUITY_MARKERS):
+            return Observed(field, State.AMBIGUOUS, detail=reason,
+                            reason=Reason.AMBIGUOUS)
         return Observed(field, State.BLOCKED, detail=reason,
-                        override=False)
+                        reason=Reason.DERIVATION_BLOCKED)
 
     value = getattr(assumption, "base", None)
     if value is None:
@@ -53,13 +81,15 @@ def row_for_range(field: str, assumption) -> Observed:
             detail=(f"unit {assumption.unit!r} is not one this system can "
                     "convert; an unresolved unit must never be VERIFIED "
                     "(ISSUES.md #15)"),
+            reason=Reason.INVALID_UNIT,
             override=is_override, override_reason=reason if is_override else "")
 
     periods = [o.period for o in getattr(assumption, "observations", []) or []]
+    latest_period = periods[-1] if periods else None
     return Observed(
         field, State.DERIVED if not is_override else State.VERIFIED,
         value=value, unit=assumption.unit,
-        period=periods[-1] if periods else None,
+        period=latest_period, frequency=frequency_of(latest_period),
         detail=("analyst override" if is_override else
                 f"derived from {len(periods)} period(s)"),
         override=is_override, override_reason=reason if is_override else "",
@@ -70,17 +100,20 @@ def row_for_market(field: str, market: dict) -> Observed:
     """One market input. Requires a value, a unit, a source and an as_of date."""
     entry = market.get(field)
     if entry is None:
-        return Observed(field, State.MISSING,
+        return Observed(field, State.MISSING, reason=Reason.MISSING,
                         detail="not present in data/market.json")
     if not getattr(entry, "source", "").strip():
         return Observed(field, State.BLOCKED, value=entry.value,
-                        detail="no source recorded")
+                        detail="no source recorded",
+                        reason=Reason.DERIVATION_BLOCKED)
     if not getattr(entry, "as_of", "").strip():
         return Observed(field, State.BLOCKED, value=entry.value,
-                        detail="no as_of date recorded")
+                        detail="no as_of date recorded",
+                        reason=Reason.DERIVATION_BLOCKED)
     if not _unit_ok(entry.unit):
         return Observed(field, State.BLOCKED, value=entry.value, unit=entry.unit,
-                        detail=f"unit {entry.unit!r} is not convertible")
+                        detail=f"unit {entry.unit!r} is not convertible",
+                        reason=Reason.INVALID_UNIT)
     return Observed(field, State.VERIFIED, value=entry.value, unit=entry.unit,
                     source_ref=f"{entry.source} (as of {entry.as_of})",
                     detail="market input")
@@ -94,12 +127,13 @@ def row_for_series(field: str, bound: dict, minimum_periods: int = 3) -> Observe
     calculation on an inadequate sample this contract exists to stop.
     """
     if not bound or not bound.get("available"):
-        return Observed(field, State.MISSING,
+        return Observed(field, State.MISSING, reason=Reason.MISSING,
                         detail=(bound or {}).get("reason", "no series available"))
     series = bound.get("fcff_by_period") or {}
     if len(series) < minimum_periods:
         return Observed(
             field, State.BLOCKED,
+            reason=Reason.INSUFFICIENT_HISTORY,
             detail=(f"HISTORICAL_DATA_INSUFFICIENT: {len(series)} verified "
                     f"period(s), minimum {minimum_periods}"))
     return Observed(field, State.DERIVED, value=float(len(series)),
