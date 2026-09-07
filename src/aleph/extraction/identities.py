@@ -171,6 +171,30 @@ def check_balance_sheet_identity(
     and the one that catches a figure copied from the wrong column: a total
     read one year to the left still quotes correctly and still cross-foots
     within its own row.
+
+    WHICH equity, measured on all six filings. Run against the extracted
+    captions this check passes on Lyft and DoorDash in every period and
+    breaches on Uber in every period - by 1,433 (FY2023), 918 (FY2024) and
+    1,042 (FY2025). Uber is not out of balance. Its balance sheet reads:
+
+        Total liabilities                                      28,768
+        Redeemable non-controlling interests                       93
+        Total Uber Technologies, Inc. stockholders' equity     21,558
+        Non-redeemable non-controlling interests                  825
+        Total equity                                           22,383
+        Total liabilities, redeemable NCI and equity           51,244
+
+    and 28,768 + 93 + 22,383 = 51,244 exactly. The FY2024 gap of 918 is
+    93 + 825 - the non-controlling interests - because the extraction picked
+    the parent-only subtotal. FY2023 is the same: 654 + 779 = 1,433.
+
+    So for a filer with material NCI the identity is A = L + mezzanine + E,
+    and the equity term must be TOTAL equity, not the attributable subtotal.
+    This is the same failure as the one documented on check_income_identity,
+    on a second statement: a parent-only caption standing in for a total. The
+    fix in both cases is to extract the total, never to widen the tolerance
+    until a wrong comparison passes - 1.79% would need a tolerance four times
+    the current one, which would also stop catching real breaks.
     """
     right = total_liabilities + total_equity
     gap = _relative_gap(total_assets, right)

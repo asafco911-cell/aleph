@@ -719,9 +719,24 @@ def derive_net_debt(facts, overrides) -> AssumptionRange:
     Components are surfaced so the decision is made against the numbers. The
     unrestricted cash query excludes "restricted" explicitly, because substring
     matching would otherwise return restricted balances as available cash.
+
+    Scoped to the BALANCE SHEET target, and not by preference. Net debt is a
+    balance, and the cash flow statement names the same words in captions
+    that are not balances at all: "Net increase (decrease) in cash, cash
+    equivalents, and restricted cash" and the beginning and end of period
+    lines all contain "restricted cash". Measured on DASH_FY2024 the moment
+    those captions began being extracted: eight collisions, and net_debt
+    blocked as ambiguous instead of on its policy. Reading a stock from a
+    flow statement was always wrong; until those captions existed, nothing
+    made it visible.
     """
     override = overrides.get("net_debt")
     doc_ids = _doc_ids(facts)
+
+    balance_sheet_only = [
+        f for f in facts
+        if f.source and f.source.target_key == "balance_sheet"
+    ]
 
     queries = (
         (("cash and cash equivalents",), ("restricted",)),
@@ -731,7 +746,8 @@ def derive_net_debt(facts, overrides) -> AssumptionRange:
     )
     components, collisions = [], []
     for name_contains, exclude in queries:
-        found, clashes = _observations(facts, *name_contains, exclude=exclude)
+        found, clashes = _observations(
+            balance_sheet_only, *name_contains, exclude=exclude)
         components.extend(found)
         collisions.extend(clashes)
 

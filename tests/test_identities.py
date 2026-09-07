@@ -102,6 +102,32 @@ class TestBalanceSheetIdentity:
         assert breaches[0].figures == (
             "total_assets", "total_liabilities", "total_equity")
 
+    @pytest.mark.parametrize(
+        "period,assets,liabilities,parent_equity,nci,expected_breach",
+        [
+            ("FY2023", 38_699, 26_017, 11_249, 654 + 779, True),
+            ("FY2024", 51_244, 28_768, 21_558, 93 + 825, True),
+        ],
+    )
+    def test_the_parent_only_equity_subtotal_breaches_and_nci_closes_it(
+        self, period, assets, liabilities, parent_equity, nci, expected_breach
+    ):
+        """MEASURED on UBER_FY2024, read from the filing itself.
+
+        Uber's balance sheet is in balance. The extraction picks "Total Uber
+        Technologies, Inc. stockholders' equity", which excludes both
+        redeemable and non-redeemable non-controlling interests, so the check
+        breaches by exactly the NCI - 1,433 in FY2023, 918 in FY2024.
+
+        Adding the NCI back closes it to the cent, which is what proves the
+        breach is a caption problem and not an arithmetic one. The same
+        failure appears on the income statement; see check_income_identity.
+        """
+        assert bool(check_balance_sheet_identity(
+            assets, liabilities, parent_equity, period)) is expected_breach
+        assert check_balance_sheet_identity(
+            assets, liabilities, parent_equity + nci, period) == []
+
     def test_rounding_inside_tolerance_is_not_a_breach(self):
         """Filers round components independently of totals. An exact test
         would fail on arithmetic the filer itself published."""
