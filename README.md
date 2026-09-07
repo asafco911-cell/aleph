@@ -148,6 +148,35 @@ is now resolved by section title, never by number or position, because of
 exactly those five failures. The full list is in
 [CLAUDE.md](CLAUDE.md#five-10-k-facts-that-were-actually-uber-facts).
 
+## Accounting normalisation is not economic normalisation
+
+`valuation/cfo_normalization.py` asks two different questions and keeps them
+apart, because conflating them produced two directional bugs in this module's
+own history.
+
+ACCOUNTING normalisation asks whether a line is non-cash or unusual as the
+statement presents it. The cash flow statement answers that itself: the
+reconciliation from net income to CFO exists to strip non-cash items out, so
+by the time you are reading CFO, this has already happened. ECONOMIC
+normalisation asks whether the amount represents the recurring cash-generating
+power of the business. The statement does not answer that and cannot - nothing
+in it is labelled "one-time".
+
+**A reported CFO can equal normalised CFO even when the latest fiscal year is
+economically unusual.** The system therefore reports normalisation COVERAGE
+(how much of CFO's composition it could account for) and historical
+ABNORMALITY (whether the year sits outside its own range) as separate
+measures, and neither adjusts a number on its own.
+
+Measured, and the reason coverage exists: across all six filings and 71
+distinct cash-flow captions, ZERO name a one-time cash cost. That is
+structural, not a clean bill of health - a one-time cash payment never appears
+as its own reconciliation line. It is invisible, or buried inside a caption
+that says only "Accrued expenses and other liabilities". So the engine reports
+NO_ADJUSTMENT_IDENTIFIED, never NO_ADJUSTMENT_REQUIRED, and one-time cash
+items enter only as an analyst adjustment with a written reason - the same
+shape as net debt, which blocks until a human states a policy.
+
 ## What is broken
 
 [ISSUES.md](ISSUES.md) is the honest state of the project, not a changelog.
