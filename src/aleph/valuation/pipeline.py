@@ -24,6 +24,8 @@ from ..extraction.targets import resolve_targets
 from ..schemas import DocumentRecord
 from ..schemas.valuation import AssumptionRange, MarketAssumption, Override
 from .assumptions import derive_all
+from .contract import PATH_DCF, PATH_PER_SHARE, PATH_WACC, Status, evaluate
+from .contract_adapter import observe
 from .bridge import BridgeError, build_dcf_inputs
 from .wacc import build_wacc
 
@@ -39,6 +41,22 @@ OVERRIDES = Path("data/overrides.json")
 MARKET = Path("data/market.json")
 
 BETA_BOUND_FACTORS = (0.75, 1.45)
+
+
+class ContractBlockedError(RuntimeError):
+    """The required-data contract refused the run.
+
+    Carries the ContractResult, not a message: a caller has to be able
+    to print the field-by-field table, and re-deriving it from a
+    formatted string is how a second implementation starts.
+    """
+
+    def __init__(self, result, facts=None, rejected=None) -> None:
+        self.result = result
+        self.facts = facts or []
+        self.rejected = rejected or []
+        super().__init__(
+            f"DATA CONTRACT BLOCKED: {'; '.join(result.reasons)}")
 
 
 class BlockedError(RuntimeError):
@@ -86,6 +104,7 @@ class ValuationRun:
     ranges: dict[str, AssumptionRange]
     bridged: object                    # Bridged, from bridge.py
     result: object                     # DCFResult, from dcf_engine
+    contract: object = None            # ContractResult, from contract.py
     facts: list = field(default_factory=list)      # gate-passed Facts, with quote + source
     rejected: list = field(default_factory=list)   # Rejections, shown, never used
     wacc: object | None = None         # WACCResult, None if it could not be built
@@ -238,6 +257,19 @@ def value_filing(
     if blocked:
         raise BlockedError(blocked, facts=facts, rejected=rejected)
 
+    # THE CONTRACT GATE. Runs before WACC, before the bridge, before the
+    # engine. The blocked-assumption check above can only see quantities
+    # derive_all produced; this sees quantities the contract EXPECTED and
+    # nothing produced, which is the state gates.py structurally cannot
+    # hold (ISSUES.md #27) - a row absent from every quote makes no group
+    # for check_coverage to iterate over.
+    contract = evaluate(
+        observe(ranges, market, market_price=market_price),
+        paths=(PATH_DCF, PATH_PER_SHARE, PATH_WACC),
+    )
+    if contract.status is Status.BLOCKED:
+        raise ContractBlockedError(contract, facts=facts, rejected=rejected)
+
     wacc = None
     wacc_error = None
     beta_base = None
@@ -296,6 +328,7 @@ def value_filing(
         record=record,
         targets=targets,
         ranges=ranges,
+        contract=contract,
         bridged=bridged,
         result=result,
         facts=facts,

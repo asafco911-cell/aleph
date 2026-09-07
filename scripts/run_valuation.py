@@ -15,6 +15,7 @@ import sys
 from aleph.valuation.bridge import BridgeError
 from aleph.valuation.pipeline import (
     BlockedError,
+    ContractBlockedError,
     DCFConsistencyError,
     range_position,
     value_filing,
@@ -36,6 +37,12 @@ def show_target(target_result):
 
 try:
     run = value_filing(doc_id, market_price, on_target=show_target)
+except ContractBlockedError as exc:
+    print("\n" + "=" * 74)
+    print("DATA CONTRACT")
+    print("=" * 74)
+    print(exc.result.as_table())
+    sys.exit(1)
 except BlockedError as exc:
     print(f"\nBLOCKED: {[a.name for a in exc.blocked]}")
     for item in exc.blocked:
@@ -50,6 +57,19 @@ except DCFConsistencyError as exc:
 
 bridged = run.bridged
 result = run.result
+
+if run.contract is not None:
+    print("\n" + "=" * 74)
+    print("DATA CONTRACT")
+    print("=" * 74)
+    for row in run.contract.rows:
+        flag = "  [ANALYST OVERRIDE]" if row.override else ""
+        print(f"  {row.field:<26} {row.state.value}{flag}")
+    print(f"  STATUS: {run.contract.status.value} "
+          f"({run.contract.verified_count} of "
+          f"{run.contract.expected_count} required inputs satisfied)")
+    for note in run.contract.notes:
+        print(f"  {note}")
 
 if run.wacc_error:
     print(f"\nWACC NOT BUILT: {run.wacc_error}")
