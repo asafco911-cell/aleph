@@ -37,7 +37,12 @@ STATEMENT_TARGETS = [
      "property and equipment, and stock-based compensation, for each "
      "period presented. Also extract, if presented: the net increase or "
      "decrease in cash, and the beginning and end of period balances of "
-     "cash, cash equivalents and restricted cash.", True),
+     "cash, cash equivalents and restricted cash. Also extract EVERY "
+     "line in the reconciliation of net income to net cash provided by "
+     "operating activities, including net income, depreciation and "
+     "amortization, deferred income taxes, unrealized gains or losses, "
+     "impairments, gains or losses on sales or divestitures, and each "
+     "change in assets and liabilities.", True),
     ("operations", "statement:operations",
      "Extract total revenue, diluted weighted-average shares outstanding, "
      "interest expense, and net income attributable to the company, for each "

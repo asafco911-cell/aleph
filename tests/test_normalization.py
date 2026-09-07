@@ -139,20 +139,28 @@ class TestAdjustedEbitAndROIC:
 
 class TestSBCAdjustedFCFF:
     def test_matches_the_bridge_formula_on_uber_fy2024(self):
-        """The anchor's own components, hand-computed.
+        """The anchor's own components, read from the filing.
 
-        UBER_FY2024: CFO 7,137, capex 805, SBC 1,796, interest 523, tax 21%.
-            7,137 + 523 x 0.79 - 805 - 1,796 = 4,949.17
+        UBER_FY2024: CFO 7,137, capex 242, SBC 1,796, interest 523, tax 21%.
+            7,137 + 523 x 0.79 - 242 - 1,796 = 5,512.17
+
+        5,512 is the FY2024 figure in the FCFF series ISSUES.md #29 records
+        (-957, 1,927, 5,512, 8,285), which is what makes this a check against
+        the pipeline rather than against itself. An earlier version of this
+        docstring said capex was 805 - a number from nowhere. The assertion
+        still passed, because both sides used it; only the claim about the
+        filing was false. Every figure here is now traceable to an extracted
+        fact: capex is "Purchases of property and equipment" = (242).
         """
-        assert sbc_adjusted_fcff(7137.0, 805.0, 1796.0, 523.0, 0.21) == pytest.approx(
-            7137.0 + 523.0 * 0.79 - 805.0 - 1796.0
+        assert sbc_adjusted_fcff(7137.0, 242.0, 1796.0, 523.0, 0.21) == pytest.approx(
+            5512.17, abs=0.01
         )
 
     def test_signs_are_normalised_so_a_negative_capex_cannot_be_added_back(self):
         """Filings print capex negative in the cash flow statement. Taking it
         at face value would ADD it to free cash flow."""
-        positive = sbc_adjusted_fcff(7137.0, 805.0, 1796.0, 523.0, 0.21)
-        negative = sbc_adjusted_fcff(7137.0, -805.0, -1796.0, -523.0, 0.21)
+        positive = sbc_adjusted_fcff(7137.0, 242.0, 1796.0, 523.0, 0.21)
+        negative = sbc_adjusted_fcff(7137.0, -242.0, -1796.0, -523.0, 0.21)
         assert positive == pytest.approx(negative)
 
     def test_omitting_interest_understates_fcff_by_the_after_tax_add_back(self):
@@ -161,8 +169,8 @@ class TestSBCAdjustedFCFF:
         CFO is levered; WACC prices debt again. Dropping the add-back counts
         interest twice, and the gap is exactly I(1 - Tc).
         """
-        with_interest = sbc_adjusted_fcff(7137.0, 805.0, 1796.0, 523.0, 0.21)
-        without = sbc_adjusted_fcff(7137.0, 805.0, 1796.0)
+        with_interest = sbc_adjusted_fcff(7137.0, 242.0, 1796.0, 523.0, 0.21)
+        without = sbc_adjusted_fcff(7137.0, 242.0, 1796.0)
         assert with_interest - without == pytest.approx(523.0 * 0.79)
 
 

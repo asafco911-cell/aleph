@@ -20,6 +20,17 @@ from .gates import Rejection, validate
 PROMPT_VERSION = "extract-v3"
 DEFAULT_MODEL = "claude-sonnet-5"
 
+# Output ceiling for one bounded call. Raised from 4,000 when the cash-flow
+# target began asking for every line of the CFO reconciliation across three
+# periods: the answer overran and arrived truncated. Raising the ceiling does
+# not remove that failure mode, it moves it, which is why the truncation is
+# now detected and named rather than left to surface as a JSON parse error.
+MAX_OUTPUT_TOKENS = 16000
+
+
+class ExtractionError(RuntimeError):
+    """The model's answer cannot be trusted, for a reason worth naming."""
+
 SYSTEM_PROMPT = """You extract financial data points from SEC filings.
 
 RULES:
@@ -99,7 +110,7 @@ def extract(
         schema = json.dumps(ExtractedFacts.model_json_schema())
         response = client.messages.create(
             model=model,
-            max_tokens=4000,
+            max_tokens=MAX_OUTPUT_TOKENS,
             system=SYSTEM_PROMPT,
             messages=[{
                 "role": "user",
@@ -111,6 +122,22 @@ def extract(
                 ),
             }],
         )
+        # A truncated answer is a TRUNCATION, not malformed JSON. Without this
+        # it surfaces as json.JSONDecodeError "Unterminated string", which
+        # sends the reader hunting a parser bug that does not exist. Measured:
+        # asking for every line of Uber's CFO reconciliation across three
+        # periods overran the old 4,000-token ceiling and failed exactly that
+        # way. Nothing truncated is parsed, and nothing truncated is cached -
+        # a cached half-answer would be served silently forever after.
+        if response.stop_reason == "max_tokens":
+            raise ExtractionError(
+                f"{source.doc_id} {source.kind}:{source.ref}: the model hit the "
+                f"{MAX_OUTPUT_TOKENS}-token output limit and its answer is cut "
+                "off. Nothing was parsed and nothing was cached. Ask this "
+                "target's question for fewer quantities, or split the target - "
+                "raising the ceiling only moves the overrun to the next question."
+            )
+
         raw = "".join(
             block.text for block in response.content if block.type == "text"
         ).strip()
