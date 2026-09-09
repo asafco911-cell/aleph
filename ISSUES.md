@@ -555,7 +555,7 @@ Six tests in test_assumptions.py, including a negative control
 SUCCEED on ordinary wording - every other assertion here demands a block,
 and without it they would all pass against a derivation that never works.
 
-## #27 check_coverage cannot see a row the model never quoted
+## #27 check_coverage cannot see a row the model never quoted — CLOSED
 
 Confirmed by a direct synthetic test, not inferred from reading the code: a
 fixture with one row fully quoted and extracted across both periods,
@@ -572,7 +572,64 @@ DASH_FY2024's short-term-securities row (see #26) looked like a candidate
 but was not one: the model quoted and extracted that row completely: the
 loss happened one layer downstream, in derivation, not here.
 
-Status: open, unmeasured beyond the synthetic proof above.
+RESOLVED by the required-data contract (`src/aleph/valuation/contract.py`,
+`contract_adapter.py`), which does not extend the gate - it moves the
+question upstream of it. `REQUIREMENTS` is a static list read off the real
+code path (`bridge.require`, `wacc.REQUIRED_MARKET`, the substring each
+`derive_*` queries). `evaluate()` compares it against what the run holds:
+a field the contract declares and the run never produced is `MISSING`,
+which is a state the system carries whether or not extraction ever
+mentioned it. That is the structural fix - the omission cannot vanish
+because the requirement existed before extraction ran.
+
+`value_filing` calls `evaluate()` after derivation and before `build_wacc`,
+the bridge and the engine, and raises `ContractBlockedError` on
+`Status.BLOCKED`. The gate order is asserted against the source by
+`tests/test_contract_hardening.py::TestGateOrder` (spies on all three
+downstream functions, plus a negative control proving the spies fire on a
+clean run).
+
+HARDENING PASS, 2026-09-07:
+- Period integrity is wired INTO the gate: `_period_problems` delegates to
+  `extraction.identities.check_period_alignment` (one definition of "these
+  periods do not line up", shared with the cross-statement checks) and adds
+  an annual-vs-quarterly frequency check. CFO FY2025 against capex FY2024,
+  and an annual figure against a quarterly one, both block with
+  `Reason.PERIOD_MISMATCH`; two annual figures on one period pass.
+- The failure CAUSE survives the aggregate `BLOCKED`. `Reason` is a typed
+  enum (`MISSING`, `AMBIGUOUS`, `PERIOD_MISMATCH`, `INVALID_UNIT`,
+  `DEPENDENCY_UNMET`, `INSUFFICIENT_HISTORY`, `DERIVATION_BLOCKED`) carried
+  on every `Observed`. The pre-gate `BlockedError` (a blocked derivation
+  never reaches `evaluate()`) now carries a structured `.reasons`
+  `{field: Reason}`, classified by the same `row_for_range` the gate uses,
+  so an ambiguous collision reads as `AMBIGUOUS` on that path too, not as
+  prose in a rationale string.
+- `State.LOCATED` and `State.EXTRACTED` were removed. The adapter reads
+  post-gate state; nothing in this pipeline observes region resolution or a
+  pre-gate return, so they were documented lifecycle stages no code could
+  reach. `tests/test_contract_adversarial.py::TestLifecycleStates` locks
+  the enum to the seven reachable states. They return only with a real
+  transition that reaches them.
+- `tests/test_contract_adversarial.py` runs the eight adversarial cases
+  through `pipeline.value_filing` on the cached UBER_FY2024 extraction:
+  missing field -> BLOCKED/MISSING; conflicting observations -> the final
+  error names AMBIGUOUS; wrong unit -> BLOCKED/INVALID_UNIT; wrong period ->
+  BLOCKED/PERIOD_MISMATCH; valid zero -> PASS; analyst override -> PASS,
+  labelled, reaches the 77.08 anchor; missing WACC input -> PATH_WACC
+  blocked and `discount_rate` BLOCKED/DEPENDENCY_UNMET. Every blocked case
+  also asserts `build_wacc`, `build_dcf_inputs` and `run_dcf` never ran.
+  Insufficient history is exercised at the gate directly: `value_filing`
+  fixes its path set to (DCF, PER_SHARE, WACC) and does not select
+  PATH_HISTORICAL, and wiring it in would be a contract redesign this pass
+  did not undertake.
+
+Test count: 166 -> 179. All anchors hold (UBER_FY2024 77.08, LYFT_FY2025
+49.06). #14 (coverage gate returned the wrong type) and #15 (1000x unit
+bug) stay covered - the contract adds INVALID_UNIT as a second line of
+defence on the latter.
+
+Status: CLOSED. The structural completeness gap is fixed; the residual
+economic weakness in the base FCFF itself is #29, a separate issue.
 
 ## #29 A ten-year DCF anchored on one year's FCFF is the wrong instrument for a company mid-inflection
 
@@ -671,6 +728,1043 @@ latest-period basis, same as the point valuation is. Confirmed by reading
 initial claim to the contrary - that it "doesn't touch the contaminated
 cash-flow base at all" - turned out to be wrong and was caught before it
 reached the README.
+
+## #32 Accounting-quality diagnostics (P4) - built, diagnostic only
+
+`src/aleph/valuation/accounting_quality.py`. The pipeline could say "this
+number was extracted correctly" but not "how economically informative is
+this number". P4 adds that second layer, and ONLY that: it reads verified
+facts and reports what they imply about how well reported earnings and cash
+flow represent sustainable earning power. It changes no FCFF, no WACC, no
+growth rate, no share count, no value.
+
+WHAT WAS BUILT. Ten deterministic diagnostics across eight dimensions -
+earnings vs cash, accrual intensity, working-capital quality, revenue
+quality (a cash-collection proxy), capital intensity, maintenance-capex
+verifiability, SBC materiality, SBC dilution, large non-cash earnings
+adjustments, and cash one-offs. Each returns a `Diagnostic` with separate
+FACT / DIAGNOSTIC / INTERPRETATION / VALUATION-RELEVANCE fields, a state
+(`FLAGGED` / `ASSESSED_NO_ISSUE` / `INSUFFICIENT_DATA` / `NOT_APPLICABLE` /
+`NOT_ASSESSED`), a horizon (`LATEST_PERIOD` / `HISTORICAL_PATTERN` /
+`TREND` / `SINGLE_YEAR_ANOMALY`), a qualitative
+`potential_valuation_impact` (`NONE`..`HIGH`/`UNKNOWN`), and `Evidence`
+rows carrying the source fact's quote and page reference. `converging_risks`
+LISTS the flags that point the same way - it is a sentence, never a number,
+and `test_convergence_is_not_a_number` asserts it has no score attribute.
+
+NO SYNTHETIC SCORE. There is deliberately no "73/100". A company can have
+clean earnings and weak cash conversion at once; the dimensions are kept
+apart.
+
+NO LLM. Every number is Python over gate-verified `Fact` objects. The LLM
+extracted and quoted those; it computes no ratio, picks no threshold,
+decides no impact here.
+
+NO FRAUD LANGUAGE. The strongest wording is "accounting-quality risk". A
+`_FORBIDDEN` guard plus `has_forbidden_language()` plus tests over the
+converging and real-like reports enforce it.
+
+THRESHOLDS carry rationale + economic interpretation + limitation at their
+definition (`SBC_TO_REVENUE_MATERIAL` etc.) and are echoed on the
+`Diagnostic.threshold` field. `MATERIAL_DEVIATION = 0.25` is reused verbatim
+from `historical_fcff` / `cfo_normalization` so the three modules cannot
+drift on "materially different". A threshold gates a FLAG and nothing else;
+the underlying series is always printed so a reader is not taking the flag
+on trust.
+
+CANNOT TOUCH VALUATION - the P4 invariant, tested three ways in
+`tests/test_accounting_quality.py::TestP4CannotTouchValuation`:
+`assess_accounting_quality` runs LAST in `value_filing`, after `run_dcf`
+and `reverse_dcf` (asserted against source order); an all-HIGH-impact
+report monkeypatched in leaves `value_per_share`, `enterprise_value`,
+`equity_value`, `wacc` and `base_cash_flow` byte-identical; and the
+UBER_FY2024 77.08 anchor holds with P4 present.
+
+WHAT P4 CANNOT SEE, measured and surfaced rather than hidden:
+- Balance-sheet receivable / inventory / deferred-revenue LEVELS are not
+  extracted, so revenue-quality works off the cash-flow "change in accounts
+  receivable" as a collection-lag PROXY, stated as such in every such
+  diagnostic. Where even that line is absent (LYFT_FY2025), the state is
+  `INSUFFICIENT_DATA`, not a pass.
+- A one-time CASH cost never appears as its own reconciliation caption
+  (see #29 and cfo_normalization.py). P4 identifies non-cash earnings
+  adjustments from the reconciliation; a cash one-off is identified ONLY
+  from analyst-supplied `CashOneOff` evidence, else
+  `NO_CASH_ONE_OFF_IDENTIFIED` - explicitly NOT `NO_CASH_ONE_OFF_EXISTS`.
+
+CROSS-FILER, measured on the cached extractions: UBER_FY2024, UBER_FY2025,
+LYFT_FY2025 and DASH_FY2025 all run without a company-specific branch.
+UBER_FY2024 and LYFT_FY2025 both raise `CONVERGING_ACCOUNTING_QUALITY_RISKS`
+(HIGH_ACCRUAL_COMPONENT, ONE_YEAR_WORKING_CAPITAL_SWING, HIGH_SBC) - the
+same picture #29 and the tax-rate overrides describe from a different angle.
+DASH_FY2025 flags HIGH_SBC and REVENUE_CASH_DIVERGENCE and does not
+converge.
+
+Fact wording is resolved by tolerant substring, the way `assumptions.py`
+does it, not one exact caption: measured, Uber writes "Net cash provided by
+operating activities" and Lyft writes "Net cash provided by (used in)
+operating activities", and an exact match on the first silently drops every
+Lyft period into INSUFFICIENT_DATA. Caught during P4 cross-filer testing,
+before it shipped.
+
+Tests: `tests/test_accounting_quality.py`, 39 cases - a positive case and a
+negative control for every dimension, the #13 CFO/NI examples both ways, the
+#14/#15/#16/#17 adversarial cases, insufficient-data, convergence, the
+no-fraud-language guard, traceability, and the cannot-touch-valuation
+regression. Suite: 179 -> 218.
+
+P4.5 HARDENING PASS, 2026-09-07 - three weaknesses from P4's own report, no
+new diagnostics, no redesign:
+
+1. SINGLE-PERIOD SEMANTICS. `Diagnostic` gains `confidence` (`NORMAL` /
+   `LIMITED`). A diagnostic assessed from fewer than three periods is
+   `LIMITED`; an `ASSESSED_NO_ISSUE` from one period additionally gets
+   `horizon=SINGLE_YEAR` and its interpretation rewritten to "No issue
+   identified in the observed data ... historical persistence cannot be
+   assessed" - the strings "historically clean", "structurally normal",
+   "no accounting-quality concern" are now in an `_OVERCLAIM` guard with
+   `has_overclaiming_language()` and a standing test. A `FLAGGED` finding
+   from thin history KEEPS its flag (a real one-year signal is still a
+   signal) but is marked `LIMITED` and says persistence is untested.
+
+2. WORKING-CAPITAL CLASSIFICATION FAILS CLOSED. `_classify_wc_line` returns
+   a bucket, `UNKNOWN_OPERATING_COMPONENT`, `EXCLUDED_NON_OPERATING`,
+   `STRUCTURAL`, or `NO_CHANGE_MARKER`. A cash-flow line counts as working
+   capital only if its caption carries a change marker ("change in ...",
+   "(change)") - measured: Uber/Lyft write the first, DoorDash the second -
+   which stops capex and the net-change subtotal being swept in. A
+   change-marked line that matches no bucket is `UNKNOWN_OPERATING_COMPONENT`:
+   summed into the net total (never dropped) and named in a
+   `WorkingCapitalCoverage` (`FULL` / `PARTIAL` / `NO`, with `classified`,
+   `unclassified`, `coverage_ratio`, `unknown_components`). Below
+   `WC_COVERAGE_SUFFICIENT` (0.85) or with no bucket at all, the diagnostic
+   returns `INSUFFICIENT_DATA` - the movement SIZE is still reported, the
+   composition claim is withheld. An unmarked cash-flow line that is not
+   clearly non-cash is listed as an `unmarked_candidate` and downgrades
+   `FULL`->`PARTIAL` when material (>10% of the movement). Buckets were
+   widened generically (insurance/loss reserves, `lease liabilit`,
+   `right-of-use`, `customer-related`, `other operating`) - no issuer
+   name appears in the module, asserted by a test that greps the source.
+   Synthetic fifth-company fixture with captions like "Operating assets and
+   liabilities, net (change)" leaves that line UNKNOWN, visible, counted,
+   and blocks a FULL-attribution claim.
+
+3. REVENUE QUALITY - EPISTEMIC LABEL, NOT A STRONGER CLAIM. Every
+   revenue-quality output now carries `_REVENUE_PROXY_LIMITATION`: "This is
+   REVENUE_CASH_DIVERGENCE, not a full REVENUE_QUALITY_ASSESSMENT" - the
+   AR balance, contract assets, contract liabilities / deferred revenue and
+   the allowance are not extracted, so the flag rests on the cash-flow
+   receivables-change proxy and "is not sufficient by itself to establish a
+   revenue-recognition issue". A flagged divergence is stated as a
+   single-year move explicitly NOT called structural deterioration; when
+   the series shows an earlier drag spike that reversed, that is named as
+   timing. The flag key stays `REVENUE_CASH_DIVERGENCE`; there is no
+   `REVENUE_QUALITY_PROBLEM` / `REVENUE_QUALITY_ASSESSMENT` key.
+
+DATA EXPANSION (P4.5 item 4): NOT done. Adding `accounts_receivable`,
+`contract_assets`, `contract_liabilities`, `deferred_revenue`,
+`allowance_for_doubtful_accounts` to `targets.py` would need a cold
+re-extraction of every filing against the live API and a changed committed
+cache, and carries an unmeasured collision risk in `derive_net_debt` across
+filers - outside a narrow hardening pass. Recorded as a P5/P8 candidate:
+the balance-sheet extraction target would gain those fields, the P3
+contract would mark them OPTIONAL (missing stays explicitly missing), and
+revenue quality would upgrade from proxy to a receivables-turnover /
+deferred-revenue analysis.
+
+Suite: 218 -> 240 (`tests/test_accounting_quality_p45.py`, 22 cases).
+Anchors unchanged (77.08 / 49.06); `TestP45CannotTouchValuation` asserts
+per-share, EV-equity consistency and WACC are untouched with the confidence
+and coverage fields present.
+
+RESIDUAL (documented, not a defect to patch): a single-period LEVEL ratio
+(SBC/revenue, capex/CFO) still reaches `ASSESSED_NO_ISSUE` with one year of
+data - but now `confidence=LIMITED`, `horizon=SINGLE_YEAR`, and an
+interpretation that explicitly declines to speak about persistence. A
+working-capital line with no change marker and no non-cash marker
+(DoorDash's "Funds held at payment processors") is excluded from the net
+total by rule and surfaced as an `unmarked_candidate` rather than counted -
+a deliberate fail-closed choice that can undercount WC for a filer whose
+captions omit the marker; the coverage line makes the omission visible.
+
+P4.6 ADVERSARIAL AUDIT, 2026-09-07 - a hostile validation pass over
+P1-P4.5. No new diagnostics. Nine vulnerabilities found, eight fixed, one
+documented. Mutation-tested: 18 mutations of the safeguards, all killed
+after two follow-up tests were added for survivors.
+
+- F1 (HIGH, FIXED) - the convergence engine called correlated diagnostics
+  "independent". A single synthetic receivables build raised four flags
+  (`CASH_EARNINGS_DIVERGENCE`, `HIGH_ACCRUAL_COMPONENT`,
+  `REVENUE_CASH_DIVERGENCE`, plus a WC flag) and the summary said "4
+  independent diagnostics point the same way" - they are four measurements
+  of one NI<->CFO event. Fix: `_CONVERGENCE_FAMILY` groups every eligible
+  flag into an accounting RELATIONSHIP (`cash_vs_earnings`,
+  `equity_compensation`, `capital_intensity`, `one_off_cash`); convergence
+  now requires >= CONVERGENCE_MIN_FLAGS flags spanning >=
+  CONVERGENCE_MIN_FAMILIES (2) distinct families, and the summary lists the
+  families and states "Flags within one dimension are different measurements
+  of the same relationship, not independent signals." Uber/Lyft still
+  converge (cash_vs_earnings + equity_compensation); the pure single-family
+  case no longer does.
+- F2 (MEDIUM, FIXED) - convergence counted single-period LIMITED-confidence
+  flags silently alongside NORMAL ones. `ConvergingRisks.limited_flag_count`
+  is now reported and the summary discloses "N of M contributing flags rest
+  on single-period (LIMITED-confidence) evidence".
+- F3 (HIGH, FIXED) - the working-capital classifier routed financing and
+  investing "change in" lines (`Change in long-term debt`, `Change in
+  short-term borrowings`, `Change in marketable securities`, `Change in
+  restricted cash`, `Change in cash and cash equivalents`) to
+  `UNKNOWN_OPERATING_COMPONENT`, which summed them into the net WC total,
+  distorting the CFO-dependence magnitude and mislabelling a financing flow
+  as operating. `_WC_NOT` extended with a generic financing/investing block
+  (no issuer aliases). The real corpus is unchanged.
+- F4 (HIGH, FIXED) - P4 ratios did not verify numerator and denominator
+  share a unit scale. `_monetary_scale` (bare "USD" resolves to 1e-6, not
+  None, unlike `infra.units.resolve_scale`) plus `_scale_conflict` detect a
+  mixed-scale set up front; every cross-metric diagnostic
+  (`CASH_EARNINGS_DIVERGENCE`, `HIGH_ACCRUAL_COMPONENT`,
+  `HIGH_CAPITAL_INTENSITY`, `HIGH_SBC`,
+  `LARGE_NON_CASH_EARNINGS_ADJUSTMENTS`) is forced to `INSUFFICIENT_DATA`
+  with an explicit reason (ISSUES.md #15 class).
+- F5 (MEDIUM, FIXED) - `_series` detected conflicting facts (same period,
+  different value) but every caller discarded the clash set: first-seen
+  won silently. `assess_accounting_quality` now collects the clashes; a
+  metric with a conflict forces every diagnostic that consumes it to
+  `INSUFFICIENT_DATA` and the report carries a `CONFLICTING SOURCE FACTS`
+  note. No conflict exists in the current corpus - this is a latent guard.
+- F6 (LOW, DOCUMENTED) - a flag one microstep past a threshold is already
+  hedged ("Not a quality verdict on its own", `threshold` field states the
+  rule, `_OVERCLAIM` blocks "proven"). A `TestThresholdLanguage` test pins
+  the hedge. No wording change made.
+- F7 (LOW, FIXED) - P4 read raw facts with no period-label guard. `_series`
+  now ignores anything but an annual `FY####` label, so a quarterly or
+  stub-period figure cannot be mixed into an annual series (the P3 gate's
+  equivalent, for the diagnostic path).
+- F8 (LOW, FIXED) - `SBC/revenue` and `SBC/CFO` were computed against a
+  possibly-negative denominator. Now gated on a positive denominator;
+  when neither revenue nor CFO is positive the diagnostic is
+  `INSUFFICIENT_DATA`, not `ASSESSED_NO_ISSUE`.
+- F9 (HIGH, FIXED, self-inflicted) - a mutation-testing harness timed out
+  under SIGKILL mid-run and its `finally` restore did not execute, leaving
+  `_classify_wc_line` returning `"receivables"` for every unbucketed line.
+  Caught by the P4.6 tests within minutes, reverted, and the harness
+  rewritten to back up outside the tree and restore unconditionally.
+- Non-finite values: `_series` drops any fact whose value is NaN or inf
+  (corrupt data) so it cannot propagate into a ratio.
+- Valuation isolation re-verified: `accounting_quality.py` imports only
+  stdlib; `assess_accounting_quality` runs last in `value_filing`, after
+  `run_dcf`/`reverse_dcf`, and nothing reads its result back. An absurd
+  (inf-valued, all-HIGH) monkeypatched report leaves per-share, EV, equity,
+  WACC, terminal value and implied growth byte-identical.
+- Test-suite reality check (P4.6 section 9, documented not fixed): P4 runs
+  UNGUARDED in `value_filing`. An exception inside `assess_accounting_quality`
+  currently propagates and takes down an otherwise-valid valuation.
+  `test_p4_exception_does_not_take_down_a_valid_valuation` pins this
+  behaviour so a future try/except is a deliberate decision, not an
+  accident. This is the one CURRENT weakness and it is a robustness gap,
+  not an economic-correctness or isolation gap.
+
+Suite: 240 -> 301 (`tests/test_accounting_quality_p46.py`, 61 cases).
+Anchors unchanged (77.08 / 49.06). All 11 standalone scripts pass.
+
+## #33 P4.7 + P5 - robustness and economic-correctness audit of the valuation
+
+P4.7 (the one open P4.6 item) and a P5 robustness pass on the DCF engine
+itself. Diagnostic layers only; no anchor moved; the LLM is not involved in
+any of it.
+
+P4.7 - `assess_accounting_quality` in `value_filing` is now wrapped: an
+exception is captured with provenance and surfaced as
+`AccountingQualityReport.not_assessed(reason=...)` (field
+`not_assessed_reason`, CLI prints `ACCOUNTING QUALITY: NOT ASSESSED`). The
+valuation is already final when P4 runs and is NOT recomputed; a test
+proves per-share / EV / equity / WACC / FCFF / terminal / implied-growth
+are byte-identical to a clean run and that `run_dcf` is called the same
+number of times (3), i.e. no downstream recomputation. A clean run is
+unchanged.
+
+P5 DCF-ENGINE GUARDS (`dcf_engine.validate`) - fail closed, never emit a
+NaN / inf / crash dressed as a valuation. Measured before: `base_cash_flow`
+0 -> ZeroDivisionError; inf / NaN -> leaked to `value_per_share`;
+`discount_rate <= -1` -> ZeroDivisionError; `net_debt` inf -> `-inf`
+per-share. Added Guard 0 (all numeric inputs finite), 0b
+(`discount_rate > -100%`), 0c (`base_cash_flow != 0` -> else NOT_SOLVABLE),
+and a `total == 0 / non-finite` guard in `run_dcf`. The 77.08 / 49.06
+anchors are unaffected - their inputs are finite and well-posed. `WACC <= g`
+was already caught by Guard 1; boundary tests (g == r, g == r ± ε) pin it.
+
+P5 ROBUSTNESS LAYER (`src/aleph/valuation/robustness.py`) - a new
+DIAGNOSTIC module, isolated like P4: imports only `dcf_engine` (to re-run
+the PURE engine on COPIES) and stdlib; never the bridge, WACC, assumptions
+or accounting-quality. `value_filing` attaches a `RobustnessReport` LAST,
+wrapped like P4.7. It measures and EXPOSES, never adjusts:
+  - ANCHOR_SENSITIVITY: value under latest / mean / median / each disclosed
+    FCFF year. UBER_FY2024 spans -$14.13 to $77.08 (290% of midpoint) ->
+    `HIGH`. LYFT_FY2025 spans -$39.37 to $49.06 (1826%) -> `HIGH`. No anchor
+    is promoted; averaging is labelled a STATISTIC and #29's warning that it
+    can widen the instability is carried in the interpretation.
+  - TERMINAL_VALUE_DEPENDENCE: `result.terminal_pct`, categorised
+    (>90% extreme, >80% high). Both live filings sit at ~60%.
+  - ASSUMPTION_SENSITIVITY / PRIMARY VALUE DRIVER: reads the tornado the
+    pipeline already builds. For both filings `base_cash_flow` dominates
+    (UBER 118% swing vs 39% discount_rate; LYFT 180% vs 39%).
+  - REVERSE_DCF_CONSISTENCY: feeds the implied growth back into the forward
+    engine and checks it reproduces the market price (1% tolerance). Both
+    round-trip (UBER 0.03%, LYFT 0.09%) - and the interpretation states this
+    is a restatement under the SAME assumptions, "not an independent check".
+    `implied_growth is None` -> `NOT_SOLVABLE`, never an invented rate.
+  - VALUE_BRIDGE_INTEGRITY: asserts `equity == EV - net_debt` and
+    `per_share == equity / shares` to 1e-9, plus scale sanity (per-share
+    outside 1e-2..1e6, or net-debt > 50x EV -> `SCALE ANOMALY`, the
+    ISSUES.md #15 1000x class).
+  - HISTORICAL_REGIME: sign change / monotonic trend / tight-band-then-jump
+    over the FCFF series. Both live filings change sign -> `HIGH`, "series
+    may NOT be comparable across time"; a comparable series is explicitly
+    "NOT a statement that the level is right".
+  - VALUATION_METHOD_LIMITATION: negative base FCFF -> `HIGH`, "a Gordon
+    DCF on a negative cash flow compounds a loss; the output is arithmetic,
+    not a valuation".
+`FailureCategory` (Phase 14): `categorize_failure(exc)` maps each pipeline
+exception to one of ten categories + a usability note. A valuation is never
+just "failed".
+
+MUTATION TESTED (Phase 12): 20 mutations of the DCF guards and robustness
+safeguards, all killed after four follow-up tests were added for survivors
+(zero-base guard, total==0 guard, reverse-DCF tolerance, EV/equity link -
+each was a defence-in-depth survivor caught only once a test pinned the
+specific check).
+
+Suite: 301 -> 371 (`tests/test_robustness.py`, 69 cases). Anchors 77.08 /
+49.06 unchanged. All 11 scripts pass.
+
+THE HEADLINE FINDING, stated plainly: the anchor and regime instability
+that #29 identified is REAL, LARGE, and now MEASURED IN THE OUTPUT. For
+UBER_FY2024 the valuation is anywhere from -$14/share to $77/share
+depending on which disclosed year's FCFF is taken as run-rate, and
+`base_cash_flow` swings the answer more than every other assumption
+combined. P5 does not resolve this - #29 established that no single anchor
+or statistic can - it makes it impossible to read the $77.08 point estimate
+without also seeing that range and that dependence. That is the correct
+outcome for an economic sensitivity: expose it, do not eliminate it.
+
+P5 CONTROLLED IMPLEMENTATION, 2026-09-08 - after a full Phase 2 forensic
+audit (V1-V14) the following controls were built. None moved the point
+value: UBER_FY2024 $77.08, LYFT_FY2025 $49.06 unchanged.
+
+- P5.1 PROVENANCE INTEGRITY (V3, genuine defect). `bridge.build_dcf_inputs`
+  hard-coded `Assumption(source="filing")` for every input. It now reads
+  `ranges[name].status`: an override -> `analyst_judgment`; a computed
+  statistic or the FCFF composite -> `derived`; a single gate-verified
+  level -> `filing`. `dcf_engine.Assumption.source` Literal widened to
+  {filing, derived, market, analyst_judgment, model_convention, peer_group};
+  `app.py` GRADES updated. Measured before/after: `net_debt` filing ->
+  analyst_judgment (both filings, always an override); LYFT `growth_year_1`
+  filing -> analyst_judgment (a 9.2% override); UBER `growth_year_1` filing
+  -> derived (a median); `base_cash_flow` filing -> derived with a LINEAGE
+  note naming the effective_tax_rate assumption it embeds. `terminal_growth`
+  stays analyst_judgment, `discount_rate` stays market.
+
+- P5.2 MODEL CONVENTIONS FIRST-CLASS (V14). `robustness.model_conventions()`
+  returns a 10-entry registry of `ModelConvention(name, value, rationale,
+  location, effect, classification=MODEL_CONVENTION)`, values read live where
+  possible (forecast horizon 10, growth statistic median, linear fade
+  17.46%->2.50%, terminal growth 0.025, cap 0.03, beta factors 0.75/1.45,
+  reverse-DCF window -50%/+100% and tolerance 0.001, SBC full-value + flat
+  shares, net-cash WACC clamp). Attached to `ValuationRun.robustness`; the
+  CLI prints it. A reader can now enumerate every convention from the run.
+
+- P5.4 HISTORY COMPARABILITY (V2). `_history_comparability` - a deterministic
+  LIMITATION framework, not a regime classifier. Conditions: FCFF sign
+  change, any YoY FCFF change > 100%, a missing fiscal year, < 3 years,
+  a revenue-growth band > 15 points, historical FCFF reconstructed with an
+  assumption (the flat-interest substitution). Taxonomy: `HIGH_CONCERN` /
+  `LIMITED` / `NO_DETERMINABLE_CONCERN` / `NO_DETERMINABLE_CONCLUSION`. It
+  NEVER says "the business entered a new regime" - only "the series is not
+  clearly one regime". Both live filings -> HIGH_CONCERN (sign change).
+
+- P5.6 WACC INPUT QUALITY (V6/V7). `_wacc_input_quality` separates
+  MATHEMATICAL validity from MARKET-INPUT integrity. Deterministic checks:
+  missing / non-finite input -> `BLOCKED`; a source or rationale marked
+  UNVERIFIED -> `INSUFFICIENT_EVIDENCE`; stale (rf/ERP as_of months differ),
+  extreme (beta outside 0.2-3.0, ERP outside 2-10%, rf > 15%), or
+  undisclosed-judgement input -> `LIMITED`; else `OK`. It NEVER clamps and
+  NEVER picks a new WACC. Measured: UBER -> LIMITED (Jan-2026 ERP with
+  Aug-2026 rf; undisclosed CRP method); LYFT and DASH ->
+  INSUFFICIENT_EVIDENCE (debt_spread marked UNVERIFIED FOR THIS FILER).
+
+- P5.7 REVERSE DCF CORRECTNESS (V4, genuine math defect).
+  `dcf_engine.reverse_dcf` rewritten: it samples value(g) across the
+  window, establishes monotonicity DIRECTION (rises with g for a positive
+  anchor, FALLS for a negative anchor), checks the target price is bracketed
+  by the attainable range, then bisects with the correct orientation. A
+  non-monotonic / near-flat value(g), an unattainable target, or an invalid
+  interior point returns None (NOT_SOLVABLE) - it never guesses and never
+  blindly shrinks the bracket. The forward faded-growth DCF is NOT inverted;
+  the docstring and the output label it "the uniform-growth equivalent
+  implied by the market price under current non-growth assumptions". UBER
+  10.5% and LYFT -8.5% are unchanged (positive anchors, monotone
+  increasing, target bracketed).
+
+- P5.8 VALUE-BRIDGE INPUT INTEGRITY (V5, genuine 1000x defect).
+  `assumptions.build_level` gains `require_unit`; `derive_diluted_shares`
+  passes it. A diluted-share fact with no unit string now BLOCKS with
+  `INVALID_UNIT` instead of falling back to an assumed "thousands" - the one
+  quantity `gates.check_unit_matches_source` deliberately skips. `net_debt`
+  override units were already fail-closed at `to_millions` (a token-free
+  unit raises BridgeError); a wrong-but-valid-scale typo is caught only by
+  the robustness magnitude check - documented residual.
+
+- P5.12 FAILURE TAXONOMY. `FailureCategory` (10 values) + `categorize_failure`
+  map every pipeline exception to a category + a usability note; each
+  `RobustnessFinding` carries an optional `category`.
+
+MUTATION TESTED (P5, round 1): 22 mutations of the P5 controls. 19 killed;
+3 survived - all three over-determined internal guards in `reverse_dcf`
+(attainability, non-monotonic, invalid-mid). Resolved in P5.1 closure below.
+
+Suite: 371 -> 408 (`tests/test_p5_controls.py` 37 cases, plus 2 cross-sector
+fixtures). All 11 scripts pass. Anchors unchanged.
+
+---
+
+P5.1 CLOSURE PASS, 2026-09-08. Goal: make P5 internally complete - a
+mathematically correct valuation must also state whether it is economically
+usable. No new valuation method; no anchor selection; no clamp; negative
+values are shown, not hidden. Point values unchanged: UBER_FY2024 $77.08,
+UBER_FY2025 $119.95, LYFT_FY2025 $49.06, DASH_FY2025 $124.27 (EV, equity,
+WACC, terminal-value share and reverse-DCF implied growth all byte-stable).
+
+- REVERSE-DCF SURVIVORS RESOLVED (Part 1). `reverse_dcf` rewritten around a
+  closed-form monotonicity proof in its docstring: with K = (1+g_T)/(r-g_T)
+  and run_dcf having already enforced r > g_T and S > 0, Phi(x) is strictly
+  increasing in x hence in g, so value(g) is strictly increasing for B > 0,
+  strictly decreasing for B < 0, and undefined for B = 0. There is no
+  non-monotonic case and no partial-validity pocket. The non-monotonic guard
+  and the invalid-mid guard were therefore DEAD and were removed. The two
+  remaining runtime checks - window well-posed, target bracketed - are
+  genuine bisection preconditions, each now isolated by a mutation-killing
+  test (`test_ill_posed_window_returns_none_not_a_type_error`,
+  `test_target_just_above_the_attainable_max_is_not_solvable`). The solver
+  also no longer aliases its argument (was `trial = inputs` under mutation;
+  now `deepcopy`, pinned by `test_reverse_dcf_does_not_mutate_its_input`).
+
+- NEGATIVE / ZERO EQUITY (Part 2). `_negative_equity` -> a first-class
+  `NEGATIVE_EQUITY_VALUE` finding (Severity.HIGH, category
+  ECONOMIC_MODEL_FAILURE). Interpretation is "MATHEMATICALLY VALID,
+  ECONOMICALLY LIMITED ... NOT an ordinary bear-case intrinsic value". The
+  DCF arithmetic is untouched; the negative per-share number is still
+  returned. equity ~ 0 is reported as the break-even case.
+
+- NET-DEBT UNIT INTEGRITY (Part 3). Two layers. (a) `derive_net_debt` blocks
+  INVALID_UNIT when `infra.units.resolve_scale(override.unit)` is None - a
+  bare "USD", empty, "percent", or two scale tokens is rejected; the scale
+  is never inferred. (b) `bridge.build_dcf_inputs` cross-checks the net_debt
+  scale against the operating-cash-flow scale and raises BridgeError on a
+  mismatch - this is what catches a magnitude-plausible thousands/millions
+  typo that passes `to_millions` (both are valid single tokens). "Magnitude
+  sanity is not unit verification."
+
+- SHARE-UNIT SWEEP (Part 4). `build_level(require_unit=True)` +
+  `resolve_scale`: thousands / millions / billions / "USD thousands" derive;
+  blank / "each" / "widgets" / "thousands millions" / "USD" BLOCK with
+  INVALID_UNIT; a conflicting duplicate share caption is an ambiguous-
+  selection block. No magnitude rescue, no diagnostic rescue - the value
+  never reaches the DCF.
+
+- VALUATION APPLICABILITY (Parts 5-10). New categorical status on every run
+  (NOT a confidence score): `Applicability` in {USABLE,
+  USABLE_WITH_LIMITATIONS, LIMITED_APPLICABILITY, NOT_SOLVABLE, BLOCKED}.
+  `_applicability(findings)` consumes only evidence already computed and
+  applies EXPLICIT rules (documented as the `valuation_applicability_rules`
+  ModelConvention). Correlated findings are grouped into economically-
+  distinct FAMILIES via a single map `_LIMITATION_FAMILY` / `_family()`:
+  anchor sensitivity + historical regime + history comparability all fold to
+  `cash_flow_representativeness`; the several WACC sub-reasons from one stale
+  ERP fold to `market_input_evidence`. One root cause escalates applicability
+  once, never five times. Part 7 rule is literal: ANCHOR_SENSITIVITY HIGH
+  AND HISTORY_COMPARABILITY HIGH_CONCERN -> LIMITED_APPLICABILITY, and the
+  point value stays the latest-anchor value.
+
+- CENTRAL CONCLUSION (Part 16). `RobustnessReport.headline_conclusion`, a
+  machine-readable, euphemism-free sentence, surfaced in the CLI above the
+  robustness block. For the cash-flow-family case it reads exactly: "The
+  valuation is mathematically valid, but the choice of the latest FCFF year
+  is a dominant economic assumption and historical cash-flow comparability
+  is limited." Not "valuation confidence is medium".
+
+- LIVE FILINGS (Part 11). UBER_FY2024 LIMITED_APPLICABILITY (families:
+  cash_flow_representativeness, market_input_evidence). UBER_FY2025
+  USABLE_WITH_LIMITATIONS (history only LIMITED, not HIGH_CONCERN).
+  LYFT_FY2025 and DASH_FY2025 LIMITED_APPLICABILITY (anchor HIGH + history
+  HIGH_CONCERN + WACC INSUFFICIENT_EVIDENCE from the UNVERIFIED debt spread).
+
+- DEAD-CODE / EXPERIMENTAL MARKERS (Part 15). `historical_fcff.py`,
+  `cfo_normalization.py`, `normalization.py`, `sensitivity.py` carry a
+  "STATUS: EXPERIMENTAL - NOT IN THE LIVE VALUATION PATH" banner. Measured:
+  none is imported by `valuation/pipeline.py` or `scripts/run_valuation.py`;
+  each is exercised only by its own test file. The live valuation is
+  extraction -> assumptions -> contract -> wacc -> bridge -> dcf_engine,
+  with accounting_quality and robustness as diagnostic-only layers. The
+  research is kept, not deleted; wiring any of it in needs an ADR.
+
+MUTATION TESTED (P5.1 closure, round 2): 19 mutations across bridge,
+dcf_engine, assumptions, robustness (provenance, negative-equity finding +
+rule, net-debt unit gate x2, share-unit gate x2, anchor / comparability / TV
+thresholds, WACC-quality propagation, evidence-family de-dup x2, reverse-DCF
+orientation / attainability / well-posed probe / input isolation, central
+conclusion). 19 / 19 KILLED. Combined with round 1's material kills, every
+retained safeguard on the P5 surface is now isolated by a test; the two
+guards that could not be isolated in round 1 were removed as provably dead,
+not reclassified.
+
+Suite: 408 -> 451. All 11 standalone scripts pass. Anchors unchanged.
+
+VERDICT: P5 SOLVED. The latest-FCFF-anchor / historical-non-comparability
+economic sensitivity is NOT resolved (ISSUES.md #29 - it is inherent, and
+averaging makes it worse). It is now CLASSIFIED: those filings report
+LIMITED_APPLICABILITY with the reason stated in plain language. A
+mathematically correct valuation that is economically fragile no longer
+looks identical to one that is not.
+
+---
+
+P6 - SUSTAINABLE FCFF FRAMEWORK, 2026-09-08. EXPERIMENTAL, not wired in.
+Question: can Aleph move from "latest reported FCFF" toward an
+evidence-defensible SUSTAINABLE FCFF without manufacturing certainty?
+
+- NEW MODULE `src/aleph/valuation/sustainable_fcff.py` (EXPERIMENTAL banner).
+  Deterministic. Imports stdlib + dcf_engine + infra.units + (lazily)
+  bridge. NOT imported by pipeline.py or run_valuation's base path; a
+  regression test asserts `"sustainable_fcff" not in pipeline source`.
+  run_valuation.py calls it directly in a clearly-fenced EXPERIMENTAL block
+  AFTER the base valuation is printed.
+
+- METHOD. For every disclosed period it splits reported CFO into
+  (CFO - working capital) and (working capital), where working capital is
+  the sum of the "change in <account>" reconciliation lines the extractor
+  already pulls. It then VALIDATES that net income + every non-cash add-back
+  (SBC included) + working capital reproduces reported CFO within 3.5% /
+  $75m, and REFUSES the decomposition for that period otherwise. No LLM
+  decides recurring vs one-off. No regression, no score, no smoothing.
+
+- SEVEN OBJECTS kept distinct: reported cash flow; reconstructed FCFF;
+  normalized FCFF; sustainable FCFF (a RANGE); transition-period FCFF;
+  analyst assumption; model convention.
+
+- REGIME is deterministic: <3 years -> INSUFFICIENT_HISTORY; FCFF sign
+  change -> REGIME_UNCERTAIN; a missing/non-reconciling component ->
+  REGIME_UNCERTAIN; tight band (<=25% of median) ->
+  EVIDENCE_CONSISTENT_WITH_STRUCTURAL_CHANGE; an UPWARD isolated final spike
+  (>100% above the tight prior band) -> EVIDENCE_CONSISTENT_WITH_TEMPORARY;
+  a monotonic non-sign-changing trend -> REGIME_UNCERTAIN. A downward step
+  is never called "temporary" - that would argue the company is better than
+  it looks.
+
+- RANGE (only when the latest period reconciles): HIGH = latest
+  reconstructed FCFF exactly as disclosed (never more); LOW =
+  min(reconstructed, FCFF ex working capital); CENTRAL = FCFF ex WC + the
+  MEDIAN disclosed WC contribution, clamped to [LOW, HIGH]. Otherwise
+  SUSTAINABLE_FCFF: INSUFFICIENT_EVIDENCE - no number is manufactured.
+
+- LIVE RESULTS (base point values UNCHANGED: 77.08 / 119.95 / 49.06 /
+  124.27). UBER_FY2024: SUPPORTED_RANGE, REGIME_UNCERTAIN (sign change);
+  FCFF low 3,138 / central 3,473 / high 5,512; scenario value 43.61 / 48.33
+  / 77.08. The FY2024 FCFF of 5,512 is ~half operating improvement and ~half
+  a one-year $2,374m working-capital tailwind, 6x the prior two years,
+  dominated by the accrued-insurance-reserve build. UBER_FY2025:
+  SUPPORTED_RANGE, REGIME_UNCERTAIN (monotonic); low 6,058 / central 8,285
+  (3-yr WC median is large and positive) / high 8,285; value 87.34 / 119.95
+  / 119.95. LYFT_FY2025: SUPPORTED_RANGE, REGIME_UNCERTAIN (sign change);
+  low -19 / central 434 / high 810; value 0.88 / 27.25 / 49.06 - the base
+  valuation rests almost entirely on the WC tailwind. DASH_FY2025:
+  INSUFFICIENT_EVIDENCE - two of three periods miss the reconciliation
+  tolerance (no interest line disclosed; a small line unextracted). The
+  framework returned no range rather than a forced one.
+
+- MUTATION TESTED (Phase 17): 18 mutations of the module - adjustment
+  omission, double-count check, unit scaling, residual definition,
+  sign-change rule, WC sign, capex sign, SBC double-subtraction, tax applied
+  twice, TIGHT_BAND / SPIKE thresholds, evidence-less normalization,
+  scenario aliasing, median-ignoring range, provenance loss, inferred-
+  interest label, the 2-of-3 reconciliation gate, and the tolerance.
+
+- ARCHITECTURAL DECISION: OPTION A - KEEP_LATEST_BASE_PLUS_SUSTAINABLE_
+  SCENARIOS. The base DCF still anchors on the latest reconstructed FCFF.
+  Promotion to base needs an ADR and is not warranted: three of four live
+  filings are REGIME_UNCERTAIN with only 3 disclosed FCFF years, one of
+  which is negative, so structural inflection and an unfinished ramp are not
+  separable from the evidence.
+
+- VERDICT: P6 PARTIALLY SOLVED. The framework is built, sourced, ledgered,
+  reconciliation-gated, mutation-tested, and correctly refuses to
+  manufacture a point where the evidence is a 3-year non-comparable series.
+  It CANNOT establish a defensible sustainable-FCFF POINT for the live
+  filings from that evidence - which is the honest state, not a failure of
+  the framework.
+
+---
+
+P7 - MARKET-IMPLIED EXPECTATIONS (INVESTOR DECISION LAYER), 2026-09-08.
+EXPERIMENTAL, not wired in. Question: what expectations does the current
+market price embed, and how demanding are they versus the company's own
+historical evidence and the current DCF?
+
+- NEW MODULE `src/aleph/valuation/market_expectations.py` (EXPERIMENTAL
+  banner). Reads a finished ValuationRun + the P6 sustainable layer, re-runs
+  the PURE engine on COPIES, NEVER writes back. `assess_market_expectations`
+  is called directly from run_valuation.py (only when a market price is
+  given), NOT from pipeline.py; a test asserts `"market_expectations" not in
+  pipeline source`.
+
+- TWO SOLVERS. (1) implied UNIFORM growth = the existing dcf_engine.reverse_dcf
+  (no second DCF); labelled "uniform-growth equivalent, all other inputs
+  fixed" - NOT "expected revenue growth", NOT the inverse of the faded-vector
+  forward DCF. (2) implied BASE FCFF - NEW, closed form: value/share is
+  exactly linear in base FCFF with the growth path fixed, so
+  B* = (price*shares + net_debt) / Phi where Phi = EV/base_FCFF; verified by
+  re-running the engine at B*, else NOT_SOLVABLE. This directly attacks the
+  P6 anchor problem.
+
+- ANTI-CIRCULARITY (Phase 17). Market price in -> analytical outputs out.
+  Nothing modifies inputs, the run, or any valuation number. Regression test
+  proves the point value byte-identical with the layer present.
+
+- FCFF-ANCHOR SCENARIOS: implied uniform growth re-solved under latest /
+  sustainable-low / -central / -high, everything else fixed. No anchor is
+  chosen. WACC and terminal-growth sensitivity re-solve implied growth at
+  the EXISTING beta-derived WACC bounds and the EXISTING terminal-growth
+  tornado band - neither rate is altered.
+
+- CLASSIFICATION (deterministic, no score). vs_evidence:
+  MARKET_EXPECTATIONS_{BELOW,ALIGNED,ABOVE}_EVIDENCE / INSUFFICIENT_EVIDENCE,
+  from implied base FCFF vs the P6 sustainable range (+-5% of range width).
+  level: EXPECTATIONS_{MODEST,DEMANDING,EXTREME} / NOT_CLASSIFIED, from
+  implied FCFF vs the sustainable CENTRAL and range top; when P6 is
+  INSUFFICIENT, graded against the latest FCFF only and labelled as such.
+
+- LIVE RESULTS (base point values UNCHANGED: 77.08 / 119.95 / 49.06 /
+  124.27). UBER_FY2024 @ 76.95 ~ DCF 77.08: implied uniform growth 10.5%,
+  implied base FCFF 5,503 (~ latest 5,512). ALIGNED / DEMANDING - the price
+  mainly requires the current (working-capital-inflated) FCFF to persist,
+  not heroic growth. UBER_FY2025 @ 79.00 vs DCF 119.95: implied growth 5.4%,
+  implied base FCFF 5,488 - BELOW the sustainable floor 6,058 ->
+  BELOW_EVIDENCE / MODEST; the market has already discounted FCFF below the
+  evidence range. LYFT_FY2025 @ 17.35 vs DCF 49.06: implied growth -8.5%,
+  implied base FCFF 264 (< 33% of the latest 810), within the sustainable
+  range -> ALIGNED / MODEST; the market does NOT require the WC-inflated
+  FCFF and prices in a decline. DASH_FY2025 @ 215 vs DCF 124.27: implied
+  growth 22.4%, implied base FCFF 1,987 (1.8x latest); P6 INSUFFICIENT ->
+  vs_evidence INSUFFICIENT_EVIDENCE, level EXTREME graded against latest
+  only.
+
+- MUTATION TESTED (Phase 19): 16 mutations - reverse-DCF direction,
+  implied-FCFF net-debt sign, shifted price target, dropped fixed-input,
+  input aliasing x2, sensitivity setattr no-op, swapped bounds, blanked
+  equation, classification inversion, NOT_SOLVABLE-guard drop x2,
+  verification skip, unit error, level-threshold sign, circular write-back.
+
+- ARCHITECTURAL DECISION: KEEP_EXPECTATIONS_LAYER_EXPERIMENTAL. It reuses
+  the reverse-DCF maths and one closed-form solve, produces
+  economically-interpretable investor output, and never touches a valuation
+  number - but it depends on the P6 sustainable layer (itself EXPERIMENTAL /
+  PARTIALLY SOLVED), and its "vs evidence" classification is only as strong
+  as that dependency. Promotion needs an ADR.
+
+- VERDICT: P7 SOLVED. Aleph now explains, deterministically and with full
+  provenance: what the market price requires (uniform-growth equivalent AND
+  base-FCFF level), what the company's evidence supports (the P6 range or
+  INSUFFICIENT_EVIDENCE), and where the gap is - without a rating, a score,
+  or a cheap/expensive claim. Where the evidence cannot support the check
+  (DASH) it says so rather than inventing an expectation.
+
+---
+
+P8 - EVIDENCE DEPTH, MULTI-PERIOD ACCOUNTING & CASH-FLOW DATA QUALITY,
+2026-09-08. EXPERIMENTAL, not wired in, promotes neither P6 nor P7.
+Question: does Aleph have enough verified, multi-period accounting evidence
+to support the economic conclusions it is being asked to make? The honest
+answer is allowed to be "the filing does not disclose enough to know."
+
+- NEW MODULE `src/aleph/valuation/evidence_depth.py` (EXPERIMENTAL banner).
+  Deterministic, no LLM in the classification. Not imported by pipeline.py
+  (test asserts). run_valuation.py calls it in a fenced EXPERIMENTAL block.
+
+- CAPTION -> CATEGORY MAP. Every extracted cash-flow line maps to
+  NON_CASH_RECONCILIATION / WORKING_CAPITAL[12 subcategories] /
+  OPERATING_CASH_ITEM / CFO_SUBTOTAL / CASH_BALANCE / CAPEX / SBC /
+  NET_INCOME / NON_OPERATING / UNCLASSIFIED, with a sign-semantics tag
+  (CASH_EFFECT: the CFO reconciliation already presents the cash effect) and
+  a mapping confidence. A caption that does not map confidently is
+  UNCLASSIFIED, never a guess (DASH's "Payments for operating lease
+  liabilities" is UNCLASSIFIED and downgrades its period).
+
+- SIGN INTEGRITY. `wc_sign_semantics` separates cash direction from the
+  implied balance-sheet direction (an AR increase is a cash OUTFLOW). Nine
+  movements tested (AR/AP/accrued/prepaid up & down, mixed, zero).
+
+- RECONCILIATION. NI + non-cash + working capital = CFO per period, P6's
+  tolerance UNCHANGED (3.5% / $75m; a test pins it equal to
+  sustainable_fcff's). RECONCILIATION_FAILED retains the residual as
+  evidence. Live: UBER/LYFT all annual periods RECONCILED; DASH_FY2023 and
+  FY2025 RECONCILIATION_FAILED (residuals -113 / -114), matching P6.
+
+- PER-PERIOD SCORECARD (categorical, no score): FULLY_EVIDENCED /
+  PARTIALLY_EVIDENCED / INFERRED_COMPONENTS / RECONCILIATION_FAILED /
+  INSUFFICIENT_EVIDENCE. Non-annual periods are INSUFFICIENT.
+
+- CAPEX SPLIT: CAPEX_SPLIT_NOT_SUPPORTED for all four filings - one capex
+  line per period (LYFT even bundles "and scooter fleet" into it); no
+  maintenance/growth/replacement split is a disclosed number. A split would
+  be estimated, not evidenced.
+
+- ONE-OFF TIERS: EXPLICIT / CORROBORATING / PATTERN_ONLY / NONE. Live:
+  EXPLICIT one-off language appears only on NON-CASH add-backs (impairments,
+  revaluations, gain on lease termination) already inside CFO; ZERO
+  corroborating one-off CASH events. Pattern evidence informs
+  REGIME_UNCERTAIN only, never an adjustment.
+
+- P6 IMPACT: P8's sum of subcategory working-capital equals P6's
+  `wc_total` for every period on every filing (agree = True). P6's
+  sustainable range and regime are byte-unchanged - P8 adds labels, sign
+  semantics and provenance to the SAME numbers.
+
+- UBER DEEP-DIVE (FY2022-FY2024): CFO 642 / 3,585 / 7,137; operating cash
+  before WC 307 / 3,420 / 4,763; WC contribution 335 / 165 / 2,374, of which
+  insurance reserves 730 / 2,230 / 2,819 (WC ex-insurance is a small USE of
+  cash). The FY2024 FCFF LEVEL is ~57% operating-cash-before-WC and ~43%
+  working capital; the FY2022->FY2024 FCFF INCREASE is ~69% operating and
+  ~31% working capital. P6's "approximately half / half" was a level
+  statement about FY2024 and is SHARPENED, not retracted. The recurrence of
+  the insurance-reserve build is disclosure-bound -> REGIME_UNCERTAIN holds.
+
+- LYFT DEEP-DIVE (FY2023-FY2025): CFO -98 / 850 / 1,168; operating cash
+  before WC -306 / 396 / 339; FCFF ex-WC ~ -436 / +4 / -19. P6's finding
+  that FCFF ex-WC ~ $0 and the positive FCFF is working-capital /
+  deferred-tax driven is CONFIRMED and now component-attributed: FY2025 WC
+  829 = insurance reserves 479 + accrued & other 386 + the rest. LYFT is
+  still operating-loss-making every year. Whether the insurance / accrued
+  build is recurring float or timing is not disclosed -> REGIME_UNCERTAIN
+  holds.
+
+- MUTATION TESTED (Phase 21): 16 mutations - WC category map, WC sign, WC
+  omission, WC double-count, reconciliation tolerance, period typing, unit
+  scale, non-USD currency guard, duplicate handling, missing-year handling,
+  one-off requirement, capex split requirement, mapping confidence,
+  inferred-period status, P6/P8 marker parity, regression isolation.
+
+- Phase 23 HONESTY VERDICT: reduces_uncertainty = NO_DISCLOSURE_BOUND for
+  all four filings. Richer extraction is a real gain in ATTRIBUTION
+  (component labels, sign semantics, provenance, per-period scorecard) but
+  NOT in RESOLUTION: no filing adds a fourth annual year, a capex split, or
+  a corroborating cash one-off. The structural-vs-temporary question is
+  bounded by what the 10-Ks disclose.
+
+- ARCHITECTURAL DECISION: KEEP_CURRENT_EVIDENCE_ARCHITECTURE. The evidence
+  layer is EXPERIMENTAL; it enriches P6's lineage without changing P6's
+  numbers or rules, and it does not promote P6/P7. Promotion needs an ADR.
+
+- VERDICT: P8 PARTIALLY SOLVED. The evidence layer is built, tested (70
+  cases, 20 adversarial fixtures, 16 mutations), and it answers the
+  question honestly: the accounting evidence is component-attributable and
+  every annual period reconciles for UBER/LYFT, but it is NOT deep enough
+  to resolve structural vs temporary - and that ceiling is set by SEC
+  disclosure, not by the extractor.
+
+---
+
+P9 - DRIVER-BASED OPERATING MODEL & FORECAST FCFF, 2026-09-08. EXPERIMENTAL,
+not wired in, promotes nothing. Question: can Aleph forecast future FCFF
+from EXPLICIT business drivers rather than implicitly assuming that one
+historical year's reconstructed FCFF is the run-rate?
+
+- NEW MODULES `src/aleph/valuation/operating_model.py` (historical driver
+  series + scenario-separated forecast) and `driver_based_dcf.py` (feeds the
+  forecast FCFF path into the EXISTING run_dcf). Deterministic, no LLM/ML.
+  Neither imported by pipeline.py (test asserts). run_valuation.py has a
+  fenced EXPERIMENTAL block.
+
+- BRIDGE (Phase 11): revenue_t = revenue_{t-1}(1+g_t); operating_income_t =
+  revenue_t * operating_margin_t; nopat_t = operating_income_t * (1 - 0.21);
+  fcff_t = nopat_t + D&A_t + wc_cash_effect_t - capex_t - sbc_t. Every value
+  carries a DriverAssumption (year, name, value, source, scenario,
+  historical_ref, formula, lineage). D&A / capex / SBC are ratios to
+  revenue, held at the historical median. Tax 21% is a MODEL_CONVENTION.
+
+- SERIES SHAPE (describes the observed series, does NOT predict): STABLE /
+  TRENDING / INFLECTING / CYCLICAL / INSUFFICIENT_EVIDENCE. A straight-line
+  growth fade to terminal 2.5% is represented explicitly as a
+  MODEL_CONVENTION, never hidden in an array.
+
+- OPERATING MARGIN (Phase 7): STABLE -> held at the median (source
+  HISTORICAL) -> FULLY_SUPPORTED possible. TRENDING / CYCLICAL -> held at
+  the LATEST value, source ANALYST_ASSUMPTION, caps support at
+  PARTIALLY_SUPPORTED. INFLECTING (crosses zero) -> OPERATING_MARGIN:
+  INSUFFICIENT_EVIDENCE, scenario bracket only. No margin is ever fabricated.
+
+- WORKING CAPITAL (Phase 8): NEVER a point (P8: recurrence not disclosed).
+  It is a SCENARIO dimension - BEAR 0 (no tailwind), BASE historical-median
+  cash-effect/revenue, BULL the latest ratio. The model NEVER assumes the
+  insurance-reserve build repeats.
+
+- CAPEX (Phase 9): TOTAL capex / revenue only - no maintenance/growth split
+  is invented (P8: NOT_SUPPORTED). SBC: full cash cost / revenue (ADR 0002).
+
+- SBC DOUBLE-COUNT (found and corrected in P10, Phase 3/23). The first P9
+  bridge was `NOPAT + D&A + WC - capex - sbc_t`. Stock-based compensation is
+  a GAAP operating expense already inside income-from-operations, hence
+  inside NOPAT; the separate `- sbc_t` term subtracted it a SECOND time -
+  total FCFF drag was 1.21x SBC (0.79x via NOPAT + 1.0x explicit). Corrected
+  to `NOPAT + D&A + WC - capex`; SBC is charged once through the P&L. sbc_t
+  is still reported for transparency. This is a genuine accounting defect,
+  not a preference - it is fixed, tests updated, regression re-run.
+
+- LIVE RESULTS (base point values UNCHANGED: 77.08 / 119.95 / 49.06 /
+  124.27). Driver DCF, BASE scenario, AFTER the SBC correction: UBER_FY2024
+  $47.03 (vs live $77.08, P6 central $48.33 - NOW CONVERGES with P6);
+  UBER_FY2025 $103.84 (vs $119.95, P6 $119.95); LYFT_FY2025 $26.29 (vs
+  $49.06, P6 $27.25 - NOW CONVERGES with P6); DASH_FY2025 n/a -
+  INSUFFICIENT_EVIDENCE (margin INFLECTING AND P8 reconciliation failures).
+  BEAR: UBER_FY2024 and LYFT NOT_REPRESENTABLE (FCFF path negative);
+  UBER_FY2025 $22.44. BULL: $80 / $163 / $110. The SBC double-count was the
+  main reason P9 looked "dramatically" lower than P6 - after fixing it the
+  P9 BASE and P6 CENTRAL agree to within ~$1-2 for UBER_FY2024 and LYFT.
+
+- WHY THE DRIVER BASE IS BELOW LIVE (after the SBC fix): two explicit
+  assumptions the live reconstruction hides - (a) 21% tax applied to
+  operating income, where the filers' actual effective CASH tax has been
+  near zero (DTA releases); (b) working capital at the historical median,
+  not the latest peak. It does NOT recreate the latest-FCFF assumption under
+  new labels - the dependence moves to the operating-margin path and the tax
+  convention, each labelled. After correcting the SBC double-count the P9
+  BASE lands on the P6 CENTRAL, so P6 and P9 are a CONVERGENCE on cash-flow
+  representativeness, not a divergence.
+
+- LYFT (Phase 19): without the working-capital tailwind (BEAR), driver FCFF
+  is NEGATIVE - the model CANNOT justify positive sustainable FCFF
+  independent of WC. It does not manufacture a turnaround.
+
+- ANTI-OVERFITTING (Phase 28): two synthetic companies with near-identical
+  historical FCFF but different economics (a high-margin low-WC SaaS vs a
+  thin-margin marketplace running a WC float) - the SaaS BEAR is
+  representable, the marketplace BEAR collapses to NOT_REPRESENTABLE. The
+  model captures economics, not just FCFF extrapolation.
+
+- MUTATION TESTED (Phase 26): 20 mutations across both modules - growth /
+  margin provenance, WC sign, capex sign, SBC double-count, tax application,
+  scenario ordering, missing-driver handling, unsupported-margin handling,
+  provenance loss, historical/forecast mixing, scenario contamination,
+  sign-change classification, capex-magnitude, tax convention, bridge
+  reconciliation, DCF-integration growth path, live-DCF isolation, and the
+  "nothing changed" claim.
+
+- PROMOTION DECISION: KEEP_DRIVER_MODEL_EXPERIMENTAL. It is more transparent
+  than the latest-FCFF extrapolation, but it introduces a new dominant
+  assumption (the operating-margin path) that is itself only an
+  ANALYST_ASSUMPTION for the trending/inflecting filers, and its base case
+  diverges sharply from both the live and P6 valuations. Promotion needs an
+  ADR and independent validation.
+
+- VERDICT: P9 PARTIALLY SOLVED. Aleph CAN forecast FCFF from explicit
+  drivers with full provenance, scenario separation, and honest
+  INSUFFICIENT_EVIDENCE / NOT_REPRESENTABLE where the economics do not hold
+  (DASH entirely; every BEAR case). It improves interpretability and
+  separates historical evidence from forecast assumptions. It does NOT
+  eliminate assumption dependence - it makes it auditable and moves it from
+  one opaque number to several labelled ones.
+
+---
+
+P10 - MODEL ARBITRATION, ASSUMPTION GOVERNANCE & VALUATION RECONCILIATION,
+2026-09-08. EXPERIMENTAL. A governance + falsification layer, not a new
+model. Question: how should Aleph evaluate competing economic
+interpretations without picking the one that produces the most attractive
+valuation?
+
+- P9 SBC DOUBLE-COUNT FOUND AND FIXED (Phase 3/23, mandatory gate). The P9
+  bridge subtracted SBC a second time after it was already inside NOPAT
+  (total drag 1.21x SBC). Corrected in operating_model.py:
+  `fcff_t = nopat_t + dna_t + wc_t - capex_t`. sbc_t stays reported. This
+  moved the P9 BASE from $14.85 -> $47.03 (UBER_FY2024) and $5.29 -> $26.29
+  (LYFT), which now CONVERGE with the P6 CENTRAL ($48.33 / $27.25). The
+  earlier "dramatic P9 divergence" was largely an accounting bug, not an
+  economic disagreement. LIVE anchors unchanged (P9 is experimental);
+  test_operating_model updated, regression re-run.
+
+- NEW MODULE `src/aleph/valuation/model_governance.py` (EXPERIMENTAL). Not
+  imported by pipeline.py (test asserts). run_valuation.py has a fenced
+  block. Its applicability / arbitration classification takes NO market
+  price - a structural guarantee (Phase 20).
+
+- RECONCILIATION LIVE -> P9: a sequential counterfactual, order-dependent
+  (every step says so), residual retained. UBER_FY2024: LIVE FCFF 5,512
+  ($77.08) -> operating basis + 21% tax + no working capital: 2,919
+  ($40.52) -> + historical-median working capital: 3,381 ($47.03) = P9
+  BASE. The gap is the ~0% cash tax and the working-capital contribution
+  the latest-FCFF anchor embeds.
+
+- SBC AUDIT: reads the actual bridge line, reports double_count =
+  NOT_PRESENT (post-fix). TAX AUDIT: 21% classified
+  CONSERVATIVE_BUT_SUPPORTED - the statutory upper bound, applied to
+  operating income, while UBER/LYFT actual cash tax is near zero (DTA
+  releases). statutory / cash / effective are three separately labelled
+  things, never conflated. DASH: no disclosed effective rate extracted ->
+  INSUFFICIENTLY_SUPPORTED, treat as unverified.
+
+- BASE-CASE ASSUMPTION REGISTER: every P9 base driver with a 1-5 evidence
+  hierarchy (L1 filing -> L5 model convention; NOT a score), a value
+  sensitivity, an evidence band x sensitivity band 2-D (never combined),
+  and a contradiction check. UBER_FY2024: tax_rate L5; operating_margin L4
+  (held at the latest of an INFLECTING series); revenue_growth L3;
+  D&A/capex/SBC ratios L2. wc_cash_effect_over_revenue is
+  ASSUMPTION_CONTRADICTED_BY_EVIDENCE (latest far above its median) and is
+  the single DOMINANT assumption - HIGH sensitivity x WEAK evidence.
+
+- MODEL APPLICABILITY (not "correctness"): LIVE LIMITED_APPLICABILITY
+  (anchor sensitivity HIGH, no explicit margin/tax assumption); P6
+  CONDITIONAL_APPLICABILITY; P9 LIMITED_APPLICABILITY (dominant assumption
+  is a weak L4 margin judgement). More detailed is not more applicable;
+  lower valuation is not more applicable.
+
+- ARBITRATION: UBER_FY2024 and LYFT -> MODEL_DIVERGENCE_WITH_EVIDENCE_BASIS.
+  The disagreement is fully attributed: (1) P9 and P6 CONVERGE after the SBC
+  fix; (2) LIVE sits above because it anchors on the latest FCFF (WC
+  contribution + ~0% cash tax); (3) the driver that most moves P9 rests on
+  weak evidence. DASH -> MODEL_DIVERGENCE_UNRESOLVED (only LIVE produces a
+  value).
+
+- ANTI-MARKET-FIT (Phase 20): applicability and arbitration are identical
+  for market prices in {1, 5, 47, 77, 250, 5000} - the classifiers take no
+  price. ANTI-CONSERVATISM (Phase 21): P9 ($47 < LIVE $77) is NOT ranked
+  higher for valuing lower. ANTI-COMPLEXITY (Phase 22): P9 (more detailed)
+  does not outrank LIVE on applicability.
+
+- MUTATION TESTED (Phase 25): 16 mutations across model_governance +
+  operating_model - SBC double-count regression, SBC audit blindness, tax
+  detection, WC / capex double-count in the bridge, evidence-level and
+  evidence-band calibration, contradiction detection, sensitivity ranking,
+  arbitration forced to convergence, market-price leakage, conservative-bias
+  leakage, complexity-bias leakage, scenario contamination, reconciliation
+  anchor. 16 / 16 KILLED. First pass left 4 alive - the SBC audit could not
+  see a re-introduced `- sbc_t` (its clean value and the mutant's are both
+  False, so only a poisoned-source test kills it); the reconciliation added
+  the median WC term twice / subtracted capex twice with no step-level
+  assertion; the dominant-assumption sort could invert with only one HIGH
+  entry to order. Four tests added (poisoned-bridge SBC detection, step-1 and
+  step-2 arithmetic pinned to independently recomputed parts, full
+  sensitivity-ranked order), `_dominant` now emits the complete ranking not
+  just the HIGH band. P9's 20 mutations re-run post-SBC-fix: 20 / 20 KILLED,
+  including P9m5 (the `- sbc_t` double-count regression).
+
+- ARCHITECTURAL DECISION: KEEP_MULTI_MODEL_EXPERIMENTAL. After the SBC fix
+  LIVE / P6 / P9 are a reconcilable family: P6 and P9 converge on cash-flow
+  representativeness, and LIVE's premium over them is a single identified
+  question (does the latest working-capital contribution recur - P8: not
+  disclosed). No model is promoted; each carries its own applicability and
+  dominant assumption.
+
+- VERDICT: P10 PARTIALLY SOLVED. Aleph can now say, per filing: these models
+  disagree because of X, Y, Z; evidence is stronger for A than B; no model
+  is preferred for being more complex, more conservative, or closer to the
+  market. It found and fixed a real SBC accounting defect in P9. It does NOT
+  fully resolve the disagreement - the working-capital recurrence question
+  is disclosure-bound (P8) - but it makes the disagreement legible and
+  attributable rather than a choice of number.
+
+---
+
+P10.5 - EVIDENCE RESOLUTION, WORKING-CAPITAL ECONOMIC CLASSIFICATION &
+UNRESOLVED-DIVERGENCE AUDIT, 2026-09-09. EXPERIMENTAL, observational only.
+Question: can the remaining LIVE/P6/P9 disagreements be resolved from the
+existing filing evidence, or are they genuinely DISCLOSURE_BOUND?
+
+- NEW MODULE `src/aleph/valuation/evidence_resolution.py` (EXPERIMENTAL). Not
+  imported by pipeline.py (test asserts). NO function takes a market price -
+  structural, checked by reflection + a 7-price sweep that must produce
+  byte-identical classifications. No new score; the P10 evidence x sensitivity
+  two-axis frame is preserved.
+
+- MY P10 PROSE MISSTATED ONE NUMBER. The P10 report said UBER_FY2024's latest
+  working-capital contribution was "~$2,005m". The extracted facts say the
+  FY2024 WC total is $2,374m (insurance-reserve change alone +$2,819m); the
+  median is $335m (P6, median of dollar totals) / $462m (P9, median of
+  revenue ratios x latest revenue). ISSUES.md #33 P10 reconciliation figures
+  (5,512 -> 2,919 -> 3,381) were already correct. No LIVE number affected.
+
+- WC EVIDENCE MAP + PERSISTENCE (deterministic rules, documented). Per
+  "change in <account>" line: normalized category, cash direction, signed
+  amount, recurrence evidence (EXPLICIT_RECURRING / EXPLICIT_ONE_OFF /
+  MULTI_YEAR_REPEATED / SINGLE_YEAR_OBSERVATION / ECONOMICALLY_AMBIGUOUS /
+  NOT_DISCLOSED), disclosure status. Persistence exposes latest / prior /
+  median / mean / sign-consistency / magnitude-stability / revenue-, CFO- and
+  FCFF-scaled histories SEPARATELY, then a class (STRONGLY_PERSISTENT /
+  PERSISTENT_BUT_VOLATILE / RECURRENT_WITH_HIGH_VARIANCE / NON_PERSISTENT /
+  INSUFFICIENT_HISTORY). UBER_FY2024 wc_total: sign consistency 100%,
+  magnitude min/max 0.07 -> RECURRENT_WITH_HIGH_VARIANCE.
+
+- INSURANCE / SELF-INSURANCE FLOAT AUDIT. UBER accrued insurance reserves
+  cash change: +730 / +2,230 / +2,819 / +2,660 across FY2022-FY2025 - like-
+  signed every year. Verdict UBER_FY2024 MIXED_SUPPORTED (direction recurs,
+  level disclosure-bound), UBER_FY2025 RECURRING_SUPPORTED (tighter window),
+  LYFT_FY2025 AMBIGUOUS (one sign flip: -79 / +364 / +479), DASH_FY2025
+  DISCLOSURE_BOUND (no insurance line - payment-processor float instead).
+  No filing discloses a reserve roll-forward or claims-development table.
+
+- SEQUENTIAL BRIDGE LIVE -> P9 (every step start + delta == end, deterministic;
+  ARITHMETICALLY_RECONCILED kept separate from ECONOMICALLY_EXPLAINED). Three
+  named steps: WC normalization (actual -> P9 median), tax normalization (21%
+  statutory on operating income), accounting-basis residual (operating-income
+  basis vs CFO-derived FCFF - tax-basis, CFO nets the deferred-tax movement).
+  UBER_FY2024: dominant delta is the WC median-vs-latest choice (-1,912),
+  economically_explained PARTIAL (methodology 6.7%). UBER_FY2025: WC medians
+  coincide, so the WHOLE gap is the tax normalization (-1,169), methodology
+  0.8% -> economically_explained FULLY. LYFT: dominant WC (-334), methodology
+  12% -> PARTIAL.
+
+- UBER_FY2025 IS NOT UNRESOLVED. P10 arbitrate() labels it
+  MODEL_DIVERGENCE_UNRESOLVED; the P10.5 bridge shows the LIVE<->P9 gap is
+  entirely the 21% tax normalization. That is a gap in P10's arbitration
+  reason-set (no tax-normalization branch), not a model-methodology defect.
+  Architectural decision for UBER_FY2025: P10.5_REQUIRES_TARGETED_EVIDENCE_FIX
+  (a ~5-line reason branch in arbitrate(), NOT made here - P10.5 is
+  observational). Other filers: KEEP_P10_AS_FINAL_GOVERNANCE_LAYER.
+
+- TAX EVIDENCE LADDER (the 21% convention is graded, NOT changed).
+  UBER/LYFT: EFFECTIVE_DISCLOSED (rates 1.9 / 9.2 / -139.6 for UBER; -2.6 /
+  10.1 for LYFT), NO cash-taxes-paid line, deferred-tax swings up to -$6,027m,
+  no normalized rate derivable -> TAX_NORMALIZATION_DISCLOSURE_BOUND. DASH:
+  STATUTORY_ONLY. 21% stands as a held-identical MODEL ASSUMPTION over a
+  disclosure-bound question.
+
+- FACT vs ECONOMIC_INTERPRETATION vs MODEL_ASSUMPTION separated explicitly
+  (per-period WC movements = FACT; "the insurance change is recurring float" =
+  INTERPRETATION; "sustainable WC = its median" and "21% forward rate" =
+  ASSUMPTION). DISCLOSURE_BOUNDARY engine (RESOLVED / PARTIALLY_RESOLVED /
+  DISCLOSURE_BOUND) - a DISCLOSURE_BOUND result is a successful output.
+
+- LYFT operating cash independent of working capital is NOT demonstrably
+  positive: fcff-ex-WC = -436 / +4.5 / -19.2. Hypothesis "recurring positive
+  operating cash" RULED_OUT; evidence sits between "structurally breakeven,
+  WC-financed" and "transitional ramp" - 3 years cannot separate them.
+
+- REGRESSION: 798 tests pass (738 + 60 new); 11/11 standalone scripts OK;
+  LIVE anchors 77.08 / 119.95 / 49.06 / 124.27 unchanged. MUTATION TESTED
+  (Section 17): 16 mutations of evidence_resolution.py - recurrence flip,
+  persistence-history removal, insurance-evidence removal, WC sign flip, WC
+  amount doubled, tax reclassification, bridge tax-step suppression,
+  disclosure-bound forced to resolved, price leakage, irrelevant-evidence
+  contamination, magnitude-stability inversion, explained/reconciled
+  conflation, bridge-step arithmetic, hard-wired decision, insurance
+  threshold, epistemic mislabel. 16 / 16 KILLED.
+
+- VERDICT: P10.5 PARTIALLY SOLVED (UBER_FY2024, UBER_FY2025, LYFT_FY2025);
+  P10.5 DISCLOSURE-BOUND (DASH_FY2025 - no second model). Attribution
+  improved materially: the UBER_FY2025 divergence is RESOLVED (tax), the
+  insurance float DIRECTION is recurring, LYFT's operating-cash question is
+  answered (not independently positive). The remaining disagreement is
+  PRIMARILY an evidence problem: the sustainable LEVEL of the insurance float
+  and the normalized forward tax rate are disclosure-bound and no model
+  change resolves them. The one model-side item is P10 arbitrate()'s missing
+  tax-normalization reason branch.
 
 ## #30 sha256 is recorded as content identity but never used to detect a replaced document — CLOSED
 
