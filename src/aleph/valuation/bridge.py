@@ -341,10 +341,16 @@ def build_dcf_inputs(
     # inherits one year's deferred-tax and unrealized-investment swings in
     # full. base_cash_flow's BASE stays the latest period, unchanged - that
     # is the most current information and is not in question; only the
-    # BOUND now reflects the years on record. A negative low bound is a
-    # real result when a disclosed year's CFO was itself negative, and is
-    # reported as such, not clamped - confirmed separately that run_dcf has
-    # no guard on base_cash_flow's sign, so nothing downstream rejects it.
+    # BOUND now reflects the years on record.
+    #
+    # A negative low bound is still a real result and is still NOT clamped:
+    # the bound reports the disclosed year's FCFF as it is, sign included.
+    # What changed is what the ENGINE does with it. This comment used to end
+    # "confirmed separately that run_dcf has no guard on base_cash_flow's
+    # sign, so nothing downstream rejects it" - true when written, and it was
+    # the reason LYFT_FY2025 reported a range low of -$39.37. dcf_engine's
+    # Guard 0d now rejects a negative base, so a negative bound is carried
+    # here and reported as NOT_APPLICABLE downstream rather than valued.
     fcff_by_period, fcff_note = _per_period_fcff(ranges, tax)
     if fcff_by_period is None:
         base_cash_flow_bound_note = f"base_cash_flow multi-year bound unavailable: {fcff_note}"

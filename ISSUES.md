@@ -275,6 +275,208 @@ Fixed, and checked:
 requires any document that mentions 77.08 to also name `Latest-period basis`,
 and requires that label to be one `run_valuation.py` actually prints.
 
+## #38 The engine grew a negative FCFF for ten years and called it a valuation — CLOSED
+
+`run_dcf` multiplies `base_cash_flow` by (1 + g) each forecast year and
+capitalises the final year with Gordon. Guard 0c refused a ZERO base as
+NOT_SOLVABLE and said nothing about the SIGN, so a negative base went
+straight through: the loss compounded for ten years and the present value of
+a deepening loss was reported as a value per share.
+
+MEASURED. Two of the four valued filings, not one:
+
+```
+LYFT_FY2025   FY2023 FCFF  -712   ->  range low  -$39.37
+UBER_FY2024   FY2022 FCFF  -957   ->  range low  -$14.13
+UBER_FY2025   FY2023 FCFF  1,927  ->  positive, unaffected
+DASH_FY2025   FY2023 FCFF    462  ->  positive, unaffected
+```
+
+The task that opened this named only Lyft. UBER_FY2024 was found by running
+all four filings and reading the bound, and its -$14.13 was quoted in
+CLAUDE.md's SEVENTH SETTLED PRINCIPLE and in README's "the decision that
+changed a conclusion" - the number was load-bearing in the documentation
+while being a number the model should never have produced.
+
+DECIDED: option (A) of two. `validate()` gets Guard 0d - a negative
+`base_cash_flow` raises `DCFConsistencyError(... NOT_APPLICABLE)`. Rejected
+alternative: keep the arithmetic and label it loudly wherever it is printed.
+Rejected because the number stays in the file, in the app and in the README
+table, where a reader can quote it without the label - which is this
+project's own worst failure mode.
+
+No tolerance band. -0.01 is a loss; there is no amount of loss small enough
+to grow into a valuation, and a threshold would be a number nobody could
+defend.
+
+WHAT CHANGED BEYOND THE LOW, because the cascade was larger than the request
+assumed and every step of it was measured:
+
+- the tornado row for `base_cash_flow` loses its swing. `sensitivity_tornado`
+  sorts on `(swing is not None, swing or 0)`, so the row now sorts LAST.
+- `robustness._assumption_sensitivity` filtered `swing is None` rows out and
+  crowned the runner-up. Left alone it would have printed "the valuation is
+  controlled by discount_rate" for BOTH affected filings - reversing this
+  project's own central finding (#25, #29) with a sentence that is false
+  about the world and carries no red flag. FIXED in the same change: a
+  refused bound is reported as `PRIMARY VALUE DRIVER: base_cash_flow (bound
+  NOT_APPLICABLE)`, severity HIGH, with the interpretation stating that
+  unquantifiable is not small.
+- `model_governance` formatted P6's scenario values with `:.2f`. A refused
+  scenario is None, `f"{None:.2f}"` raises TypeError, and the broad
+  `except Exception` turned that into `value=error` / `NOT_SUPPORTED` -
+  discarding the two scenarios that DID value and reporting a formatting
+  failure as an evidence failure. FIXED: NOT_APPLICABLE per scenario, P6
+  stays CONDITIONAL_APPLICABILITY.
+- anchor spread narrows because the refused anchor leaves the set:
+  UBER_FY2024 290% -> 98%, LYFT_FY2025 1826% -> 117%. The spread is now
+  "across the anchors that can be valued", which is what it always measured.
+
+UNCHANGED, and checked by diffing every run against its own pre-change
+output: `Latest-period basis` 77.08 and 49.06, the high end of both ranges,
+PV explicit / PV terminal / enterprise / equity value, the reverse DCF
+(-8.5% for Lyft), and UBER_FY2025 and DASH_FY2025 byte-for-byte.
+
+Fifteen `run_dcf` call sites were read. Fourteen already caught
+`DCFConsistencyError`; ONE did not - `pipeline.py`'s range-bound re-run - and
+that one would have taken down an otherwise-valid valuation. That is now
+guarded, and `tests/test_negative_base_fcff.py` walks the AST of every module
+under `valuation/` and fails on a sixteenth unguarded re-run, with the two
+base-case sites allowlisted by name and reason.
+
+TEN EXISTING TESTS FAILED on the first full run and every one was a test
+asserting the OLD behaviour, not a defect in the change. They were rewritten
+to assert the refusal rather than deleted, because what they encode - that a
+negative anchor must not silently produce a plausible number - is the same
+property, now enforced one layer earlier:
+
+  test_p5_controls    2  the P5.7 reverse-DCF orientation proof for B < 0
+  test_market_expect. 4  sectors priced off their own negative-anchor DCF
+  test_robustness     3  a negative base listed as "finite output allowed",
+                         and two findings built on a run_dcf(-500) result
+  three more          1  see below - not about the guard at all
+
+That last one is worth its own line. `test_pipeline_has_no_*_import` in
+three files greps `pipeline.py`'s SOURCE for the names of the diagnostic
+modules, to prove they are not wired into the orchestrator. A COMMENT added
+in this change happened to list four of them by name and failed all three.
+The comment was reworded; the tests are right, and the next person to write
+a comment in that file should know they are reading it.
+
+TWO THINGS LEFT DEAD BY THIS, recorded rather than removed:
+`reverse_dcf`'s B < 0 direction branch (the window probe returns
+NOT_SOLVABLE first), and `robustness._method_limitation`'s negative-base
+finding (a filing whose LATEST FCFF is negative now stops at the pipeline's
+own `run_dcf` and the CLI exits 1). Both are kept, tested where the contract
+is observable - the second by handing robustness a CONSTRUCTED DCFResult,
+since the engine will no longer produce one - and documented in place.
+
+ONE THING DELIBERATELY NOT CHANGED: `market_expectations.implied_base_fcff`
+can still report a NEGATIVE implied base FCFF when the market price is low
+enough, and that is not a valuation - it is a statement about what the price
+implies, solved in closed form and never fed back through the engine. Its
+docstring's claim that "a re-run at B* cannot raise" is now false in
+principle (Guard 0d is a new guard keyed on base_cash_flow), but no re-run
+happens, so nothing is broken. None of the four filings produces a negative
+B* today.
+
+## #39 Capex excludes capitalized software; DoorDash capitalises more of it than it spends on hardware
+
+`derive_capex` matches on the single string `"property and equipment"`.
+DoorDash's cash-flow statement carries a SECOND investing line the pipeline
+never sees.
+
+MEASURED, from the filings themselves via `pypdf` - no API call, no new
+extraction:
+
+```
+DASH_FY2025 cash flow (columns FY2023 FY2024 FY2025, confirmed against CFO
+1,673 / 2,132 / 2,431 and the pipeline's own FY2025 FCFF of 1,123):
+
+  Purchases of property and equipment                    (123)  (104)  (257)
+  Capitalized software and website development costs     (201)  (226)  (348)
+  SBC included in capitalized software and website costs   161    165    193
+
+LYFT_FY2025 cash flow: no capitalized-software line exists.
+UBER: no capitalized-software line exists.
+```
+
+DoorDash capitalised MORE software ($348m) in FY2025 than it spent on
+property and equipment ($257m). The pipeline subtracts the 257 and not the
+348.
+
+EFFECT, measured by re-running the pure engine with only `base_cash_flow`
+changed:
+
+```
+DASH_FY2025   FCFF 1,123 -> 775      value/share 124.27 -> 87.72   -$36.55  (-29.4%)
+```
+
+That moves DoorDash from "86.6% above the top of the range" to a smaller but
+still substantial premium. It does not reverse the conclusion; it is 29% of
+the answer.
+
+THE INCONSISTENCY WITH SBC, which is the part that makes this a defect
+rather than a scope choice. `derive_stock_based_compensation` excludes
+DoorDash's "Stock-based compensation included in capitalized software and
+website development costs" with the written rationale that the amount "was
+capitalised into an asset and already leaves through capex, so subtracting
+it here too would double count it." It does not leave through capex - capex
+is `"property and equipment"` only. The $193m is excluded from SBC on the
+grounds that capex catches it, and capex does not catch it. It leaves
+through neither.
+
+Also measured: no fact whose name or quote contains "capitalized",
+"software" or "website" exists anywhere in the 99-entry cache. The
+`exclude=("capitalized",)` filter is a no-op today, guarding against a fact
+the extraction never requests - which is why the asymmetry was invisible.
+
+OPEN - out of scope for the closed version; fix requires re-running the
+anchor and restating the README table.
+
+## #40 Net debt credits all cash but omits the current portion of debt
+
+`derive_net_debt`'s policy is debt NET OF CURRENT PORTION, less cash and
+equivalents, less short-term investments. The current portion is therefore
+omitted from the debt side while 100% of cash is credited on the other -
+asymmetric by construction, and understating net debt by whatever the
+current portion is.
+
+MEASURED, from each balance sheet, with the column order resolved from the
+sheet's own header (they differ - Lyft prints 2025 then 2024; DoorDash prints
+2024 then 2025):
+
+```
+LYFT_FY2025   "Convertible senior notes, current"    FY2025: —     FY2024: 390,175 (USD thousands)
+UBER_FY2024   no separately captioned current-debt line on the face of the
+              balance sheet, although the caption "Long-term debt, net of
+              current portion" states that one exists
+DASH_FY2025   no current-debt line; "Convertible notes, net" 2,724 is
+              non-current (FY2024: —, FY2025: 2,724)
+```
+
+So the FY2025 effect is ZERO for all three filers: Lyft's current portion
+went to nil, and neither Uber nor DoorDash separately captions one. The gap
+is LATENT, not active - which is exactly why it survived review.
+
+EFFECT, measured on the engine rather than asserted:
+
+```
+LYFT_FY2025   net debt -834.8 -> -444.6 (adding back Lyft's OWN FY2024
+              current portion of 390.175)    value/share 49.06 -> 48.13   -$0.93
+UBER_FY2024   $1m of net debt = $0.000465/share, so $1bn of undisclosed
+              current debt would be $0.47/share
+```
+
+The UBER runs are the ones the question asks about and the ones where no
+figure exists to substitute: Uber discloses no current portion on the face of
+its balance sheet, so the effect there is UNKNOWN, not zero, and quantifying
+it needs a new extraction target against the debt note - an API call this
+entry deliberately does not make.
+
+OPEN - out of scope for the closed version; fix requires re-running the
+anchor and restating the README table.
+
 ## #11 Typographic look-alikes break raw string matching across the pipeline
 
 Documents printed from SEC HTML contain U+2019 (right single quotation mark),

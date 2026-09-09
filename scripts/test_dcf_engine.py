@@ -29,8 +29,45 @@ def test_rejects_fcfe_with_net_debt():
         print("PASS test_rejects_fcfe_with_net_debt")
 
 
+def test_rejects_negative_base_cash_flow():
+    """Guard 0d. The engine used to grow a loss for ten years and report the
+    present value of a deepening loss as a value per share - that is what
+    LYFT_FY2025's -$39.37 range low was."""
+    try:
+        run_dcf(DCFInputs("FCFF", -712, [0.10] * 10, 0.025, 0.081, 0, 417.7))
+        raise AssertionError("should have rejected a negative base_cash_flow")
+    except DCFConsistencyError as exc:
+        assert "NOT_APPLICABLE" in str(exc), exc
+        assert "-712" in str(exc), exc
+        print("PASS test_rejects_negative_base_cash_flow")
+
+
+def test_still_values_a_positive_base():
+    """The positive control. A guard that rejected everything would pass the
+    test above."""
+    result = run_dcf(DCFInputs("FCFF", 810, [0.10] * 10, 0.025, 0.081, 0, 417.7))
+    assert result.value_per_share > 0, result.value_per_share
+    print("PASS test_still_values_a_positive_base")
+
+
+def test_zero_and_negative_are_the_same_refusal_for_different_reasons():
+    """0c says NOT_SOLVABLE (nothing to grow); 0d says NOT_APPLICABLE (the
+    thing to grow is a loss). Both refuse; the words are not interchangeable
+    and a reader has to be able to tell which happened."""
+    for base, token in ((0, "NOT_SOLVABLE"), (-1, "NOT_APPLICABLE")):
+        try:
+            run_dcf(DCFInputs("FCFF", base, [0.0], 0.0, 0.10, 0, 1))
+            raise AssertionError(f"should have rejected base={base}")
+        except DCFConsistencyError as exc:
+            assert token in str(exc), (base, str(exc))
+    print("PASS test_zero_and_negative_are_the_same_refusal_for_different_reasons")
+
+
 if __name__ == "__main__":
     test_known_value()
     test_rejects_growth_above_discount()
     test_rejects_fcfe_with_net_debt()
+    test_rejects_negative_base_cash_flow()
+    test_still_values_a_positive_base()
+    test_zero_and_negative_are_the_same_refusal_for_different_reasons()
     print("\nAll tests passed.")

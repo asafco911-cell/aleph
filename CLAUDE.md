@@ -84,8 +84,14 @@ file each.
    mechanism. `temperature=0` never guaranteed determinism, and the SDK
    removed it anyway.
 7. Value is a range derived from explicit judgements, never a point with a
-   caveat. UBER_FY2024's own tornado moves between -$14.13 and $77.08
-   depending on which disclosed year's FCFF is treated as representative.
+   caveat — and a range end the model cannot compute is reported as
+   NOT_APPLICABLE, never as the number the arithmetic would have produced.
+   UBER_FY2024's tornado runs from NOT_APPLICABLE to $77.08: its low anchor
+   is FY2022 FCFF of -957, and growing a loss for ten years is not a
+   valuation (ISSUES.md #38). It read -$14.13 to $77.08 until 2026-09-10;
+   the low moved because the engine stopped answering, not because the
+   business changed. Which disclosed year's FCFF is treated as
+   representative is still the largest lever in the model.
 8. Six gates check that what was copied is correct; one gate (`coverage`)
    checks that copying finished. Reporting `accepted=4 rejected=0` while
    silently omitting a required quantity is the worst failure mode here.

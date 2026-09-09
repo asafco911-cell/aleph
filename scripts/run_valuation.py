@@ -100,17 +100,41 @@ print("\n" + "=" * 74)
 print("RESULT")
 print("=" * 74)
 
+def bound_text(value, spec):
+    """A bound the engine refused is named, not blanked and not printed.
+
+    `spec` is the caller's original format spec, kept exactly so a filing
+    with no refused bound prints byte-identically to before this existed.
+    """
+    return format(value, spec) if value is not None else "NOT_APPLICABLE"
+
+
 bound = bridged.base_cash_flow_bound
 if bound["available"]:
-    print(f"  Value per share      : {run.low_vps:>7,.2f} to {run.high_vps:<7,.2f}  "
+    print(f"  Value per share      : {bound_text(run.low_vps, '>7,.2f')} to "
+          f"{bound_text(run.high_vps, '<7,.2f')}  "
           f"(range across {bound['low_period']}-{bound['high_period']} FCFF)")
+    # A NOT_APPLICABLE end of the range says more than the number it replaced,
+    # and only if the reason is printed with it. The engine's own message is
+    # quoted rather than paraphrased.
+    for end, value, note, period in (
+        ("low", run.low_vps, run.low_vps_note, bound["low_period"]),
+        ("high", run.high_vps, run.high_vps_note, bound["high_period"]),
+    ):
+        if value is None:
+            print(f"      range {end}: NOT_APPLICABLE ({period} FCFF "
+                  f"{bound[f'{end}_fcff']:,.0f})")
+            print(f"        {note}")
     print(f"  Latest-period basis  : {result.value_per_share:>17,.2f}  "
           f"({bound['high_period']} FCFF, the base case)")
-    if market_price:
+    if market_price and run.low_vps is not None and run.high_vps is not None:
         position = range_position(
             market_price, min(run.low_vps, run.high_vps), max(run.low_vps, run.high_vps)
         )
         print(f"  Market price         : {market_price:>17,.2f}  {position}")
+    elif market_price:
+        print(f"  Market price         : {market_price:>17,.2f}  "
+              "no range to place it in - one end is NOT_APPLICABLE")
     print("  (PV, enterprise, and equity value below use the latest-period basis)")
 else:
     print(f"  Value per share      : {result.value_per_share:>14,.2f}")
@@ -128,7 +152,15 @@ if bridged.tornado_ranges:
     print("=" * 74)
     for row in run.tornado_rows:
         if row["swing"] is None:
-            print(f"  {row['param']:<22} (a bound violates a consistency guard)")
+            # Which END was refused matters: "base_cash_flow NOT_APPLICABLE ->
+            # 49.06" says the low bound cannot be valued at all, which is a
+            # larger statement about anchor sensitivity than any swing figure.
+            # Note these rows sort LAST (no comparable swing), so a driver that
+            # dominates the valuation can appear at the bottom of this list.
+            print(f"  {row['param']:<22} "
+                  f"{bound_text(row['low'], '>9.2f')} -> "
+                  f"{bound_text(row['high'], '>9.2f')}"
+                  "   swing NOT_APPLICABLE (a bound violates a consistency guard)")
         else:
             print(f"  {row['param']:<22} {row['low']:>9.2f} -> {row['high']:>9.2f}"
                   f"   swing {row['swing']:>8.2f} ({row['swing_pct']:>5.0%})")

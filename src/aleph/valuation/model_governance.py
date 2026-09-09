@@ -515,9 +515,22 @@ def model_applicability(run) -> list[ModelApplicabilityReport]:
         if s.status.value == "SUPPORTED_RANGE":
             sv = {x.label: x.value_per_share
                   for x in sustainable_scenario_valuation(inputs, s)}
-            p6_val = (f"{sv.get('sustainable_low'):.2f} / "
-                      f"{sv.get('sustainable_central'):.2f} / "
-                      f"{sv.get('sustainable_high'):.2f}")
+
+            # A scenario the engine refuses (Guard 0d - LYFT_FY2025's
+            # sustainable_low FCFF is -19) comes back as None. Formatting it
+            # with `:.2f` raised TypeError, which the broad `except` below
+            # turned into value="error" and NOT_SUPPORTED - discarding the two
+            # scenarios that DID value, and reporting a formatting failure as
+            # an evidence failure. The range is still supported; one end of it
+            # is not valuable, which is a different statement and the one
+            # worth printing.
+            def _scenario_value(label: str) -> str:
+                value = sv.get(label)
+                return f"{value:.2f}" if value is not None else "NOT_APPLICABLE"
+
+            p6_val = " / ".join(_scenario_value(label) for label in
+                                ("sustainable_low", "sustainable_central",
+                                 "sustainable_high"))
             p6_ap = Applicability.CONDITIONAL_APPLICABILITY
         else:
             p6_val, p6_ap = s.status.value, Applicability.NOT_SUPPORTED

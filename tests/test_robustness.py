@@ -32,9 +32,15 @@ def mk(**kw) -> DCFInputs:
 
 
 class _Run:
-    """Minimal stand-in for ValuationRun that assess_robustness reads."""
+    """Minimal stand-in for ValuationRun that assess_robustness reads.
+
+    `result` is an escape hatch, added when Guard 0d landed: robustness still
+    has a negative-base branch and it still has to be tested, but the engine
+    will no longer produce a DCFResult for a negative base, so those tests
+    hand one in. Every other caller keeps the real run_dcf.
+    """
     def __init__(self, inputs, *, fcff_by_period=None, market_price=None,
-                 implied_growth=None, tornado_rows=None):
+                 implied_growth=None, tornado_rows=None, result=None):
         self.doc_id = "SYNTH"
         self.bridged = type("B", (), {
             "inputs": inputs,
@@ -42,7 +48,7 @@ class _Run:
                                       "fcff_by_period": fcff_by_period}
                                      if fcff_by_period else {"available": False}),
         })()
-        self.result = run_dcf(inputs)
+        self.result = result if result is not None else run_dcf(inputs)
         self.market_price = market_price
         self.implied_growth = implied_growth
         self.tornado_rows = tornado_rows or []
@@ -65,6 +71,11 @@ class TestDCFEngineGuards:
         (dict(shares_outstanding=0.0), "positive"),
         (dict(shares_outstanding=-5.0), "positive"),
         (dict(growth_rates=[0.05, math.inf, 0.05]), "non-finite"),
+        # MOVED here from test_finite_inputs_give_finite_output when Guard 0d
+        # landed. It sat there with the comment "negative but finite: engine
+        # allows" - and "the engine allows it" was the whole defect: it
+        # produced a finite number by growing a loss for ten years.
+        (dict(base_cash_flow=-500.0), "NOT_APPLICABLE"),
     ])
     def test_ill_posed_inputs_fail_closed(self, kw, frag):
         with pytest.raises(DCFConsistencyError) as e:
@@ -73,7 +84,6 @@ class TestDCFEngineGuards:
 
     @pytest.mark.parametrize("kw", [
         dict(base_cash_flow=1e300),
-        dict(base_cash_flow=-500.0),          # negative but finite: engine allows
         dict(base_cash_flow=1e-9),
         dict(discount_rate=1e-6, terminal_growth=-0.01),
     ])
@@ -348,7 +358,17 @@ class TestHistoricalRegime:
 # =========================================================================== #
 class TestMethodLimitation:
     def test_negative_base_fcff_is_flagged_as_method_limitation(self):
-        run = _Run(mk(base_cash_flow=-500.0))
+        """Still true, and now unreachable through the pipeline: Guard 0d
+        stops a filing whose LATEST FCFF is negative at pipeline's own
+        run_dcf, and the CLI turns that into exit 1. The branch is kept and
+        kept tested because it is the correct report for any caller that
+        hands robustness such a run - see ISSUES.md #38 - so the DCFResult is
+        constructed instead of computed."""
+        from aleph.valuation.dcf_engine import DCFResult
+        run = _Run(mk(base_cash_flow=-500.0), result=DCFResult(
+            enterprise_or_equity_value=-9_000.0, equity_value=-9_100.0,
+            value_per_share=-9.1, pv_explicit=-3_400.0, pv_terminal=-5_600.0,
+            terminal_pct=0.62, yearly=[]))
         f = assess_robustness(run).get("VALUATION_METHOD_LIMITATION")
         assert f is not None
         assert f.severity is Severity.HIGH
@@ -500,9 +520,24 @@ class TestCrossSector:
                 "HISTORICAL_REGIME"} <= keys
 
     def test_negative_fcff_growth_company_fails_visibly(self):
+        """Two ways to fail visibly now, and the FIRST one is the engine.
+
+        Before Guard 0d this sector produced a value per share and relied on
+        robustness to flag it. It no longer gets that far: run_dcf refuses,
+        which is the loudest failure available. The robustness branch is
+        still asserted below, on a constructed result, because it remains the
+        right report for a caller that reaches it."""
+        from aleph.valuation.dcf_engine import DCFResult
         inp = mk(base_cash_flow=-400.0, growth_rates=[0.30] * 10)
+        with pytest.raises(DCFConsistencyError, match="NOT_APPLICABLE"):
+            run_dcf(inp)
         run = _Run(inp, fcff_by_period={"FY2022": -800.0, "FY2023": -600.0,
-                                        "FY2024": -400.0})
+                                        "FY2024": -400.0},
+                   result=DCFResult(
+                       enterprise_or_equity_value=-8_000.0,
+                       equity_value=-8_100.0, value_per_share=-8.1,
+                       pv_explicit=-3_000.0, pv_terminal=-5_000.0,
+                       terminal_pct=0.625, yearly=[]))
         rob = assess_robustness(run)
         assert rob.get("VALUATION_METHOD_LIMITATION").severity is Severity.HIGH
         # and it does NOT silently look fine

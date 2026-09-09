@@ -172,7 +172,7 @@ bound = run.bridged.base_cash_flow_bound
 st.subheader("Value per share")
 left, right = st.columns([2, 1])
 with left:
-    if bound["available"]:
+    if bound["available"] and run.low_vps is not None and run.high_vps is not None:
         low, high = min(run.low_vps, run.high_vps), max(run.low_vps, run.high_vps)
         st.markdown(f"### ${low:,.2f} &nbsp;to&nbsp; ${high:,.2f}",
                     unsafe_allow_html=True)
@@ -182,6 +182,30 @@ with left:
             "analyst treats as representative moves the answer further than "
             "any other input in this model (ISSUES.md #29). Nothing in the "
             "pipeline normalises it."
+        )
+    elif bound["available"]:
+        # One end of the range is a disclosed year the engine refuses to value
+        # (Guard 0d - a negative FCFF). Showing the other end alone would read
+        # as a point estimate, which is the one thing this panel exists to
+        # avoid, so the refusal IS the headline.
+        low = high = None
+        refused = "low" if run.low_vps is None else "high"
+        shown = run.high_vps if refused == "low" else run.low_vps
+        st.markdown(
+            f"### NOT_APPLICABLE &nbsp;to&nbsp; ${shown:,.2f}"
+            if shown is not None else "### NOT_APPLICABLE",
+            unsafe_allow_html=True)
+        st.warning(
+            f"The {refused} end of this filing's own disclosed-FCFF range "
+            f"({bound[f'{refused}_period']}: "
+            f"{bound[f'{refused}_fcff']:,.0f}) cannot be valued by this model. "
+            f"{run.low_vps_note or run.high_vps_note}"
+        )
+        st.caption(
+            "Read this as *one of this filing's own disclosed years cannot be "
+            "valued at all*, which is a stronger statement about anchor "
+            "sensitivity than a number would have been - not as a missing "
+            "figure (ISSUES.md #29, #38)."
         )
     else:
         low = high = None

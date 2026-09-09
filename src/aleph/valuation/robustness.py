@@ -524,6 +524,15 @@ def _terminal_value_dependence(result: DCFResult) -> RobustnessFinding:
 def _assumption_sensitivity(
     tornado_rows: list[dict], base_vps: float
 ) -> tuple[RobustnessFinding, str]:
+    # A row whose swing is None had a BOUND the engine refused - since Guard
+    # 0d, most often a disclosed year with negative FCFF. Dropping it silently
+    # and crowning the runner-up was this function's behaviour and it was
+    # wrong in the most expensive way available: for LYFT_FY2025 and
+    # UBER_FY2024 it turned "base_cash_flow dominates, 180% and 118%" into
+    # "the valuation is controlled by discount_rate" - a sentence that is
+    # false about the world, carrying no red flag, which is the exact failure
+    # mode this project is built against. Unquantifiable is not small.
+    refused = [r for r in tornado_rows if r.get("swing") is None]
     rows = [r for r in tornado_rows if r.get("swing") is not None]
     if not rows:
         return (RobustnessFinding(
@@ -538,6 +547,26 @@ def _assumption_sensitivity(
     top = rows[0]
     ranked = "; ".join(
         f"{r['param']} {r['swing_pct']:.0%}" for r in rows[:5])
+
+    if refused:
+        names = ", ".join(r["param"] for r in refused)
+        return (RobustnessFinding(
+            key="ASSUMPTION_SENSITIVITY", severity=Severity.HIGH,
+            sensitivity=Sensitivity.NOT_SOLVABLE,
+            headline=f"PRIMARY VALUE DRIVER: {names} (bound NOT_APPLICABLE)",
+            detail=(f"{names} could not be ranked: one of its stated bounds "
+                    "is a value the engine refuses to compute, so its swing "
+                    "is UNQUANTIFIABLE, not small. The largest driver that "
+                    f"could be ranked is {top['param']}, at "
+                    f"{top['swing']:,.2f} ({top['swing_pct']:.0%} of the "
+                    f"{base_vps:,.2f} base). Ranked: {ranked}."),
+            interpretation=(
+                f"the ranking below covers only the assumptions that could be "
+                f"perturbed inside their own bounds. {names} is not among "
+                "them and is not therefore smaller - the model cannot value "
+                "one end of its own disclosed range at all, which is a "
+                "stronger statement about that driver than any percentage."),
+            numbers={r["param"]: r["swing_pct"] for r in rows}), names)
     dominant = top["swing_pct"] > 0.5 and (
         len(rows) == 1 or top["swing"] > 2 * rows[1]["swing"])
     sev = Severity.HIGH if top["swing_pct"] > 1.0 else (

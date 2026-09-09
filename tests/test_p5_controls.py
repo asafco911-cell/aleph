@@ -11,7 +11,12 @@ import aleph.valuation.pipeline as pipeline
 from aleph.schemas.evidence import Fact, FactSource
 from aleph.schemas.valuation import Override
 from aleph.valuation.assumptions import derive_diluted_shares
-from aleph.valuation.dcf_engine import DCFInputs, reverse_dcf, run_dcf
+from aleph.valuation.dcf_engine import (
+    DCFConsistencyError,
+    DCFInputs,
+    reverse_dcf,
+    run_dcf,
+)
 from aleph.valuation.robustness import (
     FailureCategory,
     Severity,
@@ -228,15 +233,23 @@ class TestReverseDCFWellPosed:
         assert pipeline.value_filing(*UBER).implied_growth == pytest.approx(0.1048, abs=1e-3)
         assert pipeline.value_filing(*LYFT).implied_growth == pytest.approx(-0.0851, abs=1e-3)
 
-    def test_negative_fcff_uses_the_correct_orientation(self):
+    def test_negative_fcff_is_not_solvable(self):
+        """REWRITTEN when Guard 0d landed. This used to assert the opposite -
+        that value(g) is DECREASING for a negative anchor and that a lower
+        target round-trips through reverse_dcf. That was true, and it was the
+        machinery that produced LYFT_FY2025's -$39.37 range low.
+
+        The engine no longer values a negative base at all, so value_at()
+        returns None at every g and the window probe returns NOT_SOLVABLE
+        before the direction is read. The old assertion is preserved as
+        history in the docstring rather than deleted, because the arithmetic
+        it described was never wrong - the decision about what to do with it
+        changed."""
         neg = mk(base_cash_flow=-500.0)
-        v0 = run_dcf(neg).value_per_share
-        # value(g) is DECREASING for a negative anchor; a reachable lower target
-        g = reverse_dcf(neg, v0 - 2.0)
-        assert g is not None
-        # feeding it back reproduces the target
-        rt = run_dcf(mk(base_cash_flow=-500.0, growth_rates=[g] * 10)).value_per_share
-        assert abs(rt - (v0 - 2.0)) / abs(v0 - 2.0) < 0.01
+        with pytest.raises(DCFConsistencyError, match="NOT_APPLICABLE"):
+            run_dcf(neg)
+        assert reverse_dcf(neg, 10.0) is None
+        assert reverse_dcf(neg, -10.0) is None
 
     def test_zero_fcff_is_not_solvable(self):
         assert reverse_dcf(mk(base_cash_flow=0.0), 10.0) is None
@@ -281,17 +294,23 @@ class TestReverseDCFWellPosed:
         assert reverse_dcf(mk(base_cash_flow=1e-6), 0.01) is None
 
     def test_monotonicity_direction_is_read_from_the_base_fcff_sign(self):
-        # the proof: value(g) increases with g iff base FCFF > 0. A round trip
-        # must close for BOTH signs when the target is reachable.
-        for base in (1000.0, -500.0):
-            inp = mk(base_cash_flow=base)
-            v0 = run_dcf(inp).value_per_share
-            target = v0 * (1.2 if base > 0 else 0.85)
-            g = reverse_dcf(inp, target)
-            assert g is not None, base
-            rt = run_dcf(mk(base_cash_flow=base,
-                            growth_rates=[g] * 10)).value_per_share
-            assert abs(rt - target) / abs(target) < 0.01
+        """The proof: value(g) increases with g iff base FCFF > 0. Guard 0d
+        left only the positive half of that reachable, so this now tests the
+        surviving half as a round trip and the refused half as a refusal -
+        NOT by dropping the negative case, which would leave the engine's sign
+        behaviour untested in either direction."""
+        inp = mk(base_cash_flow=1000.0)
+        v0 = run_dcf(inp).value_per_share
+        target = v0 * 1.2
+        g = reverse_dcf(inp, target)
+        assert g is not None
+        rt = run_dcf(mk(base_cash_flow=1000.0,
+                        growth_rates=[g] * 10)).value_per_share
+        assert abs(rt - target) / abs(target) < 0.01
+
+        # the other sign is a refusal, not a direction
+        with pytest.raises(DCFConsistencyError):
+            run_dcf(mk(base_cash_flow=-500.0))
 
     def test_near_boundary_target_still_solves(self):
         # a target 1% inside the attainable max must still solve (not be
@@ -530,9 +549,26 @@ class TestValuationApplicability:
         assert list(families).count("cash_flow_representativeness") == 1
 
     def test_negative_fcff_forces_limited_applicability(self):
+        """robustness._method_limitation still fires on a negative base, and
+        this still proves it - but the DCFResult is now CONSTRUCTED rather
+        than obtained from run_dcf, because Guard 0d refuses to produce one.
+
+        That is the point worth recording, not a test-plumbing detail: the
+        finding has become unreachable through the pipeline. A filing whose
+        LATEST FCFF is negative no longer reaches robustness at all - it stops
+        at pipeline's own run_dcf and the CLI exits 1 with the guard's
+        message. The branch is kept and kept tested because it is the correct
+        report for any caller that hands robustness such a run, and because
+        deleting live logic on the strength of "nothing calls it today" is how
+        a guard becomes untested the day something does. See ISSUES.md #38."""
         from aleph.valuation.robustness import assess_robustness, Applicability
-        from aleph.valuation.dcf_engine import run_dcf as _rd
+        from aleph.valuation.dcf_engine import DCFResult
         inp = mk(base_cash_flow=-400.0, growth_rates=[0.30] * 10)
+        # the arithmetic run_dcf USED to return for this input, by hand
+        constructed = DCFResult(
+            enterprise_or_equity_value=-8_000.0, equity_value=-13_000.0,
+            value_per_share=-13.0, pv_explicit=-3_000.0, pv_terminal=-5_000.0,
+            terminal_pct=0.625, yearly=[])
 
         class _R:
             doc_id = "S"
@@ -540,7 +576,7 @@ class TestValuationApplicability:
                 "available": True, "fcff_by_period": {
                     "FY2022": -800.0, "FY2023": -600.0, "FY2024": -400.0},
                 "note": ""}, "tornado_ranges": {}})()
-            result = _rd(inp)
+            result = constructed
             market_price = None
             implied_growth = None
             tornado_rows = []

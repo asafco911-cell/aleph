@@ -11,7 +11,12 @@ import math
 import pytest
 
 import aleph.valuation.pipeline as pipeline
-from aleph.valuation.dcf_engine import DCFInputs, reverse_dcf, run_dcf
+from aleph.valuation.dcf_engine import (
+    DCFConsistencyError,
+    DCFInputs,
+    reverse_dcf,
+    run_dcf,
+)
 from aleph.valuation.market_expectations import (
     ExpectationsLevel,
     ExpectationsVsEvidence,
@@ -387,10 +392,19 @@ class TestAdversarial:
         assert b.value > inp.base_cash_flow
 
     def test_04_negative_base_fcff(self):
+        """REWRITTEN for Guard 0d. This used to price the input off its own
+        forward DCF and check the solvers stayed coherent. There is no
+        forward price any more - the engine refuses a negative base - and the
+        property that matters is unchanged and stronger: the solvers must
+        return NOT_SOLVABLE, never crash and never fabricate a level."""
         inp = mk(base_cash_flow=-400.0, growth_rates=[0.2] * 10)
-        g, b = self._iq(inp, run_dcf(inp).value_per_share)
-        # solvers must return something coherent or NOT_SOLVABLE, never a crash
-        assert b.solvability in (Solvability.SOLVED, Solvability.NOT_SOLVABLE)
+        with pytest.raises(DCFConsistencyError, match="NOT_APPLICABLE"):
+            run_dcf(inp)
+        g, b = self._iq(inp, 12.34)          # any target: none is reachable
+        assert b.solvability is Solvability.NOT_SOLVABLE
+        assert b.value is None
+        assert g.solvability is Solvability.NOT_SOLVABLE
+        assert g.value is None
 
     def test_05_zero_base_fcff_multiple_undefined(self):
         # base 0 -> run_dcf raises -> Phi undefined -> NOT_SOLVABLE
@@ -483,7 +497,13 @@ class TestCrossSector:
                                      terminal_growth=0.025, discount_rate=0.10),
     }
 
-    @pytest.mark.parametrize("name", list(SECTORS))
+    # Spelled twice on purpose: a class-body comprehension cannot see other
+    # class attributes, only its own iterable.
+    NEGATIVE_SECTORS = ("recovery", "negative_fcff_growth")
+
+    @pytest.mark.parametrize(
+        "name",
+        [n for n in SECTORS if n not in ("recovery", "negative_fcff_growth")])
     def test_sector_solvers_are_coherent_or_not_solvable(self, name):
         inp = mk(**self.SECTORS[name])
         price = run_dcf(inp).value_per_share    # a self-consistent target
@@ -496,7 +516,27 @@ class TestCrossSector:
         assert g.solvability is Solvability.SOLVED
         assert math.isfinite(g.value)
 
+    @pytest.mark.parametrize("name", NEGATIVE_SECTORS)
+    def test_negative_anchor_sectors_have_no_forward_price_to_solve_against(
+            self, name):
+        """The two sectors with a negative anchor are kept in SECTORS, not
+        deleted: they are still the shapes this solver has to survive. What
+        changed is that they no longer have a self-consistent forward price -
+        Guard 0d refuses to produce one - so the whole chain must come back
+        NOT_SOLVABLE rather than crash."""
+        inp = mk(**self.SECTORS[name])
+        with pytest.raises(DCFConsistencyError, match="NOT_APPLICABLE"):
+            run_dcf(inp)
+        assert implied_base_fcff(inp, 25.0).solvability is Solvability.NOT_SOLVABLE
+        assert implied_uniform_growth(inp, 25.0).solvability is Solvability.NOT_SOLVABLE
+
     def test_negative_fcff_sector_does_not_fabricate_a_positive_expectation(self):
+        """The assertion used to be `b.value < 0` - honest, because the
+        implied LEVEL was negative. The honest answer is now that there is no
+        level: Phi is computed from a reference run that the engine refuses,
+        so nothing is implied at all. Both are refusals to fabricate; this one
+        happens earlier."""
         inp = mk(**self.SECTORS["negative_fcff_growth"])
-        b = implied_base_fcff(inp, run_dcf(inp).value_per_share)
-        assert b.value < 0        # honest: the implied level is negative
+        b = implied_base_fcff(inp, 25.0)
+        assert b.solvability is Solvability.NOT_SOLVABLE
+        assert b.value is None

@@ -127,6 +127,11 @@ class ValuationRun:
     wacc_at_beta_bounds: list[float] | None = None
     low_vps: float | None = None       # value per share at the low FCFF bound
     high_vps: float | None = None
+    # Why a bound is None, in the engine's own words. None when the bound
+    # valued cleanly. A caller that prints "NOT_APPLICABLE" without saying
+    # which period and which guard has moved the problem, not reported it.
+    low_vps_note: str | None = None
+    high_vps_note: str | None = None
     tornado_rows: list[dict] = field(default_factory=list)
     implied_growth: float | None = None
     # The merged market inputs this run was built on (shared + per_filing),
@@ -356,13 +361,38 @@ def value_filing(
     result = run_dcf(bridged.inputs)
 
     low_vps = high_vps = None
+    low_vps_note = high_vps_note = None
     bound = bridged.base_cash_flow_bound
     if bound["available"]:
         low_trial, high_trial = deepcopy(bridged.inputs), deepcopy(bridged.inputs)
         low_trial.base_cash_flow = bound["low_fcff"]
         high_trial.base_cash_flow = bound["high_fcff"]
-        low_vps = run_dcf(low_trial).value_per_share
-        high_vps = run_dcf(high_trial).value_per_share
+        # These two were unguarded, and they are the ONLY unguarded run_dcf
+        # call on a base the caller did not choose: all fourteen other re-runs
+        # in the codebase already catch DCFConsistencyError and report the
+        # guard's message (tests/test_negative_base_fcff.py walks the AST and
+        # fails on a fifteenth). Under Guard 0d a disclosed year with negative
+        # FCFF would have taken the whole valuation down here.
+        #
+        # No module names in this comment on purpose: three regression tests
+        # assert that the diagnostic layers are NOT wired into this
+        # orchestrator by grepping this file's source, and a comment naming
+        # one of them fails that check exactly as an import would.
+        #
+        # It must not. The base case is the LATEST period and is untouched;
+        # only the BOUND is unreportable, and an unreportable bound is a
+        # finding, not a failure. The note is carried so the CLI and the UI
+        # can say which period and why instead of printing a bare "None".
+        for label in ("low", "high"):
+            trial = low_trial if label == "low" else high_trial
+            try:
+                value, note = run_dcf(trial).value_per_share, None
+            except DCFConsistencyError as exc:
+                value, note = None, str(exc)
+            if label == "low":
+                low_vps, low_vps_note = value, note
+            else:
+                high_vps, high_vps_note = value, note
 
     tornado_rows = []
     if bridged.tornado_ranges:
@@ -398,7 +428,8 @@ def value_filing(
         ranges=ranges, contract=contract, bridged=bridged, result=result,
         facts=facts, rejected=rejected, wacc=wacc, wacc_error=wacc_error,
         beta_base=beta_base, wacc_at_beta_bounds=beta_bounds, low_vps=low_vps,
-        high_vps=high_vps, tornado_rows=tornado_rows, implied_growth=implied_growth,
+        high_vps=high_vps, low_vps_note=low_vps_note, high_vps_note=high_vps_note,
+        tornado_rows=tornado_rows, implied_growth=implied_growth,
         market=market, forecast_years=10,
         accounting_quality=accounting_quality,
     )

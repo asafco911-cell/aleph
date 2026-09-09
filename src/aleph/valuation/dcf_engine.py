@@ -83,6 +83,27 @@ def validate(inputs: DCFInputs) -> None:
         raise DCFConsistencyError(
             "base_cash_flow is zero - a DCF has no cash flow to discount; "
             "NOT_SOLVABLE")
+    # Guard 0d: a negative base is not a small valuation, it is a category
+    # error, and 0c refused the sign's only other special case while leaving
+    # this one through. run_dcf multiplies base_cash_flow by (1 + g) each
+    # forecast year and capitalises the last year with Gordon. Applied to a
+    # LOSS that compounds the loss for the whole horizon and then reports the
+    # present value of a deepening loss as a value per share - a number with
+    # a currency sign in front of it and no meaning behind it.
+    #
+    # Measured, and the reason this guard exists: LYFT_FY2025's reported
+    # range low was -$39.37, produced by growing FY2023 FCFF of -712 at the
+    # forecast rates for ten years. Nothing was wrong with the arithmetic.
+    #
+    # What this is NOT saying: that Lyft was worth nothing in FY2023, or that
+    # the anchor should be excluded from the analyst's attention. The opposite
+    # - "one of the three disclosed years cannot be valued by this model at
+    # all" is a stronger statement about anchor sensitivity than any number
+    # this branch could return, and every caller reports it as such.
+    if inputs.base_cash_flow < 0:
+        raise DCFConsistencyError(
+            f"base_cash_flow is negative ({inputs.base_cash_flow:,.0f}) - "
+            "growing a loss is not a valuation; NOT_APPLICABLE")
     # Guard 1: terminal growth must be below the discount rate (Gordon breaks otherwise)
     if inputs.terminal_growth >= inputs.discount_rate:
         raise DCFConsistencyError(
@@ -218,13 +239,26 @@ def reverse_dcf(inputs: DCFInputs, market_price_per_share: float,
     Therefore:
 
         B > 0  =>  vps(g) strictly INCREASING in g
-        B < 0  =>  vps(g) strictly DECREASING in g
-        B = 0  =>  run_dcf raises for every g (Guard 0c)
+        B <= 0 =>  run_dcf raises for every g (Guards 0c and 0d)
+
+    The B < 0 half of that statement changed. It used to read "vps(g)
+    strictly DECREASING in g", and the decreasing branch was live: the
+    engine would value a negative anchor and this solver would invert it in
+    the correct direction. Guard 0d now refuses a negative base outright, so
+    value_at() returns None at every g and the window probe below returns
+    NOT_SOLVABLE before the direction is ever read.
+
+    The consequence for the code: `increasing` is True whenever the direction
+    logic is reached, and its else-branch is unreachable while Guard 0d
+    stands. It is kept, not deleted - it is one expression, it is correct,
+    and it is the single place that would have to change if the guard is ever
+    revisited. What is TESTED is the observable contract (a negative base
+    yields None), not the dead branch; see ISSUES.md #38.
 
     There is no non-monotonic case and no partial-validity pocket: for a
     given input, value(g) is valid at every g in the window or at none of
     them (run_dcf's remaining guards depend only on the fixed inputs, and
-    total = B * Phi(x) != 0 for B != 0, x > 0). So the direction is read
+    total = B * Phi(x) != 0 for B > 0, x > 0). So the direction is read
     directly from sign(B) and the only runtime checks are (a) the window is
     well-posed at all, and (b) the target is bracketed - both preconditions
     of bisection, each isolated by a mutation-killing test.
@@ -251,7 +285,8 @@ def reverse_dcf(inputs: DCFInputs, market_price_per_share: float,
     if v_lo is None or v_hi is None:
         return None                           # NOT_SOLVABLE - window ill-posed
 
-    # direction from the proof above - not from sampling
+    # direction from the proof above - not from sampling. Always True once
+    # Guard 0d is in place; see the docstring for why the expression stays.
     increasing = inputs.base_cash_flow > 0
     lo_bound, hi_bound = (v_lo, v_hi) if increasing else (v_hi, v_lo)
 

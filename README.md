@@ -56,7 +56,7 @@ bottom-up WACC, rebuild FCFF from CFO, discount.
 | filing | value-per-share range (FCFF basis) | latest-period basis | market price | where it sits | reverse-DCF implied growth |
 |---|---|---|---|---|---|
 | UBER_FY2025 | $26.86 – $119.95 (FY2023–FY2025) | $119.95 | $76.95 | inside, 53.8% of the way up | 5.1%/yr for 10 years |
-| LYFT_FY2025 | -$39.37 – $49.06 (FY2023–FY2025) | $49.06 | $17.35 | inside, 64.1% of the way up | -8.5%/yr for 10 years |
+| LYFT_FY2025 | NOT_APPLICABLE – $49.06 (FY2023–FY2025) | $49.06 | $17.35 | no range to place it in | -8.5%/yr for 10 years |
 | DASH_FY2025 | $54.85 – $124.27 (FY2023–FY2025) | $124.27 | $231.89 | 86.6% above the top | 23.5%/yr for 10 years |
 
 Reproduce any row with `python scripts\run_valuation.py <doc_id> <price>`.
@@ -65,12 +65,20 @@ Be precise about what that table's middle columns are: the tool prints
 "inside the range, 53.8% of the way up" or "86.6% ABOVE the top of the
 range" - a description of where a price sits against a range built from the
 filing's own disclosed cash flows. It does not print a verdict. Reading
-Uber's and Lyft's rows as **insufficient basis to conclude** - the market
-price sits inside a range wide enough that both a bull and a bear case are
-consistent with the same filing - is this write-up's conclusion, not a
-string the code emits. DoorDash's row is the one place that reading
-doesn't apply: 86.6% above the top of what three years of its own cash
-flow history can support is the one unambiguous verdict of the three.
+Uber's row as **insufficient basis to conclude** - the market price sits
+inside a range wide enough that both a bull and a bear case are consistent
+with the same filing - is this write-up's conclusion, not a string the code
+emits. DoorDash's row is the one place that reading doesn't apply: 86.6%
+above the top of what three years of its own cash flow history can support
+is the one unambiguous verdict of the three.
+
+Lyft's row has NO low end, and that is a finding rather than a missing
+number. Its FY2023 FCFF was -$712m, and the engine refuses to grow a
+negative cash flow for ten years and call the result a valuation
+([ISSUES.md #38](ISSUES.md)). One of the three years Lyft itself discloses
+cannot be valued by this model at all - a stronger statement about how much
+the answer depends on the anchor year than the -$39.37 that used to sit
+there, which was arithmetic with a currency sign in front of it.
 
 The system also produces evidence against itself. `UBER_FY2024` and
 `UBER_FY2025` value the same company, at the same $76.95 price, on the
@@ -101,12 +109,17 @@ effectively at market. Nothing about Uber's filing changed between those
 two numbers - one analyst decision did, worth $25.32 a share on its own.
 
 It is still not the largest source of variation in the model. UBER_FY2024's
-own tornado puts base_cash_flow's swing at $91.20 (-$14.13 to $77.08)
-against discount_rate's $29.83 - the same base-cash-flow instability behind
-section 1's 56% swing between UBER_FY2024 and UBER_FY2025. One analyst
-decision moved the conclusion from "33% undervalued" to "fairly priced,"
-and the single largest lever in the model is still which year's cash flow
-an analyst treats as representative, not that decision. See
+own tornado cannot even put a number on base_cash_flow's swing: its low
+bound is FY2022 FCFF of -$957m, which the engine refuses to value at all
+([ISSUES.md #38](ISSUES.md)), against discount_rate's fully quantified
+$29.83. The tornado used to report that swing as $91.20 (-$14.13 to $77.08)
+by growing that loss for ten years, and the reason the driver is now
+reported as UNQUANTIFIABLE rather than as $91.20 is not that it got smaller -
+it is the same base-cash-flow instability behind section 1's 56% swing
+between UBER_FY2024 and UBER_FY2025, now stated as the model declining to
+answer. One analyst decision moved the conclusion from "33% undervalued" to
+"fairly priced," and the single largest lever in the model is still which
+year's cash flow an analyst treats as representative, not that decision. See
 [ISSUES.md #16](ISSUES.md) for the SBC reasoning, applied identically to
 all three filers - the system measures the consequence of a decision; it
 does not manufacture a number on its own.
