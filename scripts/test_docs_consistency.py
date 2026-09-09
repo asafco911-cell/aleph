@@ -28,6 +28,7 @@ README = Path("README.md")
 CLAUDE = Path("CLAUDE.md")
 WORKFLOW = Path(".github/workflows/pipeline-tests.yml")
 GATES = Path("src/aleph/extraction/gates.py")
+OPERATING_MODEL = Path("src/aleph/valuation/operating_model.py")
 
 failures: list[str] = []
 
@@ -183,6 +184,34 @@ def test_gate_count_is_not_stale():
     check("CLAUDE.md principle 8 says 'Six gates'", "Six gates" in claude)
 
 
+def test_operating_model_docstring_matches_the_bridge():
+    """P10 fixed a real SBC double-count in the P9 driver bridge: fcff_t no
+    longer subtracts sbc_t - SBC is a GAAP opex already inside operating
+    income, so it is reported only. The module docstring's own formula
+    listing is the SECOND place that claim lives; closeout hardening found
+    it had not been updated with the code - the exact #30 shape, one prose
+    block and one arithmetic line drifting apart."""
+    source = OPERATING_MODEL.read_text(encoding="utf-8")
+    # only the structured formula lines - "THE BRIDGE (Phase 11)" through the
+    # closing "= fcff_t" - NOT the prose paragraph after it, which legitimately
+    # narrates the old, wrong formula as history ("an earlier version ...
+    # subtracted a separate `- sbc_t` term"). Checking prose would false-fail
+    # on its own explanation of the bug it is documenting.
+    doc_match = re.search(r"THE BRIDGE \(Phase 11\).*?= fcff_t", source, re.S)
+    code_match = re.search(r"^        fcff_t = .*$", source, re.M)
+    check("operating_model.py docstring's bridge formula is present",
+          doc_match is not None)
+    check("operating_model.py bridge code line is present",
+          code_match is not None)
+    if doc_match and code_match:
+        check("docstring's bridge formula does not subtract sbc_t",
+              "- sbc_t" not in doc_match.group(0),
+              "docstring still lists '- sbc_t' as a subtracted bridge term - "
+              "stale since the P10 SBC double-count fix")
+        check("the actual bridge code does not subtract sbc_t (P10 fix holds)",
+              "- sbc_t" not in code_match.group(0), code_match.group(0).strip())
+
+
 def test_adr_count_matches_the_directory():
     adrs = sorted(Path("docs/adr").glob("*.md"))
     claude = CLAUDE.read_text(encoding="utf-8")
@@ -207,6 +236,7 @@ if __name__ == "__main__":
     print("Counts stated in two places:")
     test_no_workflow_needs_a_file_the_repository_does_not_ship()
     test_gate_count_is_not_stale()
+    test_operating_model_docstring_matches_the_bridge()
     test_adr_count_matches_the_directory()
 
     if failures:

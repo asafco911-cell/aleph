@@ -22,8 +22,19 @@ THE BRIDGE (Phase 11), deterministic, per forecast year:
     + dna_t            = revenue_t * (D&A / revenue)
     + wc_cash_effect_t = SCENARIO-only (see below)
     - capex_t          = revenue_t * (capex / revenue)
-    - sbc_t            = revenue_t * (SBC / revenue)             full cash cost, ADR 0002
     = fcff_t
+    sbc_t              = revenue_t * (SBC / revenue)     REPORTED ONLY, NOT
+                         subtracted. SBC is a GAAP operating expense already
+                         inside operating_income_t (hence inside nopat_t); an
+                         earlier version of this bridge additionally
+                         subtracted a separate `- sbc_t` term, double-
+                         counting SBC (P10 correction; ISSUES.md). This
+                         differs from bridge.py's LIVE bridge, which starts
+                         from CFO - a figure that already ADDS SBC back as
+                         non-cash - and so correctly subtracts SBC at full
+                         pre-tax value there (ADR 0002). The two bridges
+                         start from different bases; the ADR 0002 treatment
+                         does not carry over to this one.
 
 WORKING CAPITAL. P8 established the recurrence of the insurance-reserve /
 accrued-liability float is NOT disclosed. So wc_cash_effect is never a point

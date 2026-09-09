@@ -1766,6 +1766,46 @@ existing filing evidence, or are they genuinely DISCLOSURE_BOUND?
   change resolves them. The one model-side item is P10 arbitrate()'s missing
   tax-normalization reason branch.
 
+P10.5.1 - TARGETED GOVERNANCE FIX, 2026-09-09. Closes the one model-side item
+P10.5 left open: a ~20-line reason branch in arbitrate() (commit 7dd54fd).
+
+- WHEN the P10.5 bridge for a filer FULLY reconciles (arithmetically AND the
+  dominant named delta is tax) AND that delta is the tax step, arbitrate()
+  now appends a reason and returns MODEL_DIVERGENCE_WITH_EVIDENCE_BASIS
+  instead of MODEL_DIVERGENCE_UNRESOLVED. Verified live: UBER_FY2025 fires
+  (bridge economically_explained=FULLY); UBER_FY2024 and LYFT_FY2025 do NOT
+  fire (their bridges are only PARTIAL - negative controls hold); DASH_FY2025
+  unchanged (no P9, still MODEL_DIVERGENCE_UNRESOLVED, nothing invented).
+  DIVERGENCE ATTRIBUTION = RESOLVED is kept explicitly separate from FORWARD
+  NORMALIZED TAX RATE = DISCLOSURE_BOUND - the reason text says so, and a
+  test proves the 21% convention is never called "verified"/"validated".
+
+- A REAL GIT DEFECT, found and fixed during the P10/P10.5/P10.5.1 closeout
+  (2026-09-09): commit 7dd54fd added model_governance.py's new import of
+  evidence_resolution and tests/test_evidence_resolution.py (which imports
+  it directly) but never added evidence_resolution.py itself. A fresh clone
+  at that commit alone would fail test_evidence_resolution.py at import, and
+  arbitrate()'s try/except would silently swallow the ImportError and fall
+  back to the pre-fix UNRESOLVED behavior for UBER_FY2025 - a "sounds right,
+  isn't" failure with no red flag, the exact pattern this file exists to
+  catch. Fixed in f0547d4 (git housekeeping, no logic changed); the working
+  tree was never broken since the file existed on disk, untracked.
+
+- STALE SBC DOCSTRING, found and fixed the same day: operating_model.py's own
+  module docstring still listed "- sbc_t ... full cash cost, ADR 0002" as a
+  subtracted bridge term, even though the P10 fix (this section, above) had
+  removed that subtraction from the CODE months earlier. The formula-in-two-
+  places pattern is exactly ISSUES.md #30's shape; scripts/test_docs_
+  consistency.py now checks the docstring's structured formula lines against
+  the actual `fcff_t =` line (negative-controlled: a reintroduced `- sbc_t`
+  in the docstring makes the check fail, exit 1).
+
+- REGRESSION at closeout: 809 tests pass; 11/11 standalone scripts OK; LIVE
+  anchors 77.08 / 119.95 / 49.06 / 124.27 unchanged; mutation-tested (18/18
+  KILLED: the 16 P10 mutations + 2 new P10.5.1-branch mutations - the FULLY
+  guard weakened to "is not None", and the "does NOT establish 21%" caveat
+  dropped from the reason text).
+
 ## #30 sha256 is recorded as content identity but never used to detect a replaced document — CLOSED
 
 `schemas/documents.py` states the principle directly: `doc_id` is a
