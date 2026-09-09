@@ -1,5 +1,17 @@
 """Decompose reported CFO; separate what accounting says from what economics asks.
 
+STATUS: EXPERIMENTAL - NOT IN THE LIVE VALUATION PATH (P5.1 closure, Part 15).
+Nothing in scripts/run_valuation.py or valuation/pipeline.py imports this
+module; it is exercised only by tests/test_cfo_normalization.py. The live
+valuation builds FCFF in bridge.py directly from reported CFO
+(cfo + interest*(1-tax) - capex - sbc), with NO economic normalisation of
+CFO. This module's finding - that a cash flow statement alone cannot
+identify a one-time CASH item - is why the live path does not attempt it,
+and why robustness/accounting_quality report the limitation instead of
+"fixing" it. Kept as research history; not wired in; requires an ADR to
+become live.
+
+
 TWO DIFFERENT QUESTIONS, and conflating them is this module's history:
 
   ACCOUNTING NORMALISATION asks: is this line non-cash, or unusual as the

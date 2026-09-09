@@ -283,8 +283,17 @@ def build_trend(name, unit, observations, collisions, override, doc_ids) -> Assu
     )
 
 
-def build_level(name, unit, observations, collisions, override, doc_ids) -> AssumptionRange:
-    """Take the most recent period. Prior periods are context, not a range."""
+def build_level(name, unit, observations, collisions, override, doc_ids,
+                require_unit: bool = False) -> AssumptionRange:
+    """Take the most recent period. Prior periods are context, not a range.
+
+    ``require_unit`` (P5.8): when True, a kept observation that carries no
+    unit string blocks with INVALID_UNIT rather than falling back to the
+    caller's ``unit`` label. Used for share counts - a share fact with no
+    unit was silently assumed to be "thousands" (the V5 1000x vulnerability);
+    `to_millions` then converted it and the per-share value came out 1000x
+    wrong on the one quantity `gates.check_unit_matches_source` skips.
+    """
     if collisions:
         return _blocked(name, unit, observations, [],
                         "ambiguous fact selection: " + "; ".join(collisions), doc_ids)
@@ -299,6 +308,21 @@ def build_level(name, unit, observations, collisions, override, doc_ids) -> Assu
     mismatch = _scale_mismatch(kept)
     if mismatch:
         return _blocked(name, unit, observations, excluded, mismatch, doc_ids)
+
+    if require_unit and not any(resolve_scale(o.unit) is not None for o in kept):
+        carried = sorted({(o.unit or "(none)") for o in kept})
+        return _blocked(
+            name, unit, observations, excluded,
+            f"INVALID_UNIT: no kept observation for '{name}' carries a unit "
+            f"that resolves to exactly one recognised scale (units seen: "
+            f"{carried}), and this quantity may not fall back to an assumed "
+            f"scale ('{unit}'). Blank, ambiguous ('thousands millions'), and "
+            "unsupported units are all rejected - a share count with no valid "
+            "unit produced a 1000x per-share error historically (ISSUES.md "
+            "#15). Extract the unit, or set fixed_value with a unit in "
+            "data/overrides.json.",
+            doc_ids,
+        )
 
     latest = kept[-1]
     return AssumptionRange(
@@ -528,8 +552,12 @@ def derive_stock_based_compensation(facts, overrides) -> AssumptionRange:
 
 def derive_diluted_shares(facts, overrides) -> AssumptionRange:
     observations, collisions = _observations(facts, "diluted")
+    # require_unit: a share count is the divisor of the entire per-share
+    # result and is exempt from the extraction unit gate by name, so it must
+    # not fall back to an assumed "thousands" here (P5.8 / V5).
     return build_level("diluted_shares", "thousands", observations, collisions,
-                       overrides.get("diluted_shares"), _doc_ids(facts))
+                       overrides.get("diluted_shares"), _doc_ids(facts),
+                       require_unit=True)
 
 
 def _stated_total_revenue(facts: list[Fact], period: str) -> float | None:
@@ -752,6 +780,20 @@ def derive_net_debt(facts, overrides) -> AssumptionRange:
         collisions.extend(clashes)
 
     if override and override.fixed_value is not None:
+        # P5.1-closure Part 3: an analyst override is NOT trusted on its unit
+        # just because it is analyst-entered. net_debt is monetary, so its
+        # unit must resolve to exactly one known scale token. Reject empty,
+        # "USD" (no scale), ambiguous, or multi-token before it reaches
+        # to_millions - do not infer the intended scale.
+        if resolve_scale(override.unit) is None:
+            return _blocked(
+                "net_debt", override.unit or "(none)", components, [],
+                f"INVALID_UNIT: the net_debt override unit "
+                f"{override.unit!r} does not name exactly one recognised "
+                "monetary scale (thousands / millions / billions). A bare "
+                "'USD', an empty unit, or two scale tokens is rejected here - "
+                "the scale is not inferred. Fix data/overrides.json.",
+                doc_ids)
         return _fixed("net_debt", components, [], override, doc_ids)
 
     if collisions:

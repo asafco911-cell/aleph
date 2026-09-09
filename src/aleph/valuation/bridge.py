@@ -232,6 +232,23 @@ def build_dcf_inputs(
     shares = to_millions(require(ranges, "diluted_shares"))
     net_debt = to_millions(require(ranges, "net_debt"))
 
+    # P5.1-closure Part 3: a 10-K reports every statement in one monetary
+    # scale. net_debt (which arrives via an analyst override) must therefore
+    # be on the SAME scale as the cash-flow figures. A thousands/millions
+    # typo in the override is magnitude-plausible and slips past to_millions
+    # (both are valid single tokens) - this cross-check is what catches it.
+    _cfo_scale = resolve_scale(require(ranges, "operating_cash_flow").unit)
+    _nd_scale = resolve_scale(require(ranges, "net_debt").unit)
+    if _cfo_scale is not None and _nd_scale is not None and _cfo_scale != _nd_scale:
+        raise BridgeError(
+            f"net_debt is stated on a different monetary scale "
+            f"({require(ranges, 'net_debt').unit!r}) from operating cash flow "
+            f"({require(ranges, 'operating_cash_flow').unit!r}). A filing "
+            "reports all statements in one scale; this is a unit error in the "
+            "net_debt override, not a real difference. Magnitude sanity is "
+            "not unit verification - fix data/overrides.json."
+        )
+
     # Rule 1 + Rule 4: rebuild a firm-level cash flow from a levered starting
     # point, then remove the cash cost CFO's own reconciliation added back.
     fcff = cfo + interest * (1 - tax) - capex - sbc
@@ -241,29 +258,56 @@ def build_dcf_inputs(
     discount = discount_input.value
     terminal = terminal_input.value
 
+    # P5.1 - machine-readable provenance must reflect the ACTUAL origin.
+    # An override => analyst_judgment; a single gate-verified level => filing;
+    # a computed statistic or a composite => derived.
+    def _prov(status: str, kind: str) -> str:
+        if status in ("overridden", "fixed"):
+            return "analyst_judgment"
+        if kind in ("composite", "computed"):
+            return "derived"
+        return "filing"
+
+    tax_range = ranges["effective_tax_rate"]
+    growth_range_ = ranges["revenue_growth"]
+    sbc_range = ranges["stock_based_compensation"]
+    shares_range = ranges["diluted_shares"]
+    net_debt_range = ranges["net_debt"]
+    # base_cash_flow is ALWAYS a composite of several extracted line items,
+    # and it always embeds the effective_tax_rate assumption (an override on
+    # every filing measured). It is never a bare "filing" fact.
+    base_cf_note = (
+        f"FCFF = CFO {cfo:,.0f} + interest {interest:,.0f} x (1 - {tax:.1%}) "
+        f"- capex {capex:,.0f} - SBC {sbc:,.0f}. LINEAGE: CFO/capex/SBC/"
+        f"interest are latest-period extracted facts; the (1 - tax) term "
+        f"carries the effective_tax_rate {tax_range.status} assumption "
+        f"({_prov(tax_range.status, 'level')}).")
+
     assumptions = [
-        Assumption("base_cash_flow", fcff, "filing",
-                   f"FCFF = CFO {cfo:,.0f} + interest {interest:,.0f} x "
-                   f"(1 - {tax:.1%}) - capex {capex:,.0f} - SBC {sbc:,.0f}"),
+        Assumption("base_cash_flow", fcff, "derived", base_cf_note),
         Assumption("effective_tax_rate", tax, "analyst_judgment",
-                   ranges["effective_tax_rate"].rationale[:150]),
-        Assumption("growth_year_1", growth, "filing",
-                   ranges["revenue_growth"].rationale[:150]),
+                   tax_range.rationale[:150]),
+        Assumption("growth_year_1", growth,
+                   _prov(growth_range_.status, "computed"),
+                   growth_range_.rationale[:150]),
         Assumption("terminal_growth", terminal, "analyst_judgment",
                    f"{terminal_input.rationale} [as of {terminal_input.as_of}]"),
         Assumption("discount_rate", discount, "market",
                    f"{discount_input.rationale} "
                    f"[{discount_input.source}, as of {discount_input.as_of}]"),
-        Assumption("stock_based_compensation", sbc, "filing",
+        Assumption("stock_based_compensation", sbc,
+                   _prov(sbc_range.status, "level"),
                    "Subtracted from FCFF at full value; already tax-affected "
                    "inside net income, so no (1 - tax) adjustment applies. "
                    "Share count is held flat, deliberately: subtracting SBC "
                    "and also modelling the dilution it funds would "
                    "double-count the same cost."),
-        Assumption("shares_outstanding", shares, "filing",
-                   ranges["diluted_shares"].rationale[:150]),
-        Assumption("net_debt", net_debt, "filing",
-                   ranges["net_debt"].rationale[:150]),
+        Assumption("shares_outstanding", shares,
+                   _prov(shares_range.status, "level"),
+                   shares_range.rationale[:150]),
+        Assumption("net_debt", net_debt,
+                   _prov(net_debt_range.status, "level"),
+                   net_debt_range.rationale[:150]),
     ]
 
     inputs = DCFInputs(

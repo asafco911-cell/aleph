@@ -1,5 +1,14 @@
 """Two-dimensional sensitivity, and a warning about terminal-value dependence.
 
+STATUS: EXPERIMENTAL - NOT IN THE LIVE VALUATION PATH (P5.1 closure, Part 15).
+Nothing in scripts/run_valuation.py or valuation/pipeline.py imports this
+module; it is exercised only by tests/test_sensitivity.py. The live
+terminal-value-dependence check is robustness._terminal_value_dependence
+(single-axis, against TV_DEPENDENCE_HIGH / TV_DEPENDENCE_EXTREME). This
+module's WACC x terminal-growth grid is kept as research history; not wired
+in; requires an ADR to become live.
+
+
 The tornado in dcf_engine moves one assumption at a time. That is the right
 instrument for ranking drivers and the wrong one for the pair that interact:
 WACC and terminal growth enter the Gordon denominator together as (r - g), so

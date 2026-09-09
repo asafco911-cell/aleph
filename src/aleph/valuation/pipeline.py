@@ -23,9 +23,11 @@ from ..extraction import extract
 from ..extraction.targets import resolve_targets
 from ..schemas import DocumentRecord
 from ..schemas.valuation import AssumptionRange, MarketAssumption, Override
+from .accounting_quality import AccountingQualityReport, assess_accounting_quality
+from .robustness import RobustnessReport, assess_robustness
 from .assumptions import derive_all
 from .contract import PATH_DCF, PATH_PER_SHARE, PATH_WACC, Status, evaluate
-from .contract_adapter import observe
+from .contract_adapter import observe, row_for_range
 from .bridge import BridgeError, build_dcf_inputs
 from .wacc import build_wacc
 
@@ -70,6 +72,15 @@ class BlockedError(RuntimeError):
     is not protection if the evidence it hands the analyst is incomplete
     (ISSUES.md #26). An analyst reads that evidence to decide the override
     that unblocks the run.
+
+    ``reasons`` maps each blocked quantity to a typed contract Reason, so a
+    caller can tell an ambiguous collision (two captions matched one query)
+    from a policy block (net_debt awaiting a stated cash-and-debt policy)
+    from a bad unit, without parsing rationale prose. This block fires
+    BEFORE the contract gate - a blocked derivation never reaches evaluate()
+    - so the cause would otherwise survive only as free text. The classifier
+    is contract_adapter.row_for_range, the exact one the gate uses, so the
+    two surfaces cannot disagree about what a blocked range means.
     """
 
     def __init__(
@@ -81,6 +92,7 @@ class BlockedError(RuntimeError):
         self.blocked = blocked
         self.facts = facts or []
         self.rejected = rejected or []
+        self.reasons = {a.name: row_for_range(a.name, a).reason for a in blocked}
         super().__init__(f"blocked assumptions: {[a.name for a in blocked]}")
 
 
@@ -117,6 +129,19 @@ class ValuationRun:
     high_vps: float | None = None
     tornado_rows: list[dict] = field(default_factory=list)
     implied_growth: float | None = None
+    # The merged market inputs this run was built on (shared + per_filing),
+    # kept so the robustness layer can assess input quality (staleness,
+    # UNVERIFIED markers, extreme values) without re-reading the file.
+    market: dict = field(default_factory=dict)
+    forecast_years: int = 10
+    # P4: accounting-quality diagnostics. DIAGNOSTIC ONLY - computed after the
+    # DCF is finished and with no path back into any valuation number. An
+    # AccountingQualityReport, from accounting_quality.py.
+    accounting_quality: object | None = None
+    # P5: valuation-robustness diagnostics. DIAGNOSTIC ONLY - re-runs the pure
+    # dcf_engine on COPIES to measure anchor / terminal-value / assumption
+    # sensitivity and forward-reverse consistency. A RobustnessReport.
+    robustness: object | None = None
 
 
 def load_record(doc_id: str) -> DocumentRecord:
@@ -258,22 +283,36 @@ def value_filing(
         raise BlockedError(blocked, facts=facts, rejected=rejected)
 
     # THE CONTRACT GATE. The execution order is load-bearing and asserted
-    # against this source by test_contract_hardening:
+    # against this source by test_contract_hardening and exercised end to
+    # end, case by case, by test_contract_adversarial:
     #
-    #   requirements declared -> extract -> derive -> CONTRACT GATE
-    #      -> WACC -> FCFF bridge -> DCF
+    #   requirements declared (contract.REQUIREMENTS, import time)
+    #     -> extraction        (extract_facts)
+    #     -> verification      (gates.validate, inside extract)
+    #     -> derivation        (derive_all)
+    #     -> blocked-derivation check   (raises BlockedError, with typed
+    #                                    .reasons, before the gate)
+    #     -> contract construction      (observe: run state -> rows)
+    #     -> period / unit / integrity validation (inside evaluate:
+    #        _period_problems delegates to identities.check_period_alignment;
+    #        row_for_* reject unconvertible units)
+    #     -> CONTRACT GATE     (evaluate -> Status.BLOCKED raises
+    #                            ContractBlockedError)
+    #     -> WACC              (build_wacc)
+    #     -> FCFF bridge       (build_dcf_inputs)
+    #     -> DCF               (run_dcf / sensitivity_tornado / reverse_dcf)
     #
-    # The invariant: no MISSING, AMBIGUOUS, PERIOD_MISMATCH or INVALID_UNIT
-    # observation can reach build_wacc, build_dcf_inputs or run_dcf. Spies
-    # on all three prove they never execute on a blocked contract, with a
-    # negative control proving the spies would fire on a valid run.
+    # The invariant: no MISSING, AMBIGUOUS, PERIOD_MISMATCH, INVALID_UNIT or
+    # DEPENDENCY_UNMET observation can reach build_wacc, build_dcf_inputs or
+    # run_dcf. Spies on all three prove they never execute on a blocked
+    # contract, with a negative control proving the spies would fire on a
+    # valid run.
     #
-    # Runs before WACC, before the bridge, before the
-    # engine. The blocked-assumption check above can only see quantities
-    # derive_all produced; this sees quantities the contract EXPECTED and
-    # nothing produced, which is the state gates.py structurally cannot
-    # hold (ISSUES.md #27) - a row absent from every quote makes no group
-    # for check_coverage to iterate over.
+    # The blocked-assumption check above can only see quantities derive_all
+    # produced; this gate sees quantities the contract EXPECTED and nothing
+    # produced, which is the state gates.py structurally cannot hold
+    # (ISSUES.md #27) - a row absent from every quote makes no group for
+    # check_coverage to iterate over.
     contract = evaluate(
         observe(ranges, market, market_price=market_price),
         paths=(PATH_DCF, PATH_PER_SHARE, PATH_WACC),
@@ -333,23 +372,42 @@ def value_filing(
     if market_price:
         implied_growth = reverse_dcf(bridged.inputs, market_price)
 
-    return ValuationRun(
-        doc_id=doc_id,
-        market_price=market_price,
-        record=record,
-        targets=targets,
-        ranges=ranges,
-        contract=contract,
-        bridged=bridged,
-        result=result,
-        facts=facts,
-        rejected=rejected,
-        wacc=wacc,
-        wacc_error=wacc_error,
-        beta_base=beta_base,
-        wacc_at_beta_bounds=beta_bounds,
-        low_vps=low_vps,
-        high_vps=high_vps,
-        tornado_rows=tornado_rows,
-        implied_growth=implied_growth,
+    # P4 - accounting quality. Runs LAST, on the verified facts and the
+    # pipeline's own per-period FCFF (bridge._per_period_fcff, not recomputed).
+    # It reads; it returns a report; nothing above depends on it and nothing
+    # below it exists. `result`, `bridged` and `wacc` are already final. A
+    # regression test (test_accounting_quality.TestP4CannotTouchValuation)
+    # replaces this call with an all-HIGH-impact report and asserts the
+    # per-share value is byte-identical. cash_one_offs is analyst-supplied
+    # evidence and has no filing today; the parameter is the wiring point.
+    fcff_by_period = (bound.get("fcff_by_period")
+                      if isinstance(bound, dict) and bound.get("available") else None)
+    # P4.7: the diagnostic layer must never take down an otherwise-valid
+    # valuation. `result`, `bridged` and `wacc` are already final and are NOT
+    # recomputed here. An exception is captured with provenance and surfaced
+    # as NOT_ASSESSED - it is never swallowed into a silent "no issue".
+    try:
+        accounting_quality = assess_accounting_quality(
+            facts, fcff_by_period=fcff_by_period, cash_one_offs=(), doc_id=doc_id)
+    except Exception as exc:  # noqa: BLE001 - deliberately broad; see docstring
+        accounting_quality = AccountingQualityReport.not_assessed(
+            doc_id, f"diagnostic layer failed ({type(exc).__name__}: {exc})")
+
+    partial = ValuationRun(
+        doc_id=doc_id, market_price=market_price, record=record, targets=targets,
+        ranges=ranges, contract=contract, bridged=bridged, result=result,
+        facts=facts, rejected=rejected, wacc=wacc, wacc_error=wacc_error,
+        beta_base=beta_base, wacc_at_beta_bounds=beta_bounds, low_vps=low_vps,
+        high_vps=high_vps, tornado_rows=tornado_rows, implied_growth=implied_growth,
+        market=market, forecast_years=10,
+        accounting_quality=accounting_quality,
     )
+    # P5: robustness diagnostics. Same contract as P4.7 - runs LAST, reads the
+    # finished run, re-runs the PURE engine on copies, and can never take down
+    # or alter the valuation. An exception -> NOT_ASSESSED with provenance.
+    try:
+        partial.robustness = assess_robustness(partial)
+    except Exception as exc:  # noqa: BLE001
+        partial.robustness = RobustnessReport.not_assessed(
+            doc_id, f"robustness layer failed ({type(exc).__name__}: {exc})")
+    return partial

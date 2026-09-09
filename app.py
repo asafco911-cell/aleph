@@ -35,11 +35,13 @@ from aleph.valuation.pipeline import (
 # Ordered weakest-last. A composite inherits the weakest grade in its chain.
 GRADES = {
     "filing": ("FILING", "#1a7f37", "Extracted from the document and gate-verified"),
+    "derived": ("DERIVED", "#2da44e", "Computed from gate-verified facts (a statistic or a composite)"),
     "market": ("MARKET", "#0969da", "Observed market data, valid only at its as_of date"),
+    "model_convention": ("CONVENTION", "#8250df", "A methodology choice (horizon, fade, terminal growth level)"),
     "peer_group": ("PEER", "#9a6700", "Chosen comparison set; the choice is a judgement"),
     "analyst_judgment": ("JUDGEMENT", "#cf222e", "Stated by the analyst, not derived"),
 }
-GRADE_ORDER = ["filing", "market", "peer_group", "analyst_judgment"]
+GRADE_ORDER = ["filing", "derived", "market", "model_convention", "peer_group", "analyst_judgment"]
 
 
 def weakest(*grades: str) -> str:

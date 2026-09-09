@@ -1,5 +1,13 @@
 """Adjust reported accounting figures toward economic reality.
 
+STATUS: EXPERIMENTAL - NOT IN THE LIVE VALUATION PATH (P5.1 closure, Part 15).
+Nothing in scripts/run_valuation.py or valuation/pipeline.py imports this
+module; it is exercised only by tests/test_normalization.py. As the next
+paragraph already says, bridge.py is untouched by it. Kept as research
+history (R&D capitalisation, operating-lease and SBC views); not wired in;
+requires an ADR to become live.
+
+
 Three adjustments, each deterministic and each reversible by reading the
 returned breakdown. Nothing here calls a model, and nothing here is wired
 into the DCF: bridge.py builds FCFF from CFO and is untouched. That is

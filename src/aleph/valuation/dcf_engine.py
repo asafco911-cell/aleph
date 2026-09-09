@@ -1,14 +1,33 @@
 """Deterministic DCF engine. No LLM anywhere in this file - pure arithmetic."""
+import math
 from dataclasses import dataclass, field
 from typing import List, Literal, Optional
 
 
 @dataclass
 class Assumption:
-    """A single assumption with its provenance. Never a bare number."""
+    """A single assumption with its provenance. Never a bare number.
+
+    P5.1 widened the vocabulary. The machine-readable ``source`` must reflect
+    the ACTUAL origin, not a convenient label:
+
+      filing            a single gate-verified extracted fact, taken as-is
+      derived           computed from gate-verified facts (a statistic, or a
+                        composite like FCFF built from several line items)
+      market            observed external market data, valid at its as_of date
+      analyst_judgment  stated by the analyst - an override or a policy choice
+      model_convention  a methodology choice (horizon, fade shape, terminal
+                        growth level) - see robustness.MODEL_CONVENTIONS
+      peer_group        a chosen comparison set; the choice is a judgement
+
+    Before P5.1, ``growth_year_1`` and ``net_debt`` were hard-coded "filing"
+    even when they were analyst overrides (net_debt ALWAYS is). That mislabel
+    is the V3 vulnerability from the Phase 2 audit.
+    """
     name: str
     value: float
-    source: Literal["filing", "market", "peer_group", "analyst_judgment"]
+    source: Literal["filing", "derived", "market", "analyst_judgment",
+                    "model_convention", "peer_group"]
     rationale: str
 
     def __str__(self):
@@ -32,7 +51,38 @@ class DCFConsistencyError(ValueError):
 
 
 def validate(inputs: DCFInputs) -> None:
-    """Deterministic guards. These catch the classic double-counting errors."""
+    """Deterministic guards. These catch the classic double-counting errors
+    and, per P5, refuse mathematically ill-posed inputs rather than emit a
+    NaN / inf / division-by-zero result that looks like a valuation."""
+    # Guard 0 (P5): every numeric input must be finite. A NaN or inf anywhere
+    # upstream (a bad market rate, a mis-scaled fact) would otherwise flow
+    # straight through to value_per_share.
+    _numeric = {
+        "base_cash_flow": inputs.base_cash_flow,
+        "terminal_growth": inputs.terminal_growth,
+        "discount_rate": inputs.discount_rate,
+        "net_debt": inputs.net_debt,
+        "shares_outstanding": inputs.shares_outstanding,
+        **{f"growth_rates[{i}]": g for i, g in enumerate(inputs.growth_rates)},
+    }
+    nonfinite = [k for k, v in _numeric.items()
+                 if not isinstance(v, (int, float)) or not math.isfinite(v)]
+    if nonfinite:
+        raise DCFConsistencyError(
+            f"non-finite DCF input(s): {', '.join(nonfinite)} - refusing to "
+            "produce a NaN/inf valuation")
+    # Guard 0b (P5): the discount factor (1 + r) ** year must be well-defined
+    # and non-zero. r <= -1 makes it zero or complex.
+    if inputs.discount_rate <= -1.0:
+        raise DCFConsistencyError(
+            f"discount_rate ({inputs.discount_rate:.2%}) <= -100% - the "
+            "discount factor is undefined")
+    # Guard 0c (P5): a DCF has nothing to grow from a zero base. This is
+    # NOT_SOLVABLE, not a $0.00 valuation.
+    if inputs.base_cash_flow == 0:
+        raise DCFConsistencyError(
+            "base_cash_flow is zero - a DCF has no cash flow to discount; "
+            "NOT_SOLVABLE")
     # Guard 1: terminal growth must be below the discount rate (Gordon breaks otherwise)
     if inputs.terminal_growth >= inputs.discount_rate:
         raise DCFConsistencyError(
@@ -87,6 +137,10 @@ def run_dcf(inputs: DCFInputs) -> DCFResult:
     pv_terminal = terminal_value / ((1 + r) ** n)
 
     total = pv_explicit + pv_terminal
+    if total == 0 or not math.isfinite(total):
+        raise DCFConsistencyError(
+            "enterprise value collapsed to zero or non-finite - the growth "
+            "path drove cash flow to zero; NOT_SOLVABLE")
     equity = total - inputs.net_debt if inputs.cash_flow_type == "FCFF" else total
 
     return DCFResult(
@@ -136,16 +190,53 @@ def sensitivity_tornado(inputs: DCFInputs, ranges: dict) -> List[dict]:
     # Widest swing first - that is the assumption worth arguing about
     return sorted(rows, key=lambda r: (r["swing"] is not None, r["swing"] or 0), reverse=True)
 
+REVERSE_DCF_LOW, REVERSE_DCF_HIGH = -0.50, 1.00   # uniform-growth search window
+
+
 def reverse_dcf(inputs: DCFInputs, market_price_per_share: float,
                 tolerance: float = 0.001, max_iter: int = 100) -> Optional[float]:
-    """
-    Solve for the uniform annual growth rate the market price implies.
-    Binary search: deterministic, no optimizer library needed.
+    r"""The UNIFORM-GROWTH EQUIVALENT implied by the market price, holding every
+    other input (anchor FCFF, WACC, terminal growth, net debt, shares) fixed.
+
+    NOT the mathematical inverse of the forward DCF: the forward model uses a
+    FADED growth vector; this solves for a single flat rate applied to every
+    forecast year. It answers "what constant growth would justify the price
+    under the current non-growth assumptions?", nothing more.
+
+    P5.1 CLOSURE - the well-posedness is now PROVEN, not sampled.
+
+    With base FCFF B, discount rate r, terminal growth g_T, forecast horizon
+    n, net debt D, shares S, and x = (1 + g) / (1 + r):
+
+        EV(g) = B * [ sum_{k=1..n} x^k  +  K * x^n ]      K = (1 + g_T)/(r - g_T)
+        vps(g) = (B / S) * Phi(x(g)) - D / S              Phi(x) = sum x^k + K x^n
+
+    Whenever run_dcf succeeds it has already enforced r > g_T (Guard 1) and
+    S > 0, so K > 0. Over the search window g in [-0.5, +1.0] with a valid
+    r, x(g) > 0 and dx/dg = 1/(1+r) > 0. Every term of Phi'(x) is then
+    strictly positive, so Phi is strictly increasing in x, hence in g.
+    Therefore:
+
+        B > 0  =>  vps(g) strictly INCREASING in g
+        B < 0  =>  vps(g) strictly DECREASING in g
+        B = 0  =>  run_dcf raises for every g (Guard 0c)
+
+    There is no non-monotonic case and no partial-validity pocket: for a
+    given input, value(g) is valid at every g in the window or at none of
+    them (run_dcf's remaining guards depend only on the fixed inputs, and
+    total = B * Phi(x) != 0 for B != 0, x > 0). So the direction is read
+    directly from sign(B) and the only runtime checks are (a) the window is
+    well-posed at all, and (b) the target is bracketed - both preconditions
+    of bisection, each isolated by a mutation-killing test.
+
+    Returns the implied uniform growth rate, or None (NOT_SOLVABLE) when the
+    window is ill-posed or the price is unattainable.
     """
     n_years = len(inputs.growth_rates)
-    low, high = -0.50, 1.00                  # search between -50% and +100% annual growth
+    if n_years == 0 or not math.isfinite(market_price_per_share):
+        return None
 
-    def value_at(g):
+    def value_at(g: float) -> Optional[float]:
         trial = deepcopy(inputs)
         trial.growth_rates = [g] * n_years
         try:
@@ -153,16 +244,31 @@ def reverse_dcf(inputs: DCFInputs, market_price_per_share: float,
         except DCFConsistencyError:
             return None
 
+    # (a) is the window well-posed? value(g) is all-or-nothing valid, so the
+    # two bracket ends settle it. If either is invalid the problem is not
+    # solvable by a uniform growth rate.
+    v_lo, v_hi = value_at(REVERSE_DCF_LOW), value_at(REVERSE_DCF_HIGH)
+    if v_lo is None or v_hi is None:
+        return None                           # NOT_SOLVABLE - window ill-posed
+
+    # direction from the proof above - not from sampling
+    increasing = inputs.base_cash_flow > 0
+    lo_bound, hi_bound = (v_lo, v_hi) if increasing else (v_hi, v_lo)
+
+    # (b) bisection needs the root bracketed. An unattainable target - one
+    # the uniform-growth model cannot reach anywhere in the window - is
+    # NOT_SOLVABLE, not a boundary answer dressed up as a solution.
+    if not (lo_bound <= market_price_per_share <= hi_bound):
+        return None                           # unattainable target price
+
+    lo, hi = REVERSE_DCF_LOW, REVERSE_DCF_HIGH
     for _ in range(max_iter):
-        mid = (low + high) / 2
-        v = value_at(mid)
-        if v is None:
-            high = mid                        # invalid region - search lower
-            continue
-        if abs(v - market_price_per_share) < tolerance * market_price_per_share:
+        mid = (lo + hi) / 2
+        v = value_at(mid)                      # valid: window proven all-valid
+        if abs(v - market_price_per_share) < tolerance * abs(market_price_per_share):
             return mid
-        if v < market_price_per_share:
-            low = mid                         # need more growth to justify the price
+        if (v < market_price_per_share) == increasing:
+            lo = mid                           # move toward higher g
         else:
-            high = mid
-    return None                               # did not converge in range
+            hi = mid
+    return None                               # did not converge

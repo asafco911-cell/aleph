@@ -1,5 +1,17 @@
 """Historical FCFF series, starting-point scenarios, and anchor sensitivity.
 
+STATUS: EXPERIMENTAL - NOT IN THE LIVE VALUATION PATH (P5.1 closure, Part 15).
+Nothing in scripts/run_valuation.py or valuation/pipeline.py imports this
+module; it is exercised only by tests/test_historical_fcff.py. The live
+valuation is extraction -> assumptions -> contract -> wacc -> bridge ->
+dcf_engine, with accounting_quality and robustness as diagnostic-only layers.
+The anchor-sensitivity idea here IS live, but reimplemented independently in
+robustness._anchor_sensitivity (the two share only the ANCHOR_SPREAD_HIGH
+constant, by reference, so they cannot drift). This file is kept as research
+history for ISSUES.md #29, not wired in, and must not be imported by the
+pipeline without an ADR.
+
+
 ISSUES.md #29 in one sentence: a single fiscal year's cash flow can dominate a
 ten-year DCF even when every extracted figure is correct. UBER_FY2024 and
 UBER_FY2025 value the same company at the same price on the same day at $77.08
