@@ -38,6 +38,7 @@ def _run(doc, price=None):
 # Phase 3 / 23 - MANDATORY SBC correctness gate
 # =========================================================================== #
 class TestSBCAudit:
+    @pytest.mark.needs_filings
     def test_p9_bridge_does_not_double_count_sbc(self):
         for doc in LIVE:
             a = sbc_audit(_run(doc))
@@ -45,6 +46,7 @@ class TestSBCAudit:
             assert not a["separate_sbc_subtraction_present"]
             assert "RESOLVED" in a["verdict"]
 
+    @pytest.mark.needs_filings
     def test_the_audit_reads_the_actual_bridge_line(self):
         a = sbc_audit(_run("UBER_FY2024"))
         assert a["bridge_line"].startswith("fcff_t =")
@@ -52,6 +54,7 @@ class TestSBCAudit:
         # a regression that re-introduces '- sbc_t' would flip this to PRESENT
         assert a["accounting_structure"].lower().startswith("sbc is a gaap")
 
+    @pytest.mark.needs_filings
     def test_the_audit_would_catch_a_reintroduced_sbc_subtraction(self, monkeypatch):
         # the clean bridge yields NOT_PRESENT; that alone cannot prove the audit
         # can still SEE a double-count. Feed it a poisoned bridge and confirm it
@@ -82,6 +85,7 @@ class TestSBCAudit:
 # Phase 4 / 24 - tax convention audit (statutory != cash != effective)
 # =========================================================================== #
 class TestTaxAudit:
+    @pytest.mark.needs_filings
     def test_uber_and_lyft_are_conservative_but_supported(self):
         for doc in ("UBER_FY2024", "LYFT_FY2025"):
             t = tax_audit(_run(doc))
@@ -91,6 +95,7 @@ class TestTaxAudit:
             assert "not the expected cash rate" in t["verdict"].lower() \
                 or "not read it" in t["verdict"].lower()
 
+    @pytest.mark.needs_filings
     def test_the_three_rates_are_never_conflated(self):
         t = tax_audit(_run("UBER_FY2024"))
         # statutory, cash, effective are three separate labelled things
@@ -102,6 +107,7 @@ class TestTaxAudit:
 # Phase 0 / 1 - reconciliation LIVE -> P9 (order-dependent, residual retained)
 # =========================================================================== #
 class TestReconciliation:
+    @pytest.mark.needs_filings
     def test_first_step_is_the_live_anchor_and_it_is_unchanged(self):
         run = _run("UBER_FY2024")
         steps, meta = reconcile_live_to_p9(run)
@@ -110,6 +116,7 @@ class TestReconciliation:
         assert steps[0].value_after == pytest.approx(run.result.value_per_share, abs=0.01)
         assert meta["order_dependent"] is True
 
+    @pytest.mark.needs_filings
     def test_the_bridge_reaches_the_p9_base_value_with_a_stated_residual(self):
         run = _run("UBER_FY2024")
         steps, meta = reconcile_live_to_p9(run)
@@ -123,6 +130,7 @@ class TestReconciliation:
         assert "interact" in " ".join(s.note for s in steps).lower()
         assert "ORDER-DEPENDENT" in " ".join(s.note for s in steps)
 
+    @pytest.mark.needs_filings
     def test_step_one_operating_basis_is_nopat_plus_dna_minus_capex_once(self):
         # pins the arithmetic of step 1: NOPAT + D&A - capex, each term counted
         # exactly once. A bridge that subtracts capex (or D&A) twice would still
@@ -144,6 +152,7 @@ class TestReconciliation:
         s1 = next(s for s in steps if s.order == 1)
         assert s1.fcff_after == pytest.approx(nopat + dna - capex, rel=1e-6)
 
+    @pytest.mark.needs_filings
     def test_step_two_adds_exactly_one_median_working_capital_contribution(self):
         # the stated change is "+ historical-median working capital". Verify the
         # delta equals ONE median contribution, recomputed independently from the
@@ -159,6 +168,7 @@ class TestReconciliation:
         assert (s2.fcff_after - s1.fcff_after) == pytest.approx(expected_wc, rel=1e-6)
         assert s2.fcff_after == pytest.approx(s1.fcff_after + expected_wc, rel=1e-6)
 
+    @pytest.mark.needs_filings
     def test_lyft_operating_basis_without_wc_is_non_positive(self):
         # LYFT: strip the WC tailwind and normalise tax -> the operating basis
         # FCFF is negative; the reconciliation shows it rather than clamping
@@ -166,6 +176,7 @@ class TestReconciliation:
         step1 = next(s for s in steps if s.order == 1)
         assert step1.fcff_after is not None and step1.fcff_after < 0
 
+    @pytest.mark.needs_filings
     def test_dash_reconciliation_stops_at_the_live_anchor(self):
         steps, meta = reconcile_live_to_p9(_run("DASH_FY2025"))
         assert len(steps) == 1 and steps[0].order == 0
@@ -176,6 +187,7 @@ class TestReconciliation:
 # Phase 9-12 - assumption register + evidence hierarchy + 2-D + contradiction
 # =========================================================================== #
 class TestAssumptionRegister:
+    @pytest.mark.needs_filings
     def test_every_entry_has_evidence_level_bands_and_contradiction(self):
         reg = assumption_register(_run("UBER_FY2024"))
         assert reg
@@ -186,6 +198,7 @@ class TestAssumptionRegister:
             assert isinstance(e.contradiction, ContradictionStatus)
             assert e.historical_evidence and e.economic_rationale
 
+    @pytest.mark.needs_filings
     def test_evidence_and_sensitivity_are_two_dimensions_not_a_score(self):
         reg = assumption_register(_run("UBER_FY2024"))
         e = reg[0]
@@ -196,6 +209,7 @@ class TestAssumptionRegister:
         assert e.evidence_band.value in ("STRONG", "MODERATE", "WEAK")
         assert e.sensitivity_band.value in ("HIGH", "MEDIUM", "LOW")
 
+    @pytest.mark.needs_filings
     def test_tax_rate_is_level_5_model_convention(self):
         reg = assumption_register(_run("UBER_FY2024"))
         tax = next(e for e in reg if e.variable == "tax_rate")
@@ -203,6 +217,7 @@ class TestAssumptionRegister:
         assert tax.model_convention is True
         assert tax.evidence_band is EvidenceBand.WEAK
 
+    @pytest.mark.needs_filings
     def test_evidence_levels_are_calibrated_per_driver(self):
         reg = {e.variable: e for e in assumption_register(_run("UBER_FY2024"))}
         # INFLECTING margin held at the latest -> a genuine L4 judgement
@@ -214,12 +229,14 @@ class TestAssumptionRegister:
             EvidenceLevel.L3_REPEATED_HISTORICAL_PATTERN
         assert reg["revenue_growth"].evidence_band is EvidenceBand.MODERATE
 
+    @pytest.mark.needs_filings
     def test_uber_working_capital_assumption_is_contradicted_by_evidence(self):
         reg = assumption_register(_run("UBER_FY2024"))
         wc = next(e for e in reg if e.variable == "wc_cash_effect_over_revenue")
         assert wc.contradiction is ContradictionStatus.ASSUMPTION_CONTRADICTED_BY_EVIDENCE
         assert "median" in wc.contradiction_detail.lower()
 
+    @pytest.mark.needs_filings
     def test_capex_and_dna_ratios_are_independently_supported(self):
         reg = assumption_register(_run("UBER_FY2024"))
         for name in ("capex_over_revenue", "dna_over_revenue"):
@@ -228,11 +245,13 @@ class TestAssumptionRegister:
             assert e.evidence_level in (EvidenceLevel.L2_DERIVED_FROM_FACTS,
                                         EvidenceLevel.L3_REPEATED_HISTORICAL_PATTERN)
 
+    @pytest.mark.needs_filings
     def test_the_dominant_assumption_is_high_sensitivity_and_weak_evidence(self):
         g = assess_model_governance(_run("UBER_FY2024"))
         assert any("fragile" in d for d in g.dominant_assumptions)
         assert any("wc_cash_effect" in d for d in g.dominant_assumptions)
 
+    @pytest.mark.needs_filings
     def test_dominant_assumptions_are_ranked_most_value_sensitive_first(self):
         # Phase 13 - the ranking IS the output. Every base-case variable appears
         # once, ordered by |d(value/share)| descending. An inverted sort would
@@ -252,6 +271,7 @@ class TestAssumptionRegister:
 # Phase 20 - ANTI-MARKET-FIT: applicability does NOT depend on the price
 # =========================================================================== #
 class TestAntiMarketFit:
+    @pytest.mark.needs_filings
     @pytest.mark.parametrize("price", [None, 1.0, 5.0, 47.03, 77.08, 250.0, 5000.0])
     def test_applicability_classification_is_identical_for_every_market_price(self, price):
         run = _run("UBER_FY2024", price)
@@ -261,6 +281,7 @@ class TestAntiMarketFit:
         assert got["P6"] is Applicability.CONDITIONAL_APPLICABILITY
         assert got["P9"] is Applicability.LIMITED_APPLICABILITY
 
+    @pytest.mark.needs_filings
     def test_arbitration_outcome_is_identical_for_every_market_price(self):
         outs = set()
         for price in (None, 5.0, 47.03, 77.08, 5000.0):
@@ -274,6 +295,7 @@ class TestAntiMarketFit:
 # Phase 21 - ANTI-CONSERVATISM: the lower valuation is not auto-preferred
 # =========================================================================== #
 class TestAntiConservatism:
+    @pytest.mark.needs_filings
     def test_p9_is_not_more_applicable_just_because_it_values_lower(self):
         run = _run("UBER_FY2024")
         reports = {r.model.split()[0]: r for r in model_applicability(run)}
@@ -281,6 +303,7 @@ class TestAntiConservatism:
         assert reports["P9"].applicability is Applicability.LIMITED_APPLICABILITY
         assert reports["P9"].applicability is not Applicability.HIGH_APPLICABILITY
 
+    @pytest.mark.needs_filings
     def test_arbitration_does_not_name_a_winner(self):
         g = assess_model_governance(_run("UBER_FY2024"))
         assert g.arbitration in (
@@ -297,6 +320,7 @@ class TestAntiConservatism:
 # Phase 22 - ANTI-COMPLEXITY: detail alone does not raise applicability
 # =========================================================================== #
 class TestAntiComplexity:
+    @pytest.mark.needs_filings
     def test_p9_more_detailed_but_not_more_applicable_than_live(self):
         run = _run("UBER_FY2024")
         reports = {r.model.split()[0]: r for r in model_applicability(run)}
@@ -313,6 +337,7 @@ class TestAntiComplexity:
 # Phase 14 - arbitration on the live filings
 # =========================================================================== #
 class TestArbitration:
+    @pytest.mark.needs_filings
     def test_uber_and_lyft_diverge_with_an_evidence_basis(self):
         for doc in ("UBER_FY2024", "LYFT_FY2025"):
             g = assess_model_governance(_run(doc))
@@ -322,11 +347,13 @@ class TestArbitration:
             assert "converge" in joined and "sbc double-count" in joined
             assert "latest fcff" in joined or "working-capital" in joined
 
+    @pytest.mark.needs_filings
     def test_p9_and_p6_converge_after_the_sbc_correction(self):
         g = assess_model_governance(_run("UBER_FY2024"))
         assert isinstance(g.p9_base, float) and g.p6_central is not None
         assert abs(g.p9_base - g.p6_central) / g.p6_central < 0.10
 
+    @pytest.mark.needs_filings
     def test_dash_is_unresolved_only_one_model_produces_a_value(self):
         g = assess_model_governance(_run("DASH_FY2025"))
         assert g.arbitration is ArbitrationOutcome.MODEL_DIVERGENCE_UNRESOLVED
@@ -338,6 +365,7 @@ class TestArbitration:
 # cash-tax rate (that stays DISCLOSURE_BOUND, P10.5).
 # =========================================================================== #
 class TestP1051TaxAttribution:
+    @pytest.mark.needs_filings
     def test_uber_fy2025_divergence_is_no_longer_unresolved(self):
         g = assess_model_governance(_run("UBER_FY2025"))
         assert g.arbitration is ArbitrationOutcome.MODEL_DIVERGENCE_WITH_EVIDENCE_BASIS
@@ -345,6 +373,7 @@ class TestP1051TaxAttribution:
         assert "21% statutory convention" in joined
         assert "DIVERGENCE ATTRIBUTION = RESOLVED" in joined
 
+    @pytest.mark.needs_filings
     def test_the_attribution_does_not_validate_the_forward_tax_rate(self):
         g = assess_model_governance(_run("UBER_FY2025"))
         joined = " ".join(g.arbitration_reasons)
@@ -360,6 +389,7 @@ class TestP1051TaxAttribution:
                        "winner", "correct model", "recommend", "buy", "sell"):
             assert banned not in blob
 
+    @pytest.mark.needs_filings
     def test_the_branch_is_evidence_keyed_not_p9_below_live(self):
         # LYFT_FY2025 also has P9 < LIVE, but the P10.5 bridge is NOT fully
         # tax-explained there (WC is the dominant delta), so the tax-attribution
@@ -369,12 +399,14 @@ class TestP1051TaxAttribution:
         assert "21% statutory convention" not in joined
         assert "DIVERGENCE ATTRIBUTION = RESOLVED" not in joined
 
+    @pytest.mark.needs_filings
     @pytest.mark.parametrize("price", [None, 1.0, 17.35, 119.95, 250.0, 5000.0])
     def test_the_tax_attribution_is_price_independent(self, price):
         g = assess_model_governance(_run("UBER_FY2025", price))
         assert g.arbitration is ArbitrationOutcome.MODEL_DIVERGENCE_WITH_EVIDENCE_BASIS
         assert any("21% statutory convention" in r for r in g.arbitration_reasons)
 
+    @pytest.mark.needs_filings
     def test_uber_fy2024_and_dash_arbitration_are_unchanged_by_p1051(self):
         assert assess_model_governance(_run("UBER_FY2024")).arbitration is \
             ArbitrationOutcome.MODEL_DIVERGENCE_WITH_EVIDENCE_BASIS
@@ -384,6 +416,7 @@ class TestP1051TaxAttribution:
         j = " ".join(assess_model_governance(_run("UBER_FY2024")).arbitration_reasons)
         assert "DIVERGENCE ATTRIBUTION = RESOLVED" not in j
 
+    @pytest.mark.needs_filings
     def test_a_merely_partial_tax_bridge_does_not_yield_attribution_resolved(
             self, monkeypatch):
         # the branch requires a FULLY-explained bridge; a PARTIAL one (material
@@ -407,6 +440,7 @@ class TestP1051TaxAttribution:
 # Phase 27 - regression: the LIVE DCF is byte-identical with P10 present
 # =========================================================================== #
 class TestRegression:
+    @pytest.mark.needs_filings
     def test_point_values_unchanged(self):
         for doc, want in (("UBER_FY2024", 77.08), ("UBER_FY2025", 119.95),
                           ("LYFT_FY2025", 49.06), ("DASH_FY2025", 124.27)):
@@ -414,6 +448,7 @@ class TestRegression:
             assess_model_governance(run)
             assert run.result.value_per_share == pytest.approx(want, abs=0.01), doc
 
+    @pytest.mark.needs_filings
     def test_governance_does_not_mutate_the_run(self):
         run = _run("UBER_FY2024")
         i = run.bridged.inputs

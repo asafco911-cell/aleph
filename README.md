@@ -140,13 +140,16 @@ align to the right period. A seventh, separate gate checks that copying
 like net debt BLOCK until an analyst records a policy and a reason in
 [data/overrides.json](data/overrides.json); there is no default.
 
-Five rules that looked like general "10-K facts" turned out to be "Uber
-facts," and broke the first time a second or third filer was added - a
+Six rules that looked like general "10-K facts" turned out to be "Uber
+facts." Five broke the first time a second or third filer was added - a
 table-of-contents format, a note-heading style, a statement title, a page
-offset, where geography sits in the segment note. Every extraction target
-is now resolved by section title, never by number or position, because of
-exactly those five failures. The full list is in
-[CLAUDE.md](CLAUDE.md#five-10-k-facts-that-were-actually-uber-facts).
+offset, where geography sits in the segment note. The sixth broke without a
+second filer at all: all three FY2025 filings adopted ASU 2023-09 and now
+print TWO tax-rate reconciliation tables where the code expected one, so it
+broke across two fiscal years of the same registrant. Every extraction
+target is now resolved by section title, never by number or position,
+because of exactly those six failures. The full list is in
+[CLAUDE.md](CLAUDE.md#six-10-k-facts-that-were-actually-uber-facts).
 
 ## Accounting normalisation is not economic normalisation
 
@@ -203,7 +206,7 @@ app.py            Streamlit UI over the same pipeline. Every number carries
 data/             manifest.json, market.json (shared + per-filing market
                   inputs), overrides.json, anchors.json.
                   The PDFs and the cache are gitignored - see data/README.md
-docs/adr/         six decisions that had a real rejected alternative
+docs/adr/         eight decisions that had a real rejected alternative
 experiments/      ch01-ch13, archived course chapters. Reference only; see
                   "What this is, and what it is not" above
 CLAUDE.md         architecture and working agreement. Carries no status
@@ -259,6 +262,31 @@ mean the anchor above still holds. That check is local and manual, and the
 workflow says so in its own comments rather than leaving the badge to
 imply otherwise.
 
+The workflow also runs `python -m pytest tests/`, which is not one of the
+thirteen - those are standalone scripts; this is the suite over the pure
+modules (the data contract, model governance, robustness, the operating
+model, evidence resolution). On a clone without the filings it was 181
+failed, 628 passed, every failure a `FileNotFoundError` on a 10-K this
+repository does not distribute, which means it could not pass for anyone but
+the author. It now SKIPS those tests instead:
+[tests/conftest.py](tests/conftest.py) checks every filing
+`data/manifest.json` lists, skips the tests marked `needs_filings` when one
+is absent, and prints
+
+```
+========================== NOT VERIFIED BY THIS RUN ===========================
+SKIPPED 181 tests that need the filings; they are NOT verified by this run.
+```
+
+at the top of the summary. Skipped is not passed, and the summary says so in
+those words rather than leaving a row of `s` characters to imply it - the
+same stance as [docs/adr/0008](docs/adr/0008-eval-gate-removed-from-ci.md),
+which deleted a workflow rather than let it report success on a run that
+evaluated nothing. Which tests carry the marker was measured, not guessed:
+those 181 failures map to 158 test functions, and exactly those are marked.
+With the filings present the suite must report 0 skipped - a marked test
+that never needed a filing would otherwise sit unverified in CI forever.
+
 It is the only workflow. A second one ran the ch05 retrieval evaluation
 on pull requests until 2026-09-06; it opened `data/uber_10k.pdf`, which
 this repository does not distribute, so it could only ever fail. It was
@@ -266,6 +294,12 @@ deleted rather than taught to skip - a green "Evaluation Gate" on a run
 that evaluated nothing is the failure this project exists to avoid. See
 [docs/adr/0008](docs/adr/0008-eval-gate-removed-from-ci.md); run that
 evaluation locally with `pip install -r requirements-eval.txt`.
+
+A third file, `.github/fast-gate.yml`, made that sentence false until
+2026-09-10. It sat outside `.github/workflows/` - the only directory GitHub
+Actions reads workflow files from - while declaring `on: push` and a job, and
+it invoked a script under `experiments/`. Deleted under the same ADR: inert
+and indistinguishable from live is the same problem as green and vacuous.
 
 `streamlit run app.py` opens the same pipeline in a browser.
 

@@ -133,6 +133,7 @@ class TestHistoricalDrivers:
         by = {d.name: d for d in historical_drivers(run)}
         assert "NOT a P9 driver" in by["reconstructed_fcff"].note
 
+    @pytest.mark.needs_filings
     def test_live_uber_operating_margin_is_inflecting(self):
         run = pipeline.value_filing("UBER_FY2024", None)
         by = {d.name: d for d in historical_drivers(run)}
@@ -243,6 +244,7 @@ class TestForecast:
         assert not hasattr(f, "market_price")
         assert "price" not in " ".join(f.notes).lower()
 
+    @pytest.mark.needs_filings
     def test_respects_a_live_revenue_growth_override(self):
         run = pipeline.value_filing("LYFT_FY2025", None)   # has a 9.2% override
         f = build_operating_forecast(run, Scenario.BASE)
@@ -474,6 +476,7 @@ class TestCrossSector:
 # Phase 13-15 live filings + Phase 18-20 UBER / LYFT / DASH
 # =========================================================================== #
 class TestLiveFilings:
+    @pytest.mark.needs_filings
     def test_uber_fy2024_driver_base_is_below_live_and_near_p6_central(self):
         run = pipeline.value_filing("UBER_FY2024", None)
         base = build_operating_forecast(run, Scenario.BASE)
@@ -493,6 +496,7 @@ class TestLiveFilings:
                        if x.label == "sustainable_central")
         assert abs(r.value_per_share - central) < 5.0
 
+    @pytest.mark.needs_filings
     def test_uber_bear_scenario_is_not_representable(self):
         run = pipeline.value_filing("UBER_FY2024", None)
         bear = build_operating_forecast(run, Scenario.BEAR)
@@ -502,6 +506,7 @@ class TestLiveFilings:
                              shares_outstanding=run.bridged.inputs.shares_outstanding)
         assert r.status is DriverDCFStatus.NOT_REPRESENTABLE
 
+    @pytest.mark.needs_filings
     def test_lyft_cannot_justify_positive_fcff_without_the_wc_tailwind(self):
         run = pipeline.value_filing("LYFT_FY2025", None)
         bear = build_operating_forecast(run, Scenario.BEAR)   # WC = 0
@@ -512,6 +517,7 @@ class TestLiveFilings:
                              shares_outstanding=run.bridged.inputs.shares_outstanding)
         assert r.status is DriverDCFStatus.NOT_REPRESENTABLE   # FCFF goes negative
 
+    @pytest.mark.needs_filings
     def test_dash_is_insufficient_evidence(self):
         run = pipeline.value_filing("DASH_FY2025", None)
         f = build_operating_forecast(run, Scenario.BASE)
@@ -523,6 +529,7 @@ class TestLiveFilings:
 # Phase 29 - the LIVE base DCF is byte-identical with P9 present
 # =========================================================================== #
 class TestRegression:
+    @pytest.mark.needs_filings
     def test_point_values_unchanged(self):
         for doc, want in (("UBER_FY2024", 77.08), ("UBER_FY2025", 119.95),
                           ("LYFT_FY2025", 49.06), ("DASH_FY2025", 124.27)):
@@ -535,6 +542,7 @@ class TestRegression:
                              shares_outstanding=run.bridged.inputs.shares_outstanding)
             assert run.result.value_per_share == pytest.approx(want, abs=0.01), doc
 
+    @pytest.mark.needs_filings
     def test_p9_does_not_mutate_the_run(self):
         run = pipeline.value_filing("UBER_FY2024", None)
         i = run.bridged.inputs

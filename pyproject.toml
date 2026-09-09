@@ -54,3 +54,11 @@ testpaths = ["tests"]
 # README.md, run directly and in CI, and are deliberately not collected here.
 python_files = ["test_*.py"]
 addopts = "-q"
+# Registered, not implicit: an unregistered mark is a warning, and a typo in
+# `@pytest.mark.needs_filing` would then silently mark nothing - the test would
+# run without its filing and fail on a fresh clone, which is the exact failure
+# tests/conftest.py exists to remove. Registering it makes the typo an error
+# under -W error and a visible warning otherwise.
+markers = [
+    "needs_filings: needs the six 10-K PDFs, which this repository does not distribute (tests/conftest.py skips these when they are absent)",
+]

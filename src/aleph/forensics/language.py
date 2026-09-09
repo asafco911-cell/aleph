@@ -73,6 +73,7 @@ from pathlib import Path
 
 from ..documents import extract_section
 from ..documents.errors import DocumentError
+from ..infra.paths import DATA_DIR
 from ..infra.textnorm import normalise
 from ..schemas.documents import DocumentRecord
 
@@ -503,7 +504,7 @@ def diff_section(
     data_dir: Path | None = None,
 ) -> SectionDiff:
     """Compare one item across two filings by the same registrant."""
-    data_dir = data_dir or Path("data")
+    data_dir = data_dir or DATA_DIR
     if earlier.ticker != later.ticker:
         raise DocumentError(
             f"language forensics compares one registrant across time; got "
@@ -531,6 +532,6 @@ def self_diff(
     Anything other than zero change is a defect in this module, and until it
     reads zero no result from diff_section means anything.
     """
-    data_dir = data_dir or Path("data")
+    data_dir = data_dir or DATA_DIR
     raw = extract_section(data_dir / record.file_name, record.sections, item)
     return _diff(item, record.doc_id, record.doc_id, raw, raw)

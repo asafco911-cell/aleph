@@ -17,10 +17,10 @@ returned at the end.
 import json
 from copy import deepcopy
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from ..extraction import extract
 from ..extraction.targets import resolve_targets
+from ..infra.paths import DATA_DIR
 from ..schemas import DocumentRecord
 from ..schemas.valuation import AssumptionRange, MarketAssumption, Override
 from .accounting_quality import AccountingQualityReport, assess_accounting_quality
@@ -38,9 +38,9 @@ from .dcf_engine import (
     sensitivity_tornado,
 )
 
-MANIFEST = Path("data/manifest.json")
-OVERRIDES = Path("data/overrides.json")
-MARKET = Path("data/market.json")
+MANIFEST = DATA_DIR / "manifest.json"
+OVERRIDES = DATA_DIR / "overrides.json"
+MARKET = DATA_DIR / "market.json"
 
 BETA_BOUND_FACTORS = (0.75, 1.45)
 

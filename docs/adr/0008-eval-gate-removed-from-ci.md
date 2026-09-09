@@ -34,6 +34,29 @@ category as `test_sections.py`, `test_multicompany.py`,
 `test_regression.py` and `run_valuation.py`'s 77.08 anchor - all of which
 need the filings and none of which run in CI.
 
+The same decision is applied on 2026-09-10 to `.github/fast-gate.yml`, found
+during the closing pass. It sat at `.github/fast-gate.yml`, not in
+`.github/workflows/`, which is the only directory GitHub Actions reads workflow
+files from - so the file was inert, and a reader of the repository had no way
+to tell that from its contents, which declare `on: push` and a job. Whether it
+ever ran under an earlier layout was not checked: the `gh` CLI is not installed
+on this machine, so the run history was not consulted and no claim is made
+about it. What it invoked - `experiments/ch13_cicd/run_ci_checks.py` - is
+archived course work either way. Deleted by the same rule as `eval-gate.yml`:
+a gate that cannot do what its name says should be absent, not present and
+inert. Its existence also falsified `README.md`'s "It is the only workflow",
+which is now true.
+
+That deletion is also made structural, because the check written for this ADR
+could not have caught it:
+`test_docs_consistency.py::test_no_workflow_needs_a_file_the_repository_does_not_ship`
+globs `.github/workflows/*.yml`, and a file that is not in that directory is
+not a workflow to it.
+`test_no_inert_workflow_sits_outside_the_workflows_directory` is the
+complement - it fails on any file directly under `.github/` that declares
+`jobs:`. Verified the same way as the first check: the deleted file was written
+back, the checker exited 1 naming it, and it was removed again.
+
 `experiments/ch05_evaluation/02_ab_test.py` is NOT modified. `experiments/`
 is archived course work, read-only by the working agreement in `CLAUDE.md`;
 editing an archived chapter to accommodate a CI decision would falsify what

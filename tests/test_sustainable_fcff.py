@@ -374,6 +374,7 @@ class TestScenarioIsolation:
 # PHASE 9 + 12 - live filings, and the base DCF is untouched
 # =========================================================================== #
 class TestLiveFilings:
+    @pytest.mark.needs_filings
     def test_uber_fy2024_supported_range_regime_uncertain(self):
         run = pipeline.value_filing(*UBER)
         s = assess_sustainable_fcff(run)
@@ -383,6 +384,7 @@ class TestLiveFilings:
         assert s.high == pytest.approx(s.latest_reconstructed_fcff, abs=1.0)
         assert s.reconciliation_ok and s.double_count_ok
 
+    @pytest.mark.needs_filings
     def test_uber_fy2024_working_capital_tailwind_is_isolated(self):
         run = pipeline.value_filing(*UBER)
         s = assess_sustainable_fcff(run)
@@ -392,6 +394,7 @@ class TestLiveFilings:
         assert fy24.working_capital_total > 2000
         assert fy24.working_capital_total > 3 * abs(s.periods[0].working_capital_total)
 
+    @pytest.mark.needs_filings
     def test_lyft_fy2025_supported_range_and_low_is_near_zero(self):
         run = pipeline.value_filing(*LYFT)
         s = assess_sustainable_fcff(run)
@@ -399,18 +402,21 @@ class TestLiveFilings:
         assert s.low < 100          # ex-working-capital, Lyft FY2025 FCFF is ~0
         assert s.high == pytest.approx(s.latest_reconstructed_fcff, abs=1.0)
 
+    @pytest.mark.needs_filings
     def test_dash_fy2025_is_insufficient_evidence_not_a_forced_number(self):
         run = pipeline.value_filing("DASH_FY2025", 215.0)
         s = assess_sustainable_fcff(run)
         assert s.status is SustainableStatus.INSUFFICIENT_EVIDENCE
         assert s.low is None and s.central is None and s.high is None
 
+    @pytest.mark.needs_filings
     def test_base_point_values_are_untouched_by_p6(self):
         assert pipeline.value_filing(*UBER).result.value_per_share == \
             pytest.approx(77.08, abs=0.01)
         assert pipeline.value_filing(*LYFT).result.value_per_share == \
             pytest.approx(49.06, abs=0.01)
 
+    @pytest.mark.needs_filings
     def test_scenario_current_row_equals_the_base_dcf(self):
         run = pipeline.value_filing(*UBER)
         s = assess_sustainable_fcff(run)
@@ -576,6 +582,7 @@ class TestCrossSector:
 # PHASE 7 / 14 - the base DCF path is byte-identical with P6 present
 # =========================================================================== #
 class TestBaseDCFUntouched:
+    @pytest.mark.needs_filings
     def test_assess_sustainable_fcff_does_not_mutate_the_run(self):
         run = pipeline.value_filing(*UBER)
         before = (run.result.value_per_share, run.bridged.inputs.base_cash_flow,

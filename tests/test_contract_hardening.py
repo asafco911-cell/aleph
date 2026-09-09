@@ -150,6 +150,7 @@ class TestGateOrder:
         monkeypatch.setattr(pipeline, "derive_all", lambda f, o: [
             a for a in real(f, o) if a.name != "stock_based_compensation"])
 
+    @pytest.mark.needs_filings
     def test_nothing_downstream_runs_when_the_contract_blocks(self, monkeypatch):
         calls = self._spied(monkeypatch)
         self._block_on_missing_sbc(monkeypatch)
@@ -162,6 +163,7 @@ class TestGateOrder:
         assert caught.value.result.row(
             "stock_based_compensation").reason is Reason.MISSING
 
+    @pytest.mark.needs_filings
     def test_the_spies_would_fire_on_an_unblocked_run(self, monkeypatch):
         """The negative control that gives the test above its teeth: without
         it, a typo in the spy names would make the assertion vacuous."""

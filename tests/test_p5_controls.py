@@ -40,6 +40,7 @@ def sfact(name, value, period, unit):
 # P5.1 - machine-readable provenance
 # =========================================================================== #
 class TestProvenanceIntegrity:
+    @pytest.mark.needs_filings
     def test_net_debt_is_never_labelled_filing(self):
         for doc, price in (UBER, LYFT):
             run = pipeline.value_filing(doc, price)
@@ -47,18 +48,21 @@ class TestProvenanceIntegrity:
                       if a.name == "net_debt")
             assert nd.source == "analyst_judgment", (doc, nd.source)
 
+    @pytest.mark.needs_filings
     def test_lyft_override_growth_is_analyst_judgment_not_filing(self):
         run = pipeline.value_filing(*LYFT)          # LYFT growth is a 9.2% override
         g = next(a for a in run.bridged.inputs.assumptions
                  if a.name == "growth_year_1")
         assert g.source == "analyst_judgment"
 
+    @pytest.mark.needs_filings
     def test_uber_derived_growth_is_derived_not_filing(self):
         run = pipeline.value_filing(*UBER)          # UBER growth is a median
         g = next(a for a in run.bridged.inputs.assumptions
                  if a.name == "growth_year_1")
         assert g.source == "derived"
 
+    @pytest.mark.needs_filings
     def test_base_cash_flow_is_derived_composite_not_filing(self):
         run = pipeline.value_filing(*UBER)
         b = next(a for a in run.bridged.inputs.assumptions
@@ -66,6 +70,7 @@ class TestProvenanceIntegrity:
         assert b.source == "derived"
         assert "LINEAGE" in b.rationale and "effective_tax_rate" in b.rationale
 
+    @pytest.mark.needs_filings
     def test_terminal_growth_and_discount_rate_tags_are_unchanged(self):
         run = pipeline.value_filing(*UBER)
         tags = {a.name: a.source for a in run.bridged.inputs.assumptions}
@@ -73,6 +78,7 @@ class TestProvenanceIntegrity:
         assert tags["discount_rate"] == "market"
         assert tags["effective_tax_rate"] == "analyst_judgment"
 
+    @pytest.mark.needs_filings
     def test_provenance_correction_does_not_move_the_point_value(self):
         assert pipeline.value_filing(*UBER).result.value_per_share == \
             pytest.approx(77.08, abs=0.01)
@@ -84,6 +90,7 @@ class TestProvenanceIntegrity:
 # P5.2 - model conventions are first-class
 # =========================================================================== #
 class TestModelConventions:
+    @pytest.mark.needs_filings
     def test_every_run_carries_the_convention_registry(self):
         run = pipeline.value_filing(*UBER)
         mcs = run.robustness.model_conventions
@@ -96,6 +103,7 @@ class TestModelConventions:
             assert m.classification == "MODEL_CONVENTION"
             assert m.rationale and m.location and m.effect
 
+    @pytest.mark.needs_filings
     def test_conventions_report_live_values(self):
         run = pipeline.value_filing(*UBER)
         by = {m.name: m.value for m in run.robustness.model_conventions}
@@ -103,6 +111,7 @@ class TestModelConventions:
         assert by["growth_summary_statistic"] == "median"
         assert "17.46%" in by["growth_fade_shape"] and "2.50%" in by["growth_fade_shape"]
 
+    @pytest.mark.needs_filings
     def test_can_answer_which_conventions_generated_this_valuation(self):
         # the whole point: enumerable from the ValuationRun, not from prose
         run = pipeline.value_filing(*LYFT)
@@ -146,6 +155,7 @@ class TestHistoryComparability:
                          "is a regime change", "new regime detected"):
             assert asserted not in blob
 
+    @pytest.mark.needs_filings
     def test_real_filings_are_high_concern(self):
         for doc, price in (UBER, LYFT):
             f = pipeline.value_filing(doc, price).robustness.get("HISTORY_COMPARABILITY")
@@ -156,12 +166,14 @@ class TestHistoryComparability:
 # P5.6 - WACC input quality (integrity separate from math validity)
 # =========================================================================== #
 class TestWACCInputQuality:
+    @pytest.mark.needs_filings
     def test_uber_is_limited_stale_erp_and_undisclosed_crp(self):
         f = pipeline.value_filing(*UBER).robustness.get("WACC_INPUT_QUALITY")
         assert f.headline == "WACC INPUT QUALITY: LIMITED"
         assert "different market states" in f.detail
         assert "undisclosed analyst judgement" in f.detail
 
+    @pytest.mark.needs_filings
     def test_lyft_is_insufficient_evidence_unverified_spread(self):
         f = pipeline.value_filing(*LYFT).robustness.get("WACC_INPUT_QUALITY")
         assert f.headline == "WACC INPUT QUALITY: INSUFFICIENT_EVIDENCE"
@@ -211,6 +223,7 @@ class TestWACCInputQuality:
 # P5.7 - reverse DCF well-posedness
 # =========================================================================== #
 class TestReverseDCFWellPosed:
+    @pytest.mark.needs_filings
     def test_positive_fcff_still_solves_the_live_cases(self):
         assert pipeline.value_filing(*UBER).implied_growth == pytest.approx(0.1048, abs=1e-3)
         assert pipeline.value_filing(*LYFT).implied_growth == pytest.approx(-0.0851, abs=1e-3)
@@ -308,6 +321,7 @@ class TestValueBridgeInputIntegrity:
             {})
         assert r.status == "derived" and r.unit == "thousands"
 
+    @pytest.mark.needs_filings
     def test_live_filings_share_facts_carry_a_unit(self):
         for doc, price in (UBER, LYFT):
             r = pipeline.value_filing(doc, price)
@@ -330,6 +344,7 @@ class TestValueBridgeInputIntegrity:
 # P5.10 - scenario / base-case isolation (re-assert with the new fields)
 # =========================================================================== #
 class TestScenarioIsolation:
+    @pytest.mark.needs_filings
     def test_assess_robustness_does_not_mutate_the_run(self):
         run = pipeline.value_filing(*UBER)
         before = (run.result.value_per_share, run.bridged.inputs.base_cash_flow,
@@ -347,11 +362,13 @@ class TestScenarioIsolation:
 # P5.12 - failure taxonomy on the new findings
 # =========================================================================== #
 class TestFailureTaxonomyOnFindings:
+    @pytest.mark.needs_filings
     def test_high_concern_and_market_findings_carry_a_category(self):
         rob = pipeline.value_filing(*LYFT).robustness
         assert rob.get("HISTORY_COMPARABILITY").category is FailureCategory.ECONOMIC_MODEL_FAILURE
         assert rob.get("WACC_INPUT_QUALITY").category is FailureCategory.INSUFFICIENT_EVIDENCE
 
+    @pytest.mark.needs_filings
     def test_ok_findings_have_no_category(self):
         rob = pipeline.value_filing(*UBER).robustness
         assert rob.get("VALUE_BRIDGE_INTEGRITY").category is None
@@ -404,11 +421,13 @@ class TestNegativeEquity:
 # P5.1-closure Parts 5-10 - valuation applicability + evidence families
 # =========================================================================== #
 class TestValuationApplicability:
+    @pytest.mark.needs_filings
     def test_the_rule_is_a_model_convention(self):
         run = pipeline.value_filing(*UBER)
         names = {m.name for m in run.robustness.model_conventions}
         assert "valuation_applicability_rules" in names
 
+    @pytest.mark.needs_filings
     def test_uber_and_lyft_are_limited_applicability(self):
         from aleph.valuation.robustness import Applicability
         for doc, price in (UBER, LYFT):
@@ -416,6 +435,7 @@ class TestValuationApplicability:
             assert rob.applicability is Applicability.LIMITED_APPLICABILITY
             assert "cash_flow_representativeness" in rob.limitation_families
 
+    @pytest.mark.needs_filings
     def test_anchor_high_plus_history_high_concern_gives_limited(self):
         # the explicit Part 7 rule
         from aleph.valuation.robustness import _applicability, Applicability
@@ -425,6 +445,7 @@ class TestValuationApplicability:
         assert any("ANCHOR_SENSITIVITY HIGH" in r and "HIGH_CONCERN" in r
                    for r in reasons)
 
+    @pytest.mark.needs_filings
     def test_correlated_findings_collapse_to_one_family(self):
         # anchor + historical regime + history comparability all describe the
         # SAME cash-flow instability -> ONE family, not three concerns
@@ -440,6 +461,7 @@ class TestValuationApplicability:
         assert rob.limitation_families == (
             "cash_flow_representativeness", "market_input_evidence")
 
+    @pytest.mark.needs_filings
     def test_five_wacc_diagnostics_from_one_stale_erp_are_one_family(self):
         rob = pipeline.value_filing(*UBER).robustness
         w = rob.get("WACC_INPUT_QUALITY")
@@ -532,6 +554,7 @@ class TestValuationApplicability:
 # P5.1-closure Part 16 - the central economic truth, machine-readable
 # =========================================================================== #
 class TestCentralConclusion:
+    @pytest.mark.needs_filings
     def test_uber_conclusion_names_the_actual_reason_not_a_score(self):
         c = pipeline.value_filing(*UBER).robustness.headline_conclusion
         assert "latest FCFF year is a dominant economic assumption" in c
@@ -539,6 +562,7 @@ class TestCentralConclusion:
         for banned in ("confidence", "score", "/10", "%"):
             assert banned not in c.lower()
 
+    @pytest.mark.needs_filings
     def test_conclusion_is_in_cli_output(self):
         import subprocess, sys
         out = subprocess.run([sys.executable, "scripts/run_valuation.py",
@@ -602,6 +626,7 @@ class TestNetDebtUnitGate:
         r = self._nd(unit)
         assert r.status == "blocked" and "INVALID_UNIT" in r.rationale
 
+    @pytest.mark.needs_filings
     def test_plausible_magnitude_wrong_scale_blocks_at_the_bridge(self):
         # override says "thousands", the filing (CFO) is "USD millions".
         # 1370 thousands is a magnitude-plausible number and passes to_millions
@@ -625,6 +650,7 @@ class TestNetDebtUnitGate:
         with pytest.raises(BridgeError, match="different monetary scale"):
             build_dcf_inputs(ranges, market)
 
+    @pytest.mark.needs_filings
     def test_live_filings_pass_the_net_debt_unit_gate(self):
         for doc, price in (UBER, LYFT):
             r = pipeline.value_filing(doc, price)
@@ -635,6 +661,7 @@ class TestNetDebtUnitGate:
 # P5.1-closure Part 14 - regression invariants (diagnostic/provenance only)
 # =========================================================================== #
 class TestRegressionInvariants:
+    @pytest.mark.needs_filings
     def test_uber_and_lyft_point_values_and_bridge_unchanged(self):
         for doc, price, want in (("UBER_FY2024", 76.95, 77.08),
                                  ("LYFT_FY2025", 17.35, 49.06)):

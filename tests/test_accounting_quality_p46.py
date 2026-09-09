@@ -352,6 +352,7 @@ class TestValuationIsolationAdversarial:
                        "from .historical_fcff", "from .assumptions"):
             assert banned not in src, f"accounting_quality imports {banned!r}"
 
+    @pytest.mark.needs_filings
     def test_garbage_report_does_not_move_valuation(self, monkeypatch):
         good = pipeline.value_filing("UBER_FY2024", 76.95)
         gv = (good.result.value_per_share, good.result.enterprise_or_equity_value,
@@ -380,6 +381,7 @@ class TestValuationIsolationAdversarial:
                 bad.bridged.inputs.base_cash_flow, bad.result.pv_terminal,
                 bad.implied_growth) == gv
 
+    @pytest.mark.needs_filings
     def test_p4_exception_does_not_take_down_a_valid_valuation(self, monkeypatch):
         """P4.7: an exception inside the diagnostic layer must NOT crash an
         otherwise-valid valuation. The valuation survives byte-for-byte and
@@ -424,6 +426,7 @@ class TestValuationIsolationAdversarial:
         # 2 anchor-bound trials), and reverse_dcf/tornado are not re-run
         assert calls["run_dcf"] == 3, calls
 
+    @pytest.mark.needs_filings
     def test_clean_p4_run_is_unchanged_by_the_guard(self):
         run = pipeline.value_filing("UBER_FY2024", 76.95)
         assert run.accounting_quality.assessed is True
@@ -510,6 +513,7 @@ class TestProvenanceAudit:
     """Section 13: no diagnostic is authoritative merely for having a polished
     interpretation string. Every real finding traces fact -> calc -> diagnostic."""
 
+    @pytest.mark.needs_filings
     @pytest.mark.parametrize("doc,price", [
         ("UBER_FY2024", 76.95), ("LYFT_FY2025", 17.35), ("DASH_FY2025", 231.89)])
     def test_every_real_finding_carries_full_provenance(self, doc, price):
@@ -558,6 +562,7 @@ class TestRevenueQualityEpistemics:
 
 
 class TestOverclaimGuard:
+    @pytest.mark.needs_filings
     def test_real_filings_never_overclaim(self):
         for doc, price in (("UBER_FY2024", 76.95), ("LYFT_FY2025", 17.35),
                            ("DASH_FY2025", 231.89), ("UBER_FY2025", 76.95)):

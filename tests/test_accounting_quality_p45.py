@@ -270,6 +270,7 @@ class TestRevenueQualityMatrix:
 class TestP45CannotTouchValuation:
     ANCHOR = 77.08
 
+    @pytest.mark.needs_filings
     def test_anchor_holds_and_new_fields_are_present(self):
         run = pipeline.value_filing("UBER_FY2024", 76.95)
         assert run.result.value_per_share == pytest.approx(self.ANCHOR, abs=0.01)
@@ -280,6 +281,7 @@ class TestP45CannotTouchValuation:
         assert wc.coverage is not None
         assert any(d.confidence is Confidence.LIMITED for d in aq.diagnostics)
 
+    @pytest.mark.needs_filings
     def test_valuation_numbers_unchanged_vs_recorded(self):
         run = pipeline.value_filing("UBER_FY2024", 76.95)
         assert run.result.value_per_share == pytest.approx(77.08, abs=0.01)
@@ -290,6 +292,7 @@ class TestP45CannotTouchValuation:
             run.result.enterprise_or_equity_value - run.bridged.inputs.net_debt,
             rel=1e-9)
 
+    @pytest.mark.needs_filings
     def test_no_overclaiming_language_on_any_real_filing(self):
         for doc in ("UBER_FY2024", "LYFT_FY2025"):
             run = pipeline.value_filing(

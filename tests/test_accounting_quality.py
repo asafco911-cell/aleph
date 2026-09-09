@@ -448,12 +448,14 @@ class TestP4CannotTouchValuation:
             "fcff": run.bridged.inputs.base_cash_flow,
         }
 
+    @pytest.mark.needs_filings
     def test_baseline_anchor_holds_with_p4_present(self):
         run = pipeline.value_filing("UBER_FY2024", 76.95)
         assert run.result.value_per_share == pytest.approx(self.ANCHOR, abs=0.01)
         assert run.accounting_quality is not None
         assert run.accounting_quality.assessed
 
+    @pytest.mark.needs_filings
     def test_all_high_impact_report_does_not_move_the_valuation(self, monkeypatch):
         good = self._known_good()
 

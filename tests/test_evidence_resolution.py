@@ -61,6 +61,7 @@ class TestNoPriceLeak:
                     bad.append(f"{name}({p})")
         assert not bad, bad
 
+    @pytest.mark.needs_filings
     @pytest.mark.parametrize("price", [None, 1.0, 17.35, 47.03, 77.08, 250.0, 5000.0])
     def test_every_classification_is_identical_across_prices(self, price):
         base = assess_evidence_resolution(_run("UBER_FY2024", None))
@@ -75,6 +76,7 @@ class TestNoPriceLeak:
                 for e in got.wc_map] == \
                [(e.caption, e.recurrence_evidence) for e in base.wc_map]
 
+    @pytest.mark.needs_filings
     def test_no_composite_score_field_anywhere(self):
         r = assess_evidence_resolution(_run("UBER_FY2024"))
         banned = ("score", "confidence", "quality_score", "reliability",
@@ -144,6 +146,7 @@ class TestPersistenceFalsification:
 # Section A / B - working-capital evidence map + persistence on the filings
 # =========================================================================== #
 class TestWorkingCapitalMap:
+    @pytest.mark.needs_filings
     def test_every_entry_is_a_fact_with_a_recurrence_label(self):
         for doc in ("UBER_FY2024", "UBER_FY2025", "LYFT_FY2025"):
             m = working_capital_evidence_map(_run(doc))
@@ -154,11 +157,13 @@ class TestWorkingCapitalMap:
                 assert isinstance(e.disclosure_status, DisclosureStatus)
                 assert e.cash_flow_direction in ("INFLOW", "OUTFLOW", "NEUTRAL")
 
+    @pytest.mark.needs_filings
     def test_the_map_excludes_non_working_capital_lines(self):
         m = working_capital_evidence_map(_run("UBER_FY2024"))
         caps = " ".join(e.caption.lower() for e in m)
         assert "depreciation" not in caps and "stock-based" not in caps
 
+    @pytest.mark.needs_filings
     def test_uber_insurance_reserve_line_is_supported(self):
         m = working_capital_evidence_map(_run("UBER_FY2024"))
         ins = [e for e in m if e.normalized_category == "INSURANCE_RESERVES"]
@@ -167,6 +172,7 @@ class TestWorkingCapitalMap:
         assert all(e.recurrence_evidence is RecurrenceEvidence.MULTI_YEAR_REPEATED
                    for e in ins)
 
+    @pytest.mark.needs_filings
     def test_amounts_and_directions_match_the_disclosed_numbers(self):
         m = {(e.normalized_category, e.period): e
              for e in working_capital_evidence_map(_run("UBER_FY2024"))}
@@ -179,12 +185,14 @@ class TestWorkingCapitalMap:
 
 
 class TestPersistenceProfiles:
+    @pytest.mark.needs_filings
     def test_uber_fy2024_wc_total_is_recurrent_with_high_variance(self):
         p = {x.name: x for x in persistence_profiles(_run("UBER_FY2024"))}
         assert p["wc_total"].classification is PersistenceClass.RECURRENT_WITH_HIGH_VARIANCE
         assert p["wc_total"].sign_consistency == 1.0
         assert p["wc_total"].magnitude_stability < 0.2
 
+    @pytest.mark.needs_filings
     def test_uber_fy2025_insurance_line_is_more_persistent_than_fy2024(self):
         f24 = {x.name: x for x in persistence_profiles(_run("UBER_FY2024"))}
         f25 = {x.name: x for x in persistence_profiles(_run("UBER_FY2025"))}
@@ -194,6 +202,7 @@ class TestPersistenceProfiles:
         assert i25.classification is PersistenceClass.STRONGLY_PERSISTENT
         assert i25.magnitude_stability > i24.magnitude_stability
 
+    @pytest.mark.needs_filings
     def test_scaled_histories_are_exposed_separately(self):
         p = persistence_profiles(_run("UBER_FY2024"))[0]
         assert len(p.revenue_scaled_history) == len(p.periods)
@@ -205,6 +214,7 @@ class TestPersistenceProfiles:
 # Section C - insurance / float audit
 # =========================================================================== #
 class TestInsuranceAudit:
+    @pytest.mark.needs_filings
     def test_verdicts_per_filer(self):
         assert insurance_float_audit(_run("UBER_FY2024")).verdict is \
             InsuranceVerdict.MIXED_SUPPORTED
@@ -215,11 +225,13 @@ class TestInsuranceAudit:
         assert insurance_float_audit(_run("DASH_FY2025")).verdict is \
             InsuranceVerdict.DISCLOSURE_BOUND
 
+    @pytest.mark.needs_filings
     def test_lyft_is_ambiguous_because_of_the_sign_flip(self):
         a = insurance_float_audit(_run("LYFT_FY2025"))
         assert a.sign_consistency is not None and a.sign_consistency < 1.0
         assert "flip" in a.rationale.lower()
 
+    @pytest.mark.needs_filings
     def test_uber_direction_recurs_but_level_is_disclosure_bound(self):
         a = insurance_float_audit(_run("UBER_FY2024"))
         assert a.sign_consistency == 1.0
@@ -230,24 +242,28 @@ class TestInsuranceAudit:
 # Section E - the sequential bridge LIVE -> P9
 # =========================================================================== #
 class TestSequentialBridge:
+    @pytest.mark.needs_filings
     @pytest.mark.parametrize("doc", ["UBER_FY2024", "UBER_FY2025", "LYFT_FY2025"])
     def test_every_step_satisfies_start_plus_delta_equals_end(self, doc):
         b = sequential_bridge_live_to_p9(_run(doc))
         for s in b.steps:
             assert s.end == pytest.approx(s.start + s.delta, abs=1e-6)
 
+    @pytest.mark.needs_filings
     @pytest.mark.parametrize("doc", ["UBER_FY2024", "UBER_FY2025", "LYFT_FY2025"])
     def test_the_bridge_reconciles_arithmetically_to_the_p9_base(self, doc):
         b = sequential_bridge_live_to_p9(_run(doc))
         assert b.arithmetically_reconciled
         assert b.steps[-1].end == pytest.approx(b.p9_base_fcff, abs=2.0)
 
+    @pytest.mark.needs_filings
     def test_uber_fy2025_is_fully_explained_and_the_cause_is_tax(self):
         b = sequential_bridge_live_to_p9(_run("UBER_FY2025"))
         assert b.economically_explained is EconomicallyExplained.FULLY
         assert "tax" in b.dominant_cause.lower()
         assert b.methodology_pct_of_fcff < 0.02
 
+    @pytest.mark.needs_filings
     def test_uber_fy2024_gap_is_dominated_by_the_working_capital_choice(self):
         b = sequential_bridge_live_to_p9(_run("UBER_FY2024"))
         assert "working-capital" in b.dominant_cause.lower()
@@ -256,12 +272,14 @@ class TestSequentialBridge:
         assert b.economically_explained in (EconomicallyExplained.PARTIAL,
                                             EconomicallyExplained.FULLY)
 
+    @pytest.mark.needs_filings
     def test_arithmetically_reconciled_is_not_conflated_with_explained(self):
         b = sequential_bridge_live_to_p9(_run("LYFT_FY2025"))
         # LYFT reconciles arithmetically, but the methodology chunk is > 10%
         assert b.arithmetically_reconciled
         assert b.economically_explained is not EconomicallyExplained.FULLY
 
+    @pytest.mark.needs_filings
     def test_dash_has_no_bridge_because_there_is_no_second_model(self):
         b = sequential_bridge_live_to_p9(_run("DASH_FY2025"))
         assert b.live_fcff is None and not b.steps
@@ -272,6 +290,7 @@ class TestSequentialBridge:
 # Section F - operating basis without working capital
 # =========================================================================== #
 class TestOperatingBasisWithoutWC:
+    @pytest.mark.needs_filings
     def test_lyft_operating_cash_independent_of_wc_is_not_positive(self):
         ob = assess_evidence_resolution(_run("LYFT_FY2025")).operating_basis_without_wc
         assert ob["status"] == "CLASSIFIED"
@@ -280,6 +299,7 @@ class TestOperatingBasisWithoutWC:
         assert h1.status is HypothesisStatus.RULED_OUT
         assert "NOT hypothesis 1" in ob["verdict"]
 
+    @pytest.mark.needs_filings
     def test_uber_operating_cash_independent_of_wc_is_positive_recently(self):
         ob = assess_evidence_resolution(_run("UBER_FY2025")).operating_basis_without_wc
         h1 = next(h for h in ob["hypotheses"] if h.hypothesis.startswith("1."))
@@ -291,11 +311,13 @@ class TestOperatingBasisWithoutWC:
 # Section G - tax evidence (the 21% convention is graded, never changed)
 # =========================================================================== #
 class TestTaxEvidence:
+    @pytest.mark.needs_filings
     def test_the_statutory_convention_is_not_changed(self):
         assert er.STATUTORY_TAX == 0.21
         for doc in LIVE:
             assert tax_evidence(_run(doc)).statutory == 0.21
 
+    @pytest.mark.needs_filings
     def test_uber_and_lyft_are_effective_disclosed_and_normalization_is_bound(self):
         for doc in ("UBER_FY2024", "LYFT_FY2025"):
             t = tax_evidence(_run(doc))
@@ -305,11 +327,13 @@ class TestTaxEvidence:
             assert t.cash_taxes_paid_disclosed is False
             assert t.normalized_rate_derivable is False
 
+    @pytest.mark.needs_filings
     def test_dash_has_only_the_statutory_rate(self):
         t = tax_evidence(_run("DASH_FY2025"))
         assert t.classification is TaxEvidenceClass.STATUTORY_ONLY
         assert t.effective_by_period == {}
 
+    @pytest.mark.needs_filings
     def test_never_claims_cash_tax_support_it_does_not_have(self):
         for doc in LIVE:
             assert tax_evidence(_run(doc)).classification is not \
@@ -320,6 +344,7 @@ class TestTaxEvidence:
 # Section 11 - FACT / ECONOMIC_INTERPRETATION / MODEL_ASSUMPTION separation
 # =========================================================================== #
 class TestEpistemicTags:
+    @pytest.mark.needs_filings
     def test_all_three_classes_are_present_and_correctly_assigned(self):
         r = assess_evidence_resolution(_run("UBER_FY2024"))
         by_class = {}
@@ -341,18 +366,21 @@ class TestEpistemicTags:
 # Section H - disclosure-boundary engine
 # =========================================================================== #
 class TestDisclosureBoundaries:
+    @pytest.mark.needs_filings
     def test_tax_normalization_is_disclosure_bound_for_every_filer(self):
         for doc in LIVE:
             r = assess_evidence_resolution(_run(doc))
             q = next(b for b in r.boundaries if "normalized forward tax" in b.question)
             assert q.verdict is BoundaryVerdict.DISCLOSURE_BOUND
 
+    @pytest.mark.needs_filings
     def test_uber_fy2025_divergence_question_is_resolved(self):
         r = assess_evidence_resolution(_run("UBER_FY2025"))
         q = next(b for b in r.boundaries if "LIVE<->P9 divergence" in b.question)
         assert q.verdict is BoundaryVerdict.RESOLVED
         assert "unexplained" in q.hypotheses_ruled_out
 
+    @pytest.mark.needs_filings
     def test_wc_level_question_is_partially_resolved_where_there_is_history(self):
         for doc in ("UBER_FY2024", "UBER_FY2025", "LYFT_FY2025"):
             r = assess_evidence_resolution(_run(doc))
@@ -360,6 +388,7 @@ class TestDisclosureBoundaries:
             assert q.verdict is BoundaryVerdict.PARTIALLY_RESOLVED
             assert q.hypotheses_ruled_out  # the one-off reading is ruled out
 
+    @pytest.mark.needs_filings
     def test_disclosure_bound_is_a_valid_successful_output_not_an_error(self):
         r = assess_evidence_resolution(_run("DASH_FY2025"))
         assert r.verdict == "P10.5 DISCLOSURE-BOUND"
@@ -373,11 +402,13 @@ class TestDisclosureBoundaries:
 # Section I / J - model consequence + architectural decision
 # =========================================================================== #
 class TestModelConsequence:
+    @pytest.mark.needs_filings
     def test_no_model_architecture_is_changed(self):
         r = assess_evidence_resolution(_run("UBER_FY2024"))
         for k in ("LIVE", "P6", "P9", "P10 governance"):
             assert r.model_consequence[k] == "UNCHANGED"
 
+    @pytest.mark.needs_filings
     def test_uber_fy2025_tax_attribution_is_now_recognised_by_p10(self):
         # P10.5.1 applied the targeted arbitrate() branch: P10 no longer labels
         # UBER_FY2025 UNRESOLVED, so P10.5 reports the gap closed (KEEP), while
@@ -391,6 +422,7 @@ class TestModelConsequence:
         q = next(b for b in r.boundaries if "normalized forward tax" in b.question)
         assert q.verdict is BoundaryVerdict.DISCLOSURE_BOUND
 
+    @pytest.mark.needs_filings
     def test_all_filers_keep_the_p10_layer_as_is_after_p1051(self):
         for doc in ("UBER_FY2024", "UBER_FY2025", "LYFT_FY2025"):
             r = assess_evidence_resolution(_run(doc))
@@ -401,6 +433,7 @@ class TestModelConsequence:
 # Section 17/18 - regression: nothing in LIVE moves; the run is not mutated
 # =========================================================================== #
 class TestRegression:
+    @pytest.mark.needs_filings
     def test_live_anchors_unchanged(self):
         for doc, want in (("UBER_FY2024", 77.08), ("UBER_FY2025", 119.95),
                           ("LYFT_FY2025", 49.06), ("DASH_FY2025", 124.27)):
@@ -411,6 +444,7 @@ class TestRegression:
     def test_pipeline_has_no_evidence_resolution_import(self):
         assert "evidence_resolution" not in inspect.getsource(pipeline)
 
+    @pytest.mark.needs_filings
     def test_assess_does_not_mutate_the_run(self):
         run = _run("UBER_FY2024")
         i = run.bridged.inputs
@@ -422,6 +456,7 @@ class TestRegression:
                  i.terminal_growth, i.net_debt, i.shares_outstanding)
         assert before == after
 
+    @pytest.mark.needs_filings
     def test_report_is_deterministic(self):
         a = assess_evidence_resolution(_run("UBER_FY2024"))
         b = assess_evidence_resolution(_run("UBER_FY2024"))

@@ -72,8 +72,14 @@ say after you build it locally.
 What the hash is actually good for: if you are handed the six PDFs
 directly (rather than rendering your own), verifying against this table
 confirms you have the identical files this project's committed results -
-including the `Value per share: 77.08` / `49.06` anchors - were run
+including the `Latest-period basis: 77.08` / `49.06` anchors - were run
 against.
+
+That line name matters and this file had it wrong until 2026-09-10: the CLI's
+`Value per share` line prints a RANGE (`-14.13 to 77.08` for UBER_FY2024), and
+77.08 is what the separate `Latest-period basis` line reports. Quoting the
+anchor under the range's label is the point-estimate reading that CLAUDE.md's
+seventh settled principle exists to refuse.
 
 ```
 python -c "import hashlib; print(hashlib.sha256(open('data/uber_10k.pdf','rb').read()).hexdigest())"

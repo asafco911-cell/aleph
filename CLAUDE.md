@@ -162,7 +162,9 @@ src/aleph/
                  before any real-pair result is trusted)
   infra/         textnorm.py (Unicode look-alike normalisation, matching
                  only, never sent to the LLM), cache.py (SQLite, sha256 of
-                 every input that can change an answer)
+                 every input that can change an answer), paths.py (DATA_DIR,
+                 resolved from the package or ALEPH_DATA_DIR, never from CWD
+                 — the one spelling of where data/ is)
 
 data/            manifest.json (6 filings: UBER/LYFT/DASH x FY2024/FY2025),
                  market.json (WACC market inputs: a `shared` block held
@@ -175,6 +177,15 @@ scripts/         run_valuation.py (full pipeline CLI), test_*.py (one script
                  per pipeline stage or module, independently runnable),
                  probe_*.py (ad hoc measurement scripts — the "measure,
                  don't guess" tool)
+
+tests/           pytest suite over the pure modules (contract, governance,
+                 robustness, operating model, evidence). conftest.py skips
+                 the tests marked `needs_filings` when a filing listed in
+                 data/manifest.json is absent, and prints the skipped count
+                 in the terminal summary — a fresh clone must not be able to
+                 read the pass line as a whole-suite pass. Which tests carry
+                 the marker was measured by running the suite without the
+                 PDFs, not chosen by reading file names.
 
 app.py           Streamlit UI. Every number carries a provenance grade;
                  a composite inherits the WEAKEST grade in its chain.

@@ -89,6 +89,7 @@ def _reprice_period(by_name, field, period):
 # The negative control comes first: it gives every "calls == []" its teeth.
 # --------------------------------------------------------------------------- #
 class TestNegativeControl:
+    @pytest.mark.needs_filings
     def test_the_spies_fire_on_a_clean_run(self, monkeypatch):
         calls = _spy_downstream(monkeypatch)
         with pytest.raises(_DownstreamReached, match="build_wacc"):
@@ -102,6 +103,7 @@ class TestNegativeControl:
 # Case 1 - a required field the extractor never returned.
 # --------------------------------------------------------------------------- #
 class TestCase1MissingRequiredField:
+    @pytest.mark.needs_filings
     def test_omitted_sbc_blocks_missing_and_stops_the_pipeline(self, monkeypatch):
         calls = _spy_downstream(monkeypatch)
         _patch_ranges(monkeypatch, lambda d: d.pop("stock_based_compensation"))
@@ -133,6 +135,7 @@ class TestCase2ConflictingObservations:
                 "'Cash, cash equivalents and restricted cash' both match"),
         })
 
+    @pytest.mark.needs_filings
     def test_ambiguity_is_named_in_the_final_error(self, monkeypatch):
         calls = _spy_downstream(monkeypatch)
         _patch_ranges(monkeypatch, self._make_ambiguous)
@@ -144,6 +147,7 @@ class TestCase2ConflictingObservations:
             "BLOCKED reached the caller with the ambiguity cause erased")
         assert calls == []
 
+    @pytest.mark.needs_filings
     def test_a_plain_policy_block_is_not_mislabelled_ambiguous(self, monkeypatch):
         """Negative control for the classifier: net_debt's ordinary block
         (awaiting a cash-and-debt policy) must not read as AMBIGUOUS."""
@@ -165,6 +169,7 @@ class TestCase2ConflictingObservations:
 # Case 3 - a value that arrives in a unit the system cannot convert.
 # --------------------------------------------------------------------------- #
 class TestCase3WrongUnit:
+    @pytest.mark.needs_filings
     def test_unconvertible_unit_blocks_invalid_unit_and_stops(self, monkeypatch):
         calls = _spy_downstream(monkeypatch)
         _patch_ranges(monkeypatch, lambda d: d.__setitem__(
@@ -185,6 +190,7 @@ class TestCase3WrongUnit:
 # Case 4 - required inputs that do not describe the same period.
 # --------------------------------------------------------------------------- #
 class TestCase4WrongPeriod:
+    @pytest.mark.needs_filings
     def test_capex_a_year_off_blocks_period_mismatch_and_stops(self, monkeypatch):
         calls = _spy_downstream(monkeypatch)
         _patch_ranges(monkeypatch,
@@ -204,6 +210,7 @@ class TestCase4WrongPeriod:
 # Case 5 - a genuine zero. Evidence, not an absence: the run must complete.
 # --------------------------------------------------------------------------- #
 class TestCase5ValidZero:
+    @pytest.mark.needs_filings
     def test_zero_sbc_is_verified_not_missing_and_the_run_completes(
         self, monkeypatch
     ):
@@ -228,6 +235,7 @@ class TestCase5ValidZero:
 # This is how UBER_FY2024 runs already; it doubles as the 77.08 anchor guard.
 # --------------------------------------------------------------------------- #
 class TestCase6AnalystOverride:
+    @pytest.mark.needs_filings
     def test_overrides_are_labelled_and_the_run_reaches_the_anchor(self):
         run = pipeline.value_filing(DOC, PRICE)
 
@@ -282,6 +290,7 @@ class TestCase7InsufficientHistory:
 # Case 8 - a WACC market input the run cannot supply.
 # --------------------------------------------------------------------------- #
 class TestCase8MissingWACCDependency:
+    @pytest.mark.needs_filings
     def test_absent_debt_spread_blocks_wacc_and_stops(self, monkeypatch):
         calls = _spy_downstream(monkeypatch)
         _drop_market_key(monkeypatch, "debt_spread")

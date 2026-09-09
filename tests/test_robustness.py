@@ -83,6 +83,7 @@ class TestDCFEngineGuards:
                   r.equity_value, r.pv_terminal, r.pv_explicit, r.terminal_pct):
             assert math.isfinite(v)
 
+    @pytest.mark.needs_filings
     def test_anchor_stays_at_77_08(self):
         # the guards must not perturb the real valuation
         run = pipeline.value_filing("UBER_FY2024", 76.95)
@@ -157,6 +158,7 @@ class TestAnchorSensitivity:
         assert f.sensitivity is Sensitivity.NOT_APPLICABLE
         assert "limitation, not a clean bill" in f.interpretation
 
+    @pytest.mark.needs_filings
     def test_real_uber_anchor_sensitivity_is_high(self):
         rob = pipeline.value_filing("UBER_FY2024", 76.95).robustness
         f = rob.get("ANCHOR_SENSITIVITY")
@@ -184,6 +186,7 @@ class TestTerminalValueDependence:
         f = assess_robustness(run).get("TERMINAL_VALUE_DEPENDENCE")
         assert f.sensitivity in (Sensitivity.MEDIUM, Sensitivity.LOW)
 
+    @pytest.mark.needs_filings
     def test_real_filings_report_a_tv_share(self):
         for doc, price in (("UBER_FY2024", 76.95), ("LYFT_FY2025", 17.35)):
             f = pipeline.value_filing(doc, price).robustness.get(
@@ -265,6 +268,7 @@ class TestValueBridgeIntegrity:
         f = assess_robustness(run).get("VALUE_BRIDGE_INTEGRITY")
         assert "SCALE ANOMALY" in f.headline
 
+    @pytest.mark.needs_filings
     def test_real_filings_bridge_is_consistent(self):
         for doc, price in (("UBER_FY2024", 76.95), ("LYFT_FY2025", 17.35)):
             f = pipeline.value_filing(doc, price).robustness.get(
@@ -398,6 +402,7 @@ class TestP5Isolation:
                        "build_wacc", "build_dcf_inputs", "assess_accounting_quality"):
             assert banned not in src, f"robustness imports {banned!r}"
 
+    @pytest.mark.needs_filings
     def test_absurd_robustness_report_does_not_move_valuation(self, monkeypatch):
         good = pipeline.value_filing("UBER_FY2024", 76.95)
         gv = (good.result.value_per_share, good.result.enterprise_or_equity_value,
@@ -417,6 +422,7 @@ class TestP5Isolation:
                 bad.bridged.inputs.base_cash_flow, bad.result.pv_terminal,
                 bad.implied_growth) == gv
 
+    @pytest.mark.needs_filings
     def test_robustness_exception_does_not_take_down_the_valuation(self, monkeypatch):
         def boom(_run):
             raise RuntimeError("robustness blew up")
@@ -427,6 +433,7 @@ class TestP5Isolation:
         assert "RuntimeError" in run.robustness.not_assessed_reason
         assert run.robustness.findings == ()
 
+    @pytest.mark.needs_filings
     def test_assess_robustness_never_mutates_the_run(self):
         run = pipeline.value_filing("UBER_FY2024", 76.95)
         before = (run.result.value_per_share, run.bridged.inputs.base_cash_flow,

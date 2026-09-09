@@ -29,6 +29,8 @@ CLAUDE = Path("CLAUDE.md")
 WORKFLOW = Path(".github/workflows/pipeline-tests.yml")
 GATES = Path("src/aleph/extraction/gates.py")
 OPERATING_MODEL = Path("src/aleph/valuation/operating_model.py")
+PYPROJECT = Path("pyproject.toml")
+CONFTEST = Path("tests/conftest.py")
 
 failures: list[str] = []
 
@@ -165,6 +167,25 @@ def test_no_workflow_needs_a_file_the_repository_does_not_ship():
                       "exists locally, untracked: a CI runner lacks it")
 
 
+def test_no_inert_workflow_sits_outside_the_workflows_directory():
+    """`.github/fast-gate.yml` declared `on: push` and a job, and sat one
+    directory above `.github/workflows/` - the only place GitHub Actions reads
+    workflow files from. It was inert, and nothing in the file said so.
+
+    The check above globs `.github/workflows/*.yml`, so it never saw this one:
+    a file that is not a workflow cannot fail a workflow check. This is the
+    complement - anything under `.github/` that LOOKS like a workflow and is
+    not where workflows live.
+    """
+    strays = sorted(Path(".github").glob("*.yml")) + \
+        sorted(Path(".github").glob("*.yaml"))
+    check("no stray workflow-shaped file directly under .github/",
+          not [p for p in strays
+               if "jobs:" in p.read_text(encoding="utf-8")],
+          f"{[str(p) for p in strays]} - GitHub Actions reads only "
+          ".github/workflows/, so a job declared here never runs")
+
+
 def test_gate_count_is_not_stale():
     """#30's instance 3: CLAUDE.md said five correctness gates after a sixth
     was added. The count lives in two prose files and one module."""
@@ -222,6 +243,133 @@ def test_adr_count_matches_the_directory():
         check(f"CLAUDE.md's ADR count '{stale.group(1)}' is not a stale number",
               False, "CLAUDE.md should point at docs/adr/, not count it")
 
+    # README's layout block DOES name the count - "docs/adr/  eight decisions
+    # that had a real rejected alternative". It said "six" while eight files
+    # sat on disk: two ADRs were added and the sentence that counts them was
+    # not. #30's shape exactly, and the reason this check exists.
+    readme = README.read_text(encoding="utf-8")
+    stated = re.search(r"docs/adr/\s+(\w+) decisions", readme)
+    check("README's layout block states an ADR count", stated is not None,
+          "expected a line like 'docs/adr/   eight decisions'")
+    if stated:
+        expected = word(len(adrs))
+        check(f"README says '{expected} decisions' for {len(adrs)} ADR files",
+              expected is not None
+              and stated.group(1).lower() == expected.lower(),
+              f"README says '{stated.group(1)}', docs/adr/ holds {len(adrs)}")
+
+
+def uber_facts_section() -> tuple[str, list[str]]:
+    """CLAUDE.md's "Six 10-K facts" heading word, and the bullets under it."""
+    claude = CLAUDE.read_text(encoding="utf-8")
+    match = re.search(r"^## (\w+) \"10-K facts\".*?$(.*?)(?=^## )",
+                      claude, re.S | re.M)
+    if not match:
+        return "", []
+    bullets = re.findall(r"^- ", match.group(2), re.M)
+    return match.group(1), bullets
+
+
+def test_uber_facts_count_agrees_everywhere():
+    """The list of rules that turned out to be Uber-specific lives in two
+    documents and is counted in three sentences. README said "Five rules"
+    while CLAUDE.md's heading said "Six" over six bullets - the sixth (two
+    tax-rate tables after ASU 2023-09) had been added to the list without the
+    README sentence that counts it.
+
+    The bullets are the thing; both headings and both sentences are counts OF
+    them, so the bullets are what this counts.
+    """
+    heading_word, bullets = uber_facts_section()
+    readme = README.read_text(encoding="utf-8")
+
+    check("CLAUDE.md's '10-K facts' section found", bool(bullets),
+          f"heading word={heading_word!r}, bullets={len(bullets)}")
+    if not bullets:
+        return
+
+    expected = word(len(bullets))
+    check(f"CLAUDE.md heading says '{expected}' for {len(bullets)} bullets",
+          expected is not None and heading_word.lower() == expected.lower(),
+          f"heading says '{heading_word}'")
+    check(f"README says '{expected} rules'",
+          expected is not None
+          and f"{expected} rules that looked like general" in readme,
+          f"{len(bullets)} bullets in CLAUDE.md")
+    check(f"README's closing sentence says 'those {str(expected).lower()} failures'",
+          expected is not None
+          and f"those {expected.lower()} failures" in readme)
+
+
+ANCHOR_LABEL = "Latest-period basis"
+CLI = Path("scripts/run_valuation.py")
+
+
+def test_the_anchor_is_quoted_under_the_label_the_cli_prints():
+    """`data/README.md` wrote the 77.08 anchor as `Value per share: 77.08`.
+    The CLI's `Value per share` line prints a RANGE (-14.13 to 77.08 for
+    UBER_FY2024); 77.08 comes from the separate `Latest-period basis` line.
+    Quoting a range's label around a single number is the point-estimate
+    reading CLAUDE.md's seventh settled principle refuses, and it drifted into
+    a file whose whole job is telling a reader what to expect."""
+    check(f"run_valuation.py prints a '{ANCHOR_LABEL}' line",
+          ANCHOR_LABEL in CLI.read_text(encoding="utf-8"))
+    for doc in (README, CLAUDE, Path("data/README.md")):
+        text = doc.read_text(encoding="utf-8")
+        if "77.08" not in text:
+            continue
+        check(f"{doc} names the anchor's own label beside 77.08",
+              ANCHOR_LABEL in text,
+              "77.08 is the latest-period basis, not the 'Value per share' range")
+
+
+def slug(heading: str) -> str:
+    """GitHub's anchor for a markdown heading: lowercase, punctuation dropped,
+    spaces hyphenated."""
+    text = re.sub(r"[^\w\s-]", "", heading.strip().lower())
+    return re.sub(r"\s+", "-", text.strip())
+
+
+def test_readme_links_into_claude_md_resolve():
+    """A renamed heading leaves a link that goes nowhere. The "five 10-K
+    facts" anchor outlived the heading it pointed at by two counts."""
+    claude = CLAUDE.read_text(encoding="utf-8")
+    readme = README.read_text(encoding="utf-8")
+    anchors = {slug(h) for h in re.findall(r"^#+ (.+)$", claude, re.M)}
+    links = re.findall(r"\(CLAUDE\.md#([\w-]+)\)", readme)
+    check("README links into CLAUDE.md by anchor", bool(links))
+    for link in links:
+        check(f"CLAUDE.md#{link} is a heading that exists", link in anchors,
+              "no heading in CLAUDE.md slugifies to that")
+
+
+def test_the_needs_filings_marker_is_registered_and_used():
+    """The marker name lives in three files. A typo in any one of them is
+    silent: pytest warns about an unknown mark and runs the test anyway,
+    which on a fresh clone is the FileNotFoundError this whole mechanism
+    exists to remove."""
+    check("tests/conftest.py exists", CONFTEST.is_file())
+    if not CONFTEST.is_file():
+        return
+    conftest = CONFTEST.read_text(encoding="utf-8")
+    pyproject = PYPROJECT.read_text(encoding="utf-8")
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+
+    check("pyproject.toml registers the needs_filings marker",
+          "needs_filings:" in pyproject)
+    check("conftest.py skips on the needs_filings marker",
+          "needs_filings" in conftest)
+    check("conftest.py prints the skip count in the terminal summary",
+          "pytest_terminal_summary" in conftest
+          and "NOT verified by this run" in conftest)
+    check("the workflow comment names the marker",
+          "needs_filings" in workflow)
+
+    marked = sum(len(re.findall(r"@pytest\.mark\.needs_filings", p.read_text(encoding="utf-8")))
+                 for p in sorted(Path("tests").glob("test_*.py")))
+    check(f"{marked} test functions carry the marker", marked > 0,
+          "conftest.py's mechanism guards nothing if nothing is marked")
+
 
 if __name__ == "__main__":
     print("Command lists:")
@@ -235,9 +383,14 @@ if __name__ == "__main__":
 
     print("Counts stated in two places:")
     test_no_workflow_needs_a_file_the_repository_does_not_ship()
+    test_no_inert_workflow_sits_outside_the_workflows_directory()
     test_gate_count_is_not_stale()
     test_operating_model_docstring_matches_the_bridge()
     test_adr_count_matches_the_directory()
+    test_uber_facts_count_agrees_everywhere()
+    test_the_anchor_is_quoted_under_the_label_the_cli_prints()
+    test_readme_links_into_claude_md_resolve()
+    test_the_needs_filings_marker_is_registered_and_used()
 
     if failures:
         print(f"\n{len(failures)} documentation claim(s) no longer match the code:")

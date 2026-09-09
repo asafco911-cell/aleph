@@ -244,6 +244,7 @@ class TestEvidenceStatusAndScore:
         assert fy24.unclassified_wc                      # caption retained
         assert fy24.score is PeriodScore.PARTIALLY_EVIDENCED
 
+    @pytest.mark.needs_filings
     def test_live_filings_annual_periods_are_fully_or_reconciliation_failed(self):
         for doc in LIVE:
             r = assess_evidence_depth(pipeline.value_filing(doc, None))
@@ -258,6 +259,7 @@ class TestEvidenceStatusAndScore:
 # Phase 8 - capex split evidence
 # =========================================================================== #
 class TestCapexEvidence:
+    @pytest.mark.needs_filings
     def test_live_filings_do_not_support_a_capex_split(self):
         for doc in LIVE:
             r = assess_evidence_depth(pipeline.value_filing(doc, None))
@@ -294,6 +296,7 @@ class TestCapexEvidence:
 # Phase 9 - one-off evidence tiers
 # =========================================================================== #
 class TestOneOffEvidence:
+    @pytest.mark.needs_filings
     def test_live_filings_have_no_corroborating_cash_one_off(self):
         for doc in LIVE:
             r = assess_evidence_depth(pipeline.value_filing(doc, None))
@@ -302,6 +305,7 @@ class TestOneOffEvidence:
                                                OneOffTier.PATTERN_ONLY,
                                                OneOffTier.NONE)
 
+    @pytest.mark.needs_filings
     def test_explicit_language_on_a_noncash_line_does_not_become_a_cash_one_off(self):
         r = assess_evidence_depth(pipeline.value_filing("UBER_FY2024", None))
         # impairments / revaluations are flagged EXPLICIT but are non-cash
@@ -309,6 +313,7 @@ class TestOneOffEvidence:
                    for x in r.one_off_evidence.explicit_items)
         assert r.one_off_evidence.corroborating_items == ()
 
+    @pytest.mark.needs_filings
     def test_pattern_evidence_alone_never_creates_an_adjustment(self):
         r = assess_evidence_depth(pipeline.value_filing("UBER_FY2025", None))
         assert r.one_off_evidence.tier is OneOffTier.PATTERN_ONLY
@@ -319,6 +324,7 @@ class TestOneOffEvidence:
 # Phase 15 - P6 numbers are UNCHANGED; only the lineage is richer
 # =========================================================================== #
 class TestP6Impact:
+    @pytest.mark.needs_filings
     def test_p8_wc_component_sum_equals_p6_wc_total(self):
         for doc in LIVE:
             r = assess_evidence_depth(pipeline.value_filing(doc, None))
@@ -327,6 +333,7 @@ class TestP6Impact:
                 assert r.p6_wc_total_by_period[p] == pytest.approx(
                     r.p8_wc_component_sum_by_period[p], abs=1e-3)
 
+    @pytest.mark.needs_filings
     def test_p6_sustainable_range_is_unchanged_by_p8(self):
         from aleph.valuation.sustainable_fcff import assess_sustainable_fcff
         run = pipeline.value_filing("UBER_FY2024", None)
@@ -342,6 +349,7 @@ class TestP6Impact:
 # Phase 19 - regression: base valuations and P3/P4/P5/P6 guarantees intact
 # =========================================================================== #
 class TestRegression:
+    @pytest.mark.needs_filings
     def test_base_point_values_unchanged(self):
         for doc, want in (("UBER_FY2024", 77.08), ("UBER_FY2025", 119.95),
                           ("LYFT_FY2025", 49.06), ("DASH_FY2025", 124.27)):
@@ -353,6 +361,7 @@ class TestRegression:
         import inspect
         assert "evidence_depth" not in inspect.getsource(pipeline)
 
+    @pytest.mark.needs_filings
     def test_assess_does_not_mutate_the_run(self):
         run = pipeline.value_filing("UBER_FY2024", None)
         i = run.bridged.inputs
@@ -542,6 +551,7 @@ class TestAdversarialFixtures:
         assert fy.reconciliation_status is ReconciliationStatus.RECONCILIATION_FAILED
         assert fy.residual == pytest.approx(-750.0)
 
+    @pytest.mark.needs_filings
     def test_20_inferred_historical_component_is_marked(self):
         # a range that is 'derived' but has no observation for FY2022 -> the
         # FY2022 cell is INFERRED, not VERIFIED
@@ -565,6 +575,7 @@ class TestAdversarialFixtures:
 # Phase 23 - the honesty verdict
 # =========================================================================== #
 class TestHonestyVerdict:
+    @pytest.mark.needs_filings
     def test_live_filings_are_disclosure_bound(self):
         for doc in LIVE:
             r = assess_evidence_depth(pipeline.value_filing(doc, None))

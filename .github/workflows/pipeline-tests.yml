@@ -59,6 +59,25 @@ jobs:
       # tests/ - pytest over the pure modules added for the normalisation,
       # sensitivity and cross-statement work. Separate from the scripts
       # above, which are standalone commands README.md documents by name.
+      #
+      # This step ran red on every push until 2026-09-10, and the reason is
+      # the one this repository keeps re-learning. Measured on a checkout with
+      # data/*.pdf moved away - which is what this runner is - `pytest tests/`
+      # was 181 failed, 628 passed, every failure a FileNotFoundError on a
+      # filing the repository deliberately does not distribute (docs/adr/0006).
+      #
+      # tests/conftest.py now checks every filing data/manifest.json lists and
+      # SKIPS the tests carrying the `needs_filings` marker when one is absent.
+      # Which tests carry it was measured, not guessed: those 181 failures map
+      # to 158 test functions, and exactly those were marked. With the filings
+      # present the suite must report 0 skipped - a marked test that never
+      # needed a filing would be silently unverified here forever.
+      #
+      # The skip is not silent, which is the whole point (same stance as
+      # docs/adr/0008): pytest_terminal_summary prints "SKIPPED N tests that
+      # need the filings; they are NOT verified by this run" at the top of the
+      # summary, so a green check on this step cannot be read as a green check
+      # on the pipeline.
       - name: pytest (normalization, identities, sensitivity)
         run: python -m pytest tests/
 
@@ -95,3 +114,5 @@ jobs:
           echo "NOT covered: test_sections, test_multicompany, test_regression - all need"
           echo "             the six 10-K PDFs, which this repository does not distribute."
           echo "NOT covered: run_valuation.py's 77.08 anchor. Verify locally before release."
+          echo "NOT covered: the pytest tests marked needs_filings - skipped here, and the"
+          echo "             pytest step above prints the count rather than absorbing it."

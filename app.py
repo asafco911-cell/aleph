@@ -18,10 +18,10 @@ aleph.valuation.pipeline, shared with scripts/run_valuation.py, so the two
 callers cannot disagree about what this project's own numbers are.
 """
 import json
-from pathlib import Path
 
 import streamlit as st
 
+from aleph.infra.paths import DATA_DIR
 from aleph.valuation.bridge import BridgeError
 from aleph.valuation.dcf_engine import reverse_dcf
 from aleph.valuation.pipeline import (
@@ -57,7 +57,8 @@ def badge(grade: str) -> str:
 
 @st.cache_data(show_spinner=False)
 def load_manifest() -> list[dict]:
-    return json.loads(Path("data/manifest.json").read_text(encoding="utf-8"))
+    return json.loads(
+        (DATA_DIR / "manifest.json").read_text(encoding="utf-8"))
 
 
 @st.cache_data(show_spinner=False)

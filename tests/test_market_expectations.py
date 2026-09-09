@@ -255,6 +255,7 @@ class TestClassification:
 # Phase 17 - anti-circularity: market price never leaks into the base DCF
 # =========================================================================== #
 class TestAntiCircularity:
+    @pytest.mark.needs_filings
     def test_assess_does_not_mutate_the_run(self):
         run = pipeline.value_filing(*UBER24)
         before = (run.result.value_per_share, run.bridged.inputs.base_cash_flow,
@@ -288,6 +289,7 @@ class TestAntiCircularity:
 # Phase 10 / 11 - live filings
 # =========================================================================== #
 class TestLiveFilings:
+    @pytest.mark.needs_filings
     def test_uber_fy2024_price_mainly_needs_current_fcff_to_persist(self):
         run = pipeline.value_filing(*UBER24)
         me = assess_market_expectations(run)
@@ -297,6 +299,7 @@ class TestLiveFilings:
         assert me.vs_evidence is ExpectationsVsEvidence.MARKET_EXPECTATIONS_ALIGNED
         assert me.level is ExpectationsLevel.EXPECTATIONS_DEMANDING
 
+    @pytest.mark.needs_filings
     def test_uber_fy2025_market_prices_fcff_below_the_evidence_floor(self):
         run = pipeline.value_filing(*UBER25)
         me = assess_market_expectations(run)
@@ -304,6 +307,7 @@ class TestLiveFilings:
         assert me.vs_evidence is ExpectationsVsEvidence.MARKET_EXPECTATIONS_BELOW_EVIDENCE
         assert me.level is ExpectationsLevel.EXPECTATIONS_MODEST
 
+    @pytest.mark.needs_filings
     def test_lyft_fy2025_market_does_not_require_the_wc_inflated_fcff(self):
         run = pipeline.value_filing(*LYFT25)
         me = assess_market_expectations(run)
@@ -314,6 +318,7 @@ class TestLiveFilings:
         assert me.vs_evidence is ExpectationsVsEvidence.MARKET_EXPECTATIONS_ALIGNED
         assert me.level is ExpectationsLevel.EXPECTATIONS_MODEST
 
+    @pytest.mark.needs_filings
     def test_dash_fy2025_cannot_be_graded_against_evidence(self):
         run = pipeline.value_filing(*DASH25)
         me = assess_market_expectations(run)
@@ -323,6 +328,7 @@ class TestLiveFilings:
         assert me.implied_uniform_growth.solvability is Solvability.SOLVED
         assert "INSUFFICIENT_EVIDENCE" in me.interpretation
 
+    @pytest.mark.needs_filings
     def test_interpretation_never_says_buy_or_sell_or_cheap(self):
         import re
         for doc, px in (UBER24, UBER25, LYFT25, DASH25):
@@ -338,6 +344,7 @@ class TestLiveFilings:
 # Phase 23 - the base DCF is byte-identical with P7 present
 # =========================================================================== #
 class TestRegression:
+    @pytest.mark.needs_filings
     def test_point_values_unchanged(self):
         for doc, px, want in (("UBER_FY2024", 76.95, 77.08),
                               ("UBER_FY2025", 79.00, 119.95),

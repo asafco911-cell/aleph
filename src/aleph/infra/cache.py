@@ -13,7 +13,9 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Optional
 
-DEFAULT_PATH = Path("data/aleph_cache.db")
+from .paths import DATA_DIR
+
+DEFAULT_PATH = DATA_DIR / "aleph_cache.db"
 
 
 class Cache:

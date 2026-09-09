@@ -103,6 +103,178 @@ Note for anyone reinstating this: #3, #4 and #5, the findings this gate would
 protect, are all in the retrieval layer, which README.md states is course work
 and not part of the capstone pipeline.
 
+## #34 `pytest tests/` could not pass on a fresh clone, for the same reason #31 could not — CLOSED
+
+Found in the closing pass, 2026-09-10. `pipeline-tests.yml` runs
+`python -m pytest tests/` on every push. The filings are not distributed
+(docs/adr/0006), so the runner has none of them.
+
+MEASURED, with `data/*.pdf` and `data/aleph_cache.db` moved aside:
+
+```
+python -m pytest tests/   ->  181 failed, 628 passed
+```
+
+Every one of the 181 a `FileNotFoundError` on `data/uber_10k_fy2024.pdf` or a
+sibling. No `conftest.py` existed and no test carried a skip condition, so this
+step was red on every push since the tests were added - and #31, the workflow
+that could only ever fail, was closed while a second one sat next to it doing
+the same thing at a different granularity. Deleting a whole workflow is easier
+to notice than a suite that fails 181 of 809.
+
+FIXED structurally, and NOT by making the tests pass without documents: 181 of
+them assert on real numbers from real filings, and faking the filings would
+leave 181 green checks that prove nothing.
+
+`tests/conftest.py` reads `data/manifest.json`, checks every filing it lists,
+and skips the tests marked `needs_filings` when one is absent, naming the
+missing file. The marker is registered in `pyproject.toml` so a typo is a
+warning rather than a silent no-op.
+
+Which tests carry it was MEASURED, not chosen by reading file names: the 181
+failing node ids map to 158 test functions - and to check that mapping is
+sound, every parametrised case was examined: none is mixed, each
+parametrisation fails wholly or not at all, so the marker sits on functions and
+no `pytest.param(marks=...)` is needed.
+
+The skip is LOUD, which is the whole point and the difference between this and
+the "make it skip" alternative docs/adr/0008 rejected.
+`pytest_terminal_summary` prints, above pytest's own summary line:
+
+```
+========================== NOT VERIFIED BY THIS RUN ===========================
+SKIPPED 181 tests that need the filings; they are NOT verified by this run.
+```
+
+VERIFIED both ways, which is what makes the marking falsifiable rather than
+merely plausible:
+
+```
+data/*.pdf and data/aleph_cache.db moved aside:  635 passed, 181 skipped, 0 failed
+filings present:                                 816 passed, 0 skipped
+```
+
+Zero skipped with the filings present is the load-bearing half. A marker on a
+test that never needed a filing would silently remove that test from CI
+forever, and nothing else in the mechanism would notice.
+
+## #35 The extraction prompt was outside the cache key AND outside every check — CLOSED
+
+`Cache.key` includes `PROMPT_VERSION`, a hand-maintained string, not the prompt
+itself. That is deliberate and stays: hashing the prompt into the key would
+change every key on every wording change and force a paid re-extraction of all
+six filings.
+
+The cost of that choice went unrecorded. Edit `SYSTEM_PROMPT`, forget to bump
+`PROMPT_VERSION`, and every cached answer is served against a prompt that no
+longer produced it - silently, with no red flag, which is this project's named
+worst failure mode.
+
+The second half is worse because no one edits anything: `ExtractedFacts`'
+JSON schema is pasted into the user message, so `pydantic`'s
+`model_json_schema()` rendering is part of the prompt. A pydantic upgrade
+changes what the model was asked without touching this repository at all.
+`pyproject.toml` pins `pydantic>=2.0`, so CI installs whatever is current.
+
+FIXED without touching the cache key. `extractor.py` records
+`PROMPT_FINGERPRINT`, the sha256 of `SYSTEM_PROMPT + SCHEMA_JSON`, and checks
+it at import - `raise`, not `assert`, because `python -O` strips asserts and a
+guard that disappears under a flag is not a guard. The message says which
+constant to bump. Current value:
+`2377308fe04a7392a6369a72ab5486bd728badb9ec0e35ea678c6a16de47116d`, computed
+under pydantic 2.13.4.
+
+`SCHEMA_JSON` is now a module constant used both by the fingerprint and by the
+message actually sent, so the fingerprint is provably over the bytes the model
+receives rather than over a second rendering of them.
+
+OPEN, and deliberately left open rather than papered over: the consequence in
+CI. `pyproject.toml` pins `pydantic>=2.0`, so the runner installs whatever is
+current, and the workflow's "Import the package" step imports `extractor`. If a
+future pydantic renders the schema differently, that step goes red on a
+dependency bump nobody made deliberately. That is the CORRECT signal - the
+prompt did change and the cache is stale against it - but it is a decision
+whether to keep the loose pin and accept a red badge as the notification, or
+pin pydantic exactly and make the schema move only when someone chooses it.
+Not decided here; whoever decides should record it as an ADR, because both
+options have a real cost.
+
+Also fixed alongside it: `json.loads` on the model's reply was unwrapped. A
+reply that is not JSON surfaced as a bare `JSONDecodeError` naming a character
+offset in a string the reader cannot see, and naming neither the filing nor the
+target. It now raises `ExtractionError` with `doc_id`, the target, and the
+first 200 characters of the reply - the same treatment the `max_tokens`
+truncation already had, including not caching the failure.
+
+Tests in `tests/test_extractor_prompt.py`, seven of them, none needing a
+filing: the positive control, two negative controls (the fingerprint moves when
+the system prompt moves, and when the schema moves), the import-time raise
+exercised by re-executing the module source with the recorded constant
+tampered, and three on the malformed reply - that it is named, that nothing is
+cached, and that a well-formed reply still parses. Without that last one, a
+wrapper that rejected every reply would pass the other two.
+
+## #36 Eleven places under `src/aleph/` each decided where `data/` is — CLOSED
+
+`Path("data") / record.file_name`, `Path("data/manifest.json")` and
+`Path("data/aleph_cache.db")` appeared across `extraction/extractor.py`,
+`valuation/pipeline.py`, `infra/cache.py` and `forensics/language.py`. A
+relative path is not a location; it is a location plus an assumption about the
+current working directory.
+
+The assumption held because every documented command is run from the repository
+root. Run one from anywhere else and it fails with
+`FileNotFoundError: data/manifest.json` - a path that does exist, reported from
+a directory the reader is not looking at.
+
+FIXED with `src/aleph/infra/paths.py`: `DATA_DIR`, resolved once from
+`ALEPH_DATA_DIR` if set, otherwise from the package file's own location
+(`src/aleph/infra/paths.py` -> repo root), never from the CWD. The env var
+exists because the filings are not distributed, so someone holding them
+elsewhere needs a way to say so that is not a source edit.
+
+VERIFIED by running the anchor from a different working directory:
+
+```
+cd $env:TEMP; python <abs path>\scripts\run_valuation.py UBER_FY2024 76.95
+```
+
+Same output as from the repository root, byte for byte - `Latest-period basis:
+77.08` included.
+
+The "before" is measured too, from that same directory, rather than asserted:
+
+```
+the old literal 'data\manifest.json' resolves to
+  C:\Users\asafc\AppData\Local\Temp\data\manifest.json   exists = False
+DATA_DIR now:
+  C:\Users\asafc\...\aleph\data                          exists = True
+```
+
+Note what that failure looks like to a reader: `FileNotFoundError` naming
+`data/manifest.json`, a file that is sitting right there in the repository.
+
+## #37 `data/README.md` quoted the anchor under the range's label — CLOSED
+
+Small, and the same shape as everything else in this file. It said the six
+PDFs reproduce "the `Value per share: 77.08` / `49.06` anchors". The CLI prints
+two different lines:
+
+```
+  Value per share      :  -14.13 to 77.08    (range across FY2022-FY2024 FCFF)
+  Latest-period basis  :             77.08  (FY2024 FCFF, the base case)
+```
+
+`Value per share` is the RANGE. 77.08 is the `Latest-period basis`. Quoting a
+single number under the range's label is the point-estimate reading the seventh
+settled principle exists to refuse - in the file whose job is telling a reader
+what output to expect.
+
+Fixed, and checked:
+`test_docs_consistency.py::test_the_anchor_is_quoted_under_the_label_the_cli_prints`
+requires any document that mentions 77.08 to also name `Latest-period basis`,
+and requires that label to be one `run_valuation.py` actually prints.
+
 ## #11 Typographic look-alikes break raw string matching across the pipeline
 
 Documents printed from SEC HTML contain U+2019 (right single quotation mark),
