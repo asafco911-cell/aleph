@@ -184,14 +184,15 @@ ISSUES.md         the honest state, open and closed, each with its
 ```
 python -m venv venv
 venv\Scripts\activate
-pip install -e .
+pip install -e .[dev]
 ```
 
-Four packages, Python 3.11 or later, and that is the whole install for the
-thirteen commands below. The fourteenth is not: `python -m pytest tests/`
-needs `pip install -e .[dev]`, which adds pytest and nothing else. Measured on
-a fresh clone, `pip install -e .` followed by `python -m pytest tests/` fails
-with `No module named pytest`. Add the UI with `pip install -e .[ui]`.
+Four runtime packages plus pytest, Python 3.11 or later. The extra is not
+optional for the commands below: measured on a fresh clone, `pip install -e .`
+alone breaks two of them. `python -m pytest tests/` fails with `No module
+named pytest`, and `python scripts/test_docs_consistency.py` exits 1, because
+it counts what the `needs_filings` marker selects by shelling out to `pytest
+--collect-only`. Add the UI with `pip install -e .[ui]`.
 
 Extraction needs `ANTHROPIC_API_KEY` in `.env`, though not on a warm
 [cache](src/aleph/infra/cache.py). The six PDFs are not distributed here -
