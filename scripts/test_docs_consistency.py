@@ -453,22 +453,84 @@ def test_the_diagnostic_line_counts_in_the_readme_are_real():
 
 def slug(heading: str) -> str:
     """GitHub's anchor for a markdown heading: lowercase, punctuation dropped,
-    spaces hyphenated."""
+    then EACH whitespace character to its own hyphen.
+
+    Not `\\s+` to one hyphen, which is what this read until 2026-09-10.
+    github-slugger replaces every space individually, so a heading whose
+    punctuation removal leaves two adjacent spaces anchors with a DOUBLE
+    hyphen. Measured over every heading in README.md, CLAUDE.md and ISSUES.md:
+    the two spellings disagreed on 19 of them, and all 19 are an em dash
+    standing between two spaces - "#24 DASH_FY2024 has never been valued —
+    CLOSED as out of scope" is `...valued--closed-as-out-of-scope` on GitHub
+    and was `...valued-closed-as-out-of-scope` here.
+
+    Nothing was broken at the time, because the only two anchors in the
+    repository pointed at headings with no em dash. That is the point: a
+    checker that would have passed a link GitHub answers with a 404 is the
+    same failure this file exists to remove, one layer up.
+    """
     text = re.sub(r"[^\w\s-]", "", heading.strip().lower())
-    return re.sub(r"\s+", "-", text.strip())
+    return re.sub(r"\s", "-", text)
 
 
-def test_readme_links_into_claude_md_resolve():
+def headings_of(path: Path) -> list[str]:
+    """Every markdown heading in a file, ignoring fenced code blocks.
+
+    README.md's layout block contains lines starting with '#' inside a fence.
+    Counting those as headings would invent anchors that do not exist.
+    """
+    found, fenced = [], False
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            continue
+        if fenced:
+            continue
+        match = re.match(r"^#+\s+(.+?)\s*$", line)
+        if match:
+            found.append(match.group(1))
+    return found
+
+
+# ](file.md#fragment) or ](#fragment); http(s) links are somebody else's file.
+ANCHOR_LINK = re.compile(r"\]\((?!https?:)([^)\s#]*\.md)?#([^)\s]+)\)")
+
+
+def test_every_anchor_link_resolves():
     """A renamed heading leaves a link that goes nowhere. The "five 10-K
-    facts" anchor outlived the heading it pointed at by two counts."""
-    claude = CLAUDE.read_text(encoding="utf-8")
-    readme = README.read_text(encoding="utf-8")
-    anchors = {slug(h) for h in re.findall(r"^#+ (.+)$", claude, re.M)}
-    links = re.findall(r"\(CLAUDE\.md#([\w-]+)\)", readme)
-    check("README links into CLAUDE.md by anchor", bool(links))
-    for link in links:
-        check(f"CLAUDE.md#{link} is a heading that exists", link in anchors,
-              "no heading in CLAUDE.md slugifies to that")
+    facts" anchor outlived the heading it pointed at by two counts.
+
+    Until 2026-09-10 this checked exactly one shape - `(CLAUDE.md#...)`
+    written in README.md - and the repository contained exactly two such
+    links, so it was a guard over the two links least likely to move. An
+    anchor into ISSUES.md, data/README.md or an ADR was not checked at all,
+    and ISSUES.md is where the anchors belong: one heading per numbered issue.
+    Every `.md#anchor` in every markdown file this repository maintains now
+    resolves against the headings of the file it names.
+    """
+    md_files = [README, CLAUDE, ISSUES, Path("data/README.md")]
+    md_files += sorted(Path("docs/adr").glob("*.md"))
+    anchors = {p.resolve(): {slug(h) for h in headings_of(p)}
+               for p in md_files if p.is_file()}
+
+    checked = 0
+    for path in md_files:
+        if not path.is_file():
+            check(f"{path} exists", False, "listed here but not on disk")
+            continue
+        for file_part, fragment in ANCHOR_LINK.findall(
+                path.read_text(encoding="utf-8")):
+            checked += 1
+            target = ((path.parent / file_part).resolve() if file_part
+                      else path.resolve())
+            label = f"{path.as_posix()} -> {file_part or path.name}#{fragment}"
+            if target not in anchors:
+                check(label, False,
+                      "the target file is not one this test reads")
+                continue
+            check(label, fragment in anchors[target],
+                  "no heading in the target file slugifies to that")
+    check("the repository has anchor links to check", checked > 0)
 
 
 def test_the_needs_filings_marker_is_registered_and_used():
@@ -713,7 +775,7 @@ if __name__ == "__main__":
     test_the_diagnostic_script_exists_and_is_documented()
     test_run_valuation_owns_only_the_valuation()
     test_the_diagnostic_line_counts_in_the_readme_are_real()
-    test_readme_links_into_claude_md_resolve()
+    test_every_anchor_link_resolves()
     test_the_needs_filings_marker_is_registered_and_used()
     test_every_command_that_opens_a_filing_reports_a_missing_one()
     test_the_issues_contents_table_matches_the_file()

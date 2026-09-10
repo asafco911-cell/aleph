@@ -11,7 +11,8 @@ reports a range instead of a point.
 It holds six filings - Uber, Lyft and DoorDash, FY2024 and FY2025 - of which
 four are valued end to end; the other two stop at extraction, because valuing
 them would take analyst judgements manufactured to fill a gap in a table
-rather than to answer a question ([ISSUES.md #24](ISSUES.md)). Built with AI
+rather than to answer a question
+([ISSUES.md #24](ISSUES.md#24-dash_fy2024-has-never-been-valued--closed-as-out-of-scope)). Built with AI
 assistance (Claude) under [CLAUDE.md](CLAUDE.md).
 
 ## The result
@@ -24,7 +25,11 @@ Three companies, one method, at the same close of 2026-08-27.
 | LYFT_FY2025 | NOT_APPLICABLE – $49.06 (FY2023–FY2025) | $49.06 | $17.35 | no range to place it in | -8.5%/yr for 10 years |
 | DASH_FY2025 | $54.85 – $124.27 (FY2023–FY2025) | $124.27 | $231.89 | 86.6% above the top | 23.5%/yr for 10 years |
 
-Reproduce a row: `python scripts/run_valuation.py <doc_id> <price>`.
+Reproduce a row: `python scripts/run_valuation.py <doc_id> <price>`. The
+[cache](src/aleph/infra/cache.py) is time and money, not the source of the
+number: measured 2026-09-10, with `data/aleph_cache.db` moved aside, seven
+live LLM calls for `UBER_FY2024` produced output identical line for line to
+the cached run, 77.08 included.
 
 "Where it sits" places a price against a range built from the filing's own
 cash flows; it is not a verdict. Reading Uber's row as **insufficient basis to
@@ -33,13 +38,14 @@ DoorDash is the one row where it does not hold.
 
 Lyft has no low end, and that is a finding, not a missing number: its FY2023
 FCFF was -$712m, and the engine refuses to grow a negative cash flow for ten
-years and call the result a valuation ([ISSUES.md #38](ISSUES.md)).
+years and call the result a valuation
+([ISSUES.md #38](ISSUES.md#38-the-engine-grew-a-negative-fcff-for-ten-years-and-called-it-a-valuation--closed)).
 
 The system also produces evidence against itself. `UBER_FY2024` and
 `UBER_FY2025` value the same company at the same $76.95 price one filing year
 apart: $77.08 versus $119.95, a 56% swing with every gate passing - almost
 entirely two non-cash items in one year's CFO read as durable cash flow
-([ISSUES.md #29](ISSUES.md)).
+([ISSUES.md #29](ISSUES.md#29-a-ten-year-dcf-anchored-on-one-years-fcff-is-the-wrong-instrument-for-a-company-mid-inflection)).
 
 ## What this is, and what it is not
 
@@ -55,7 +61,9 @@ multi-agent system, by design: the LLM never searches, navigates, computes or
 chooses a source.
 
 **What it is not, at all**: investment advice. Its largest documented
-limitation ([ISSUES.md #29](ISSUES.md)) - a ten-year DCF anchored on one
+limitation
+([ISSUES.md #29](ISSUES.md#29-a-ten-year-dcf-anchored-on-one-years-fcff-is-the-wrong-instrument-for-a-company-mid-inflection))
+- a ten-year DCF anchored on one
 year's cash flow is arguably the wrong instrument for these companies - is
 here because the system produced it.
 
@@ -179,7 +187,12 @@ venv\Scripts\activate
 pip install -e .
 ```
 
-Four packages, Python 3.11 or later; add the UI with `pip install -e .[ui]`.
+Four packages, Python 3.11 or later, and that is the whole install for the
+thirteen commands below. The fourteenth is not: `python -m pytest tests/`
+needs `pip install -e .[dev]`, which adds pytest and nothing else. Measured on
+a fresh clone, `pip install -e .` followed by `python -m pytest tests/` fails
+with `No module named pytest`. Add the UI with `pip install -e .[ui]`.
+
 Extraction needs `ANTHROPIC_API_KEY` in `.env`, though not on a warm
 [cache](src/aleph/infra/cache.py). The six PDFs are not distributed here -
 [data/README.md](data/README.md) has the EDGAR source of each.
@@ -221,7 +234,9 @@ SKIPPED 185 tests that need the filings; they are NOT verified by this run.
 because skipped is not passed. Today
 185 tests carry the marker, on 159 test functions - a parametrised function
 produces several tests from one decorator - and both counts are checked
-against the code. With the filings, 0 skipped.
+against the code. With the filings, 0 skipped - and the suite takes roughly
+ten minutes rather than the few seconds it takes without them, because the
+tests that skip are exactly the ones that open a PDF.
 
 `streamlit run app.py` opens the pipeline in a browser.
 
