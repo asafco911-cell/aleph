@@ -600,12 +600,23 @@ class TestCentralConclusion:
 
     @pytest.mark.needs_filings
     def test_conclusion_is_in_cli_output(self):
+        """The applicability conclusion moved commands on 2026-09-10, from
+        run_valuation.py to diagnose_valuation.py (docs/adr/0009). It is
+        checked in BOTH directions on purpose: it has to reach a reader, and
+        it must not be back in the valuation command, because the split is the
+        claim that the valuation prints only what a number depends on."""
         import subprocess, sys
-        out = subprocess.run([sys.executable, "scripts/run_valuation.py",
+        diag = subprocess.run([sys.executable, "scripts/diagnose_valuation.py",
+                               "UBER_FY2024", "76.95"], capture_output=True,
+                              text=True).stdout
+        assert "VALUATION APPLICABILITY:  LIMITED_APPLICABILITY" in diag
+        assert "latest FCFF year is a dominant economic assumption" in diag
+
+        val = subprocess.run([sys.executable, "scripts/run_valuation.py",
                               "UBER_FY2024", "76.95"], capture_output=True,
                              text=True).stdout
-        assert "VALUATION APPLICABILITY:  LIMITED_APPLICABILITY" in out
-        assert "latest FCFF year is a dominant economic assumption" in out
+        assert "VALUATION APPLICABILITY" not in val
+        assert "Latest-period basis  :             77.08" in val
 
 
 # =========================================================================== #

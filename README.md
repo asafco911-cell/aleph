@@ -164,6 +164,57 @@ target is now resolved by section title, never by number or position,
 because of exactly those six failures. The full list is in
 [CLAUDE.md](CLAUDE.md#six-10-k-facts-that-were-actually-uber-facts).
 
+## Diagnostic layers (not in the base DCF)
+
+Most of this repository is not the valuation. Measured on
+`src/aleph/valuation/`, 12,346 lines across 20 modules: **2,786 lines are
+code a valuation number depends on** - extraction bridge, assumptions, the
+data contract, the bottom-up WACC, the DCF engine, the orchestrator. The
+other 9,560 are diagnostic layers that read a finished valuation, re-run the
+*pure* engine on copies, and report what the answer rests on. None of them
+adjusts FCFF, WACC, a discount rate, an anchor or a share count. That is
+enforced, not promised: regression tests replace each layer's report with
+garbage and assert the per-share value is byte-identical.
+
+Each answers one question:
+
+| module | lines | the question it answers |
+|---|---|---|
+| `accounting_quality.py` | 1,902 | Is the reported earnings-to-cash relationship deteriorating, and where? |
+| `evidence_resolution.py` | 1,330 | When two layers disagree about a number, which evidence wins, and why? |
+| `robustness.py` | 1,289 | How much of the answer is a choice rather than a fact? |
+| `evidence_depth.py` | 803 | What accounting evidence is actually present, and where does it run out? |
+| `model_governance.py` | 769 | Why do the LIVE, P6 and P9 valuations disagree, and which assumption is responsible? |
+| `sustainable_fcff.py` | 738 | Which part of the latest FCFF is a recurring cash-generating capability? |
+| `operating_model.py` | 638 | What does revenue → margin → working capital → capex imply, driver by driver? |
+| `market_expectations.py` | 587 | What must be true for today's market price to be right? |
+| `cfo_normalization.py` | 474 | How much of CFO's composition can be accounted for at all? |
+| `historical_fcff.py` | 445 | How far does the answer move across every starting year an analyst could defend? |
+| `normalization.py` | 277 | What would capitalising R&D do to the operating result? |
+| `sensitivity.py` | 211 | What does the answer look like across a WACC × growth grid? |
+| `driver_based_dcf.py` | 97 | Can a driver-built FCFF path be expressed as growth the existing engine accepts? |
+
+Run them with
+
+```
+python scripts\diagnose_valuation.py UBER_FY2024 76.95
+```
+
+the same arguments `run_valuation.py` takes. They printed underneath the
+valuation until 2026-09-10; splitting them out is what let each layer's bare
+`except Exception` be replaced by the two exception types the package
+actually raises, because a bug in a diagnostic can no longer take down a
+valuation.
+
+**None of these changes a number, and none was promoted, deliberately.** The
+one with the strongest case - P6, which produces an evidence-based sustainable
+FCFF range instead of one disclosed year - was considered as the base anchor
+and rejected; the reasoning and what would change the decision are in
+[docs/adr/0009](docs/adr/0009-diagnostic-layers-not-promoted.md). Four of the
+modules above (`cfo_normalization`, `historical_fcff`, `normalization`,
+`sensitivity`, 1,407 lines) are wired to nothing at all and are exercised only
+by their tests; they say so in their own docstrings.
+
 ## Accounting normalisation is not economic normalisation
 
 `valuation/cfo_normalization.py` asks two different questions and keeps them
@@ -211,15 +262,17 @@ src/aleph/        the pipeline. documents/ (structure, notes, statements),
                   valuation/ (assumptions, bridge, wacc, dcf_engine,
                   pipeline), forensics/ (language), schemas/, infra/
                   (textnorm, cache, units)
-scripts/          run_valuation.py (the CLI), test_*.py (one per stage),
-                  probe_*.py (ad hoc measurement - the "measure, don't
-                  guess" tool), capture_baseline.py, build_manifest.py
+scripts/          run_valuation.py (the valuation CLI),
+                  diagnose_valuation.py (the layers that change no number),
+                  test_*.py (one per stage), probe_*.py (ad hoc measurement -
+                  the "measure, don't guess" tool), capture_baseline.py,
+                  build_manifest.py
 app.py            Streamlit UI over the same pipeline. Every number carries
                   a provenance grade; a composite inherits the weakest.
 data/             manifest.json, market.json (shared + per-filing market
                   inputs), overrides.json, anchors.json.
                   The PDFs and the cache are gitignored - see data/README.md
-docs/adr/         eight decisions that had a real rejected alternative
+docs/adr/         nine decisions that had a real rejected alternative
 experiments/      ch01-ch13, archived course chapters. Reference only; see
                   "What this is, and what it is not" above
 CLAUDE.md         architecture and working agreement. Carries no status

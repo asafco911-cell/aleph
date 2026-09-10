@@ -179,7 +179,12 @@ data/            manifest.json (6 filings: UBER/LYFT/DASH x FY2024/FY2025),
                  (analyst decisions, versioned, rationale required),
                  anchors.json, aleph_cache.db (gitignored), *.pdf (gitignored)
 
-scripts/         run_valuation.py (full pipeline CLI), test_*.py (one script
+scripts/         run_valuation.py (the valuation CLI: contract, WACC, bridge,
+                 assumptions, result, tornado, reverse DCF — and nothing a
+                 valuation number does not depend on), diagnose_valuation.py
+                 (same argv; accounting quality, robustness and the five
+                 EXPERIMENTAL layers — 77% of valuation/ by line count,
+                 changing no number; docs/adr/0009), test_*.py (one script
                  per pipeline stage or module, independently runnable),
                  probe_*.py (ad hoc measurement scripts — the "measure,
                  don't guess" tool)

@@ -323,6 +323,94 @@ def test_the_anchor_is_quoted_under_the_label_the_cli_prints():
               "77.08 is the latest-period basis, not the 'Value per share' range")
 
 
+DIAGNOSE = Path("scripts/diagnose_valuation.py")
+VALUATION_PKG = Path("src/aleph/valuation")
+
+
+def test_the_diagnostic_script_exists_and_is_documented():
+    """`diagnose_valuation.py` is NOT one of the thirteen - those are commands
+    that VERIFY the system, and this one verifies nothing, it reports. But it
+    is now the second user-facing entry point, and an entry point nobody
+    documents is the state this whole section came out of: seven diagnostic
+    layers, more than three quarters of valuation/, and not one mention in
+    README.md."""
+    readme = README.read_text(encoding="utf-8")
+    check("scripts/diagnose_valuation.py exists", DIAGNOSE.is_file())
+    check("README documents the diagnostic command",
+          "scripts\\diagnose_valuation.py" in readme
+          or "scripts/diagnose_valuation.py" in readme)
+    check("README has the 'Diagnostic layers' section",
+          "## Diagnostic layers (not in the base DCF)" in readme)
+    check("README says the layers change no number",
+          "changes a number, and none was promoted" in readme)
+
+
+def test_run_valuation_owns_only_the_valuation():
+    """The split is the claim; this is the check. run_valuation.py must not
+    import a diagnostic layer again, and the diagnostic script must not
+    reacquire a bare `except Exception` - the two ways this reverts."""
+    cli = Path("scripts/run_valuation.py").read_text(encoding="utf-8")
+    diagnostic_modules = (
+        "sustainable_fcff", "market_expectations", "evidence_depth",
+        "evidence_resolution", "operating_model", "driver_based_dcf",
+        "model_governance",
+    )
+    for name in diagnostic_modules:
+        check(f"run_valuation.py does not import {name}",
+              f"aleph.valuation.{name}" not in cli)
+
+    if not DIAGNOSE.is_file():
+        return
+    source = DIAGNOSE.read_text(encoding="utf-8")
+    code = [l for l in source.splitlines()
+            if "except Exception" in l and not l.lstrip().startswith("#")]
+    # the module docstring explains the history and names the phrase; only
+    # actual handlers count.
+    code = [l for l in code if l.lstrip().startswith("except")]
+    check("diagnose_valuation.py has no bare `except Exception`", not code,
+          f"{code}")
+    check("diagnose_valuation.py names the exceptions it does catch",
+          "DIAGNOSTIC_ERRORS = (DCFConsistencyError, BridgeError)" in source)
+
+
+def test_the_diagnostic_line_counts_in_the_readme_are_real():
+    """README's "Diagnostic layers" table states a line count per module.
+    Thirteen numbers in prose over a directory that changes - #30's shape
+    exactly, and the reason this check exists rather than a promise to
+    re-count."""
+    readme = README.read_text(encoding="utf-8")
+    for match in re.finditer(r"\| `(\w+)\.py` \| ([\d,]+) \|", readme):
+        module, stated = match.group(1), int(match.group(2).replace(",", ""))
+        path = VALUATION_PKG / f"{module}.py"
+        check(f"{module}.py exists", path.is_file())
+        if not path.is_file():
+            continue
+        actual = len(path.read_text(encoding="utf-8").splitlines())
+        check(f"README says {module}.py is {stated:,} lines", actual == stated,
+              f"actual {actual:,}")
+
+    # and the totals the section opens with, which are the numbers a reader
+    # actually takes away
+    modules = [p for p in sorted(VALUATION_PKG.glob("*.py"))
+               if p.stem != "__init__"]
+    total = sum(len(p.read_text(encoding="utf-8").splitlines()) for p in modules)
+    check(f"README says valuation/ is {total:,} lines",
+          f"{total:,} lines" in readme, f"actual {total:,}")
+    check(f"README says {len(modules)} modules",
+          f"across {len(modules)} modules" in readme,
+          f"actual {len(modules)}")
+
+    live = re.search(r"\*\*([\d,]+) lines are\s+code a valuation number depends on\*\*",
+                     readme)
+    diag = re.search(r"other ([\d,]+) are diagnostic", readme)
+    check("README states a live line count", live is not None)
+    check("README states a diagnostic line count", diag is not None)
+    if live and diag:
+        parts = int(live.group(1).replace(",", "")) + int(diag.group(1).replace(",", ""))
+        check(f"README's live + diagnostic = {total:,}", parts == total,
+              f"stated {parts:,}")
+
+
 def slug(heading: str) -> str:
     """GitHub's anchor for a markdown heading: lowercase, punctuation dropped,
     spaces hyphenated."""
@@ -389,6 +477,9 @@ if __name__ == "__main__":
     test_adr_count_matches_the_directory()
     test_uber_facts_count_agrees_everywhere()
     test_the_anchor_is_quoted_under_the_label_the_cli_prints()
+    test_the_diagnostic_script_exists_and_is_documented()
+    test_run_valuation_owns_only_the_valuation()
+    test_the_diagnostic_line_counts_in_the_readme_are_real()
     test_readme_links_into_claude_md_resolve()
     test_the_needs_filings_marker_is_registered_and_used()
 
