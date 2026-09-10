@@ -4,8 +4,15 @@
 
 [![Pipeline tests](https://github.com/asafco911-cell/aleph/actions/workflows/pipeline-tests.yml/badge.svg)](https://github.com/asafco911-cell/aleph/actions/workflows/pipeline-tests.yml)
 
-Six filings, four valued end to end. Built with AI assistance (Claude) under
-[CLAUDE.md](CLAUDE.md).
+Aleph reads a 10-K, has an LLM copy figures out of one bounded region at a
+time, checks every copy with deterministic Python gates, and runs a DCF that
+reports a range instead of a point.
+
+It holds six filings - Uber, Lyft and DoorDash, FY2024 and FY2025 - of which
+four are valued end to end; the other two stop at extraction, because valuing
+them would take analyst judgements manufactured to fill a gap in a table
+rather than to answer a question ([ISSUES.md #24](ISSUES.md)). Built with AI
+assistance (Claude) under [CLAUDE.md](CLAUDE.md).
 
 ## The result
 
