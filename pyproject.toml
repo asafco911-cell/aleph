@@ -1,7 +1,7 @@
 [project]
 name = "aleph"
 version = "0.1.0"
-description = "Autonomous multi-document financial analyst"
+description = "A bounded-extraction DCF over 10-K filings"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"

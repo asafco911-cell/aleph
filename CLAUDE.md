@@ -1,4 +1,4 @@
-# Aleph — Autonomous Multi-Document Financial Analyst
+# Aleph — A bounded-extraction DCF over 10-K filings
 
 Capstone of a 14-chapter course (chapters 1-13 archived, read-only, under
 `experiments/`). Owner: Asi, 23, Tel Aviv, building toward running a fund.

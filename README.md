@@ -1,57 +1,15 @@
-# Aleph — Autonomous Multi-Document Financial Analyst
+# Aleph — A bounded-extraction DCF over 10-K filings
+
+*An LLM copies, Python gates, arithmetic values.*
 
 [![Pipeline tests](https://github.com/asafco911-cell/aleph/actions/workflows/pipeline-tests.yml/badge.svg)](https://github.com/asafco911-cell/aleph/actions/workflows/pipeline-tests.yml)
 
-The badge covers eight of the thirteen commands below - the ones needing only
-fixtures and arithmetic. It does NOT cover the 77.08 anchor or the three
-tests that need the filings; see "Running it".
-
-Aleph reads 10-K filings and produces a defensible valuation range: an LLM
-copies figures from bounded regions of the document, deterministic Python
-gates check that the copying is correct, and everything downstream - the
-assumption ranges, the bottom-up WACC, the DCF - is arithmetic with no model
-in the loop.
-
-Built with AI assistance (Claude) throughout, under the working discipline
-recorded in [CLAUDE.md](CLAUDE.md).
-
-## What this is, and what it is not
-
-This repository is the capstone of a fourteen-chapter course, and the name
-covers less than the course syllabus does. Stating that plainly is cheaper
-than letting a reader discover it.
-
-**What runs in `src/aleph/`** is a valuation pipeline, end to end, on six
-real filings: document structure (table of contents, Item ranges, statements
-and notes resolved by title), bounded extraction with seven gates, assumption
-derivation that blocks rather than guesses, a bottom-up WACC, a DCF that
-reports a range with a tornado and a reverse DCF, and year-over-year language
-forensics on MD&A and Risk Factors. Four filings are valued end to end.
-
-**What is course work, not the capstone**, lives in
-[`experiments/`](experiments/) - thirteen archived chapters covering
-embeddings, chunking, vector stores, hybrid retrieval and re-ranking, RAG
-evaluation, grounding, knowledge graphs, multi-agent orchestration, forensic
-scores, cross-document comparison, production concerns and CI. Each chapter
-runs and has a reference document. **None of it is wired into the pipeline
-above.** Aleph does not do retrieval, does not build a knowledge graph, and
-is not a multi-agent system - by design, since principle 5 of its
-architecture is that the LLM never searches, navigates, computes or chooses
-a source. That is a narrower system than the chapter list implies, and the
-narrowing was the point.
-
-**What it is not, at all**: investment advice. It is a measurement
-instrument with documented and material limitations, the largest of which
-([ISSUES.md #29](ISSUES.md)) is that a ten-year DCF anchored on one year's
-cash flow is arguably the wrong instrument for the companies it is pointed
-at. That finding is in the repository because the system produced it.
+Six filings, four valued end to end. Built with AI assistance (Claude) under
+[CLAUDE.md](CLAUDE.md).
 
 ## The result
 
-Three companies, one fiscal year, one trading day, one method. `UBER_FY2025`,
-`LYFT_FY2025` and `DASH_FY2025` are all priced as of the same market close -
-2026-08-27 - and run through the identical pipeline: extract, derive a
-bottom-up WACC, rebuild FCFF from CFO, discount.
+Three companies, one method, at the same close of 2026-08-27.
 
 | filing | value-per-share range (FCFF basis) | latest-period basis | market price | where it sits | reverse-DCF implied growth |
 |---|---|---|---|---|---|
@@ -59,124 +17,83 @@ bottom-up WACC, rebuild FCFF from CFO, discount.
 | LYFT_FY2025 | NOT_APPLICABLE – $49.06 (FY2023–FY2025) | $49.06 | $17.35 | no range to place it in | -8.5%/yr for 10 years |
 | DASH_FY2025 | $54.85 – $124.27 (FY2023–FY2025) | $124.27 | $231.89 | 86.6% above the top | 23.5%/yr for 10 years |
 
-Reproduce any row with `python scripts/run_valuation.py <doc_id> <price>`.
+Reproduce a row: `python scripts/run_valuation.py <doc_id> <price>`.
 
-Be precise about what that table's middle columns are: the tool prints
-"inside the range, 53.8% of the way up" or "86.6% ABOVE the top of the
-range" - a description of where a price sits against a range built from the
-filing's own disclosed cash flows. It does not print a verdict. Reading
-Uber's row as **insufficient basis to conclude** - the market price sits
-inside a range wide enough that both a bull and a bear case are consistent
-with the same filing - is this write-up's conclusion, not a string the code
-emits. DoorDash's row is the one place that reading doesn't apply: 86.6%
-above the top of what three years of its own cash flow history can support
-is the one unambiguous verdict of the three.
+"Where it sits" places a price against a range built from the filing's own
+cash flows; it is not a verdict. Reading Uber's row as **insufficient basis to
+conclude** is this write-up's judgement, not a string the code emits.
+DoorDash is the one row where it does not hold.
 
-Lyft's row has NO low end, and that is a finding rather than a missing
-number. Its FY2023 FCFF was -$712m, and the engine refuses to grow a
-negative cash flow for ten years and call the result a valuation
-([ISSUES.md #38](ISSUES.md)). One of the three years Lyft itself discloses
-cannot be valued by this model at all - a stronger statement about how much
-the answer depends on the anchor year than the -$39.37 that used to sit
-there, which was arithmetic with a currency sign in front of it.
+Lyft has no low end, and that is a finding, not a missing number: its FY2023
+FCFF was -$712m, and the engine refuses to grow a negative cash flow for ten
+years and call the result a valuation ([ISSUES.md #38](ISSUES.md)).
 
 The system also produces evidence against itself. `UBER_FY2024` and
-`UBER_FY2025` value the same company, at the same $76.95 price, on the
-same date, one filing year apart: $77.08 versus $119.95, a 56% swing.
-Every gate passed on both runs; every override applied as designed. The
-gap is almost entirely two non-cash items in one year's CFO (deferred
-income taxes, unrealized gains on marketable securities) - one year's
-accounting items being read as durable cash flow. [ISSUES.md #29](ISSUES.md)
-has the full decomposition.
+`UBER_FY2025` value the same company at the same $76.95 price one filing year
+apart: $77.08 versus $119.95, a 56% swing with every gate passing - almost
+entirely two non-cash items in one year's CFO read as durable cash flow
+([ISSUES.md #29](ISSUES.md)).
 
-The reverse DCF is the cleanest cross-company line the system produces:
-one number per company instead of a range. It is not free of the same
-base-cash-flow dependency described above - it holds the latest-period
-FCFF fixed and solves only for the growth rate, held for ten years, that
-the current market price already implies at that base: 5.1% for Uber,
--8.5% for Lyft, 23.5% for DoorDash. Lyft's is the sharpest read: its market
-price is not pricing growth at all under this model's assumptions, and
-that implied decline runs against Lyft's own recent trajectory - FCFF of
--712 (FY2023), 458 (FY2024), 810 (FY2025).
+## What this is, and what it is not
 
-## The decision that changed a conclusion
+**What runs in `src/aleph/`**: document structure, bounded extraction with
+seven gates, assumption derivation that blocks rather than guesses, a
+bottom-up WACC, a DCF reporting a range, and language forensics.
 
-Whether stock-based compensation is a cash cost is a judgement call, not a
-fact in the filing. Before that decision, UBER_FY2024 valued at $102.40
-against a $76.95 market price: roughly 33% undervalued. Treating SBC as a
-cash cost, subtracted from FCFF at full value, brought it to $77.08:
-effectively at market. Nothing about Uber's filing changed between those
-two numbers - one analyst decision did, worth $25.32 a share on its own.
+**What is course work, not the capstone**, lives in
+[`experiments/`](experiments/) - thirteen archived chapters on retrieval, RAG
+evaluation, knowledge graphs and multi-agent orchestration. **None of it is
+wired in.** Aleph does not retrieve, does not build a graph and is not a
+multi-agent system, by design: the LLM never searches, navigates, computes or
+chooses a source.
 
-It is still not the largest source of variation in the model. UBER_FY2024's
-own tornado cannot even put a number on base_cash_flow's swing: its low
-bound is FY2022 FCFF of -$957m, which the engine refuses to value at all
-([ISSUES.md #38](ISSUES.md)), against discount_rate's fully quantified
-$29.83. The tornado used to report that swing as $91.20 (-$14.13 to $77.08)
-by growing that loss for ten years, and the reason the driver is now
-reported as UNQUANTIFIABLE rather than as $91.20 is not that it got smaller -
-it is the same base-cash-flow instability behind section 1's 56% swing
-between UBER_FY2024 and UBER_FY2025, now stated as the model declining to
-answer. One analyst decision moved the conclusion from "33% undervalued" to
-"fairly priced," and the single largest lever in the model is still which
-year's cash flow an analyst treats as representative, not that decision. See
-[ISSUES.md #16](ISSUES.md) for the SBC reasoning, applied identically to
-all three filers - the system measures the consequence of a decision; it
-does not manufacture a number on its own.
-
-## What the language forensics found
-
-Comparing Item 1A (Risk Factors) year-over-year surfaces omissions no
-financial statement carries. Uber's FY2024→FY2025 filing drops language on
-its 2025 climate and EV goals in seven places (three full sentences, four
-phrases inside sentences that otherwise survive as rewrites) - including
-the explicit admission, present in the earlier filing and gone from the
-later one: *"we may not be able to achieve all of our 2025 goals as
-originally anticipated."* Lyft's driver-classification risk factor loses
-the phrase *"and we may incur significant expenses to resolve the matters
-at issue in the litigation"* from an otherwise-surviving sentence about
-that same litigation. Neither shows up in a cash flow number. Reproduce
-with `python scripts/probe_forensics.py UBER_FY2024 UBER_FY2025 1A` and
-the Lyft equivalent; a null control (a filing diffed against itself) reads
-zero on every bucket before either result means anything.
+**What it is not, at all**: investment advice. Its largest documented
+limitation ([ISSUES.md #29](ISSUES.md)) - a ten-year DCF anchored on one
+year's cash flow is arguably the wrong instrument for these companies - is
+here because the system produced it.
 
 ## How it works
 
-Extraction is bounded and probabilistic: an LLM copies one figure at a
-time from one located region of the filing, never searches or chooses a
-source. Everything after that is deterministic Python. Six gates in
-[gates.py](src/aleph/extraction/gates.py) check that what was copied is
-correct - has a source, quotes real text, the value appears in the quote,
-the unit matches the filing's own scale caption, rows cross-foot, columns
-align to the right period. A seventh, separate gate checks that copying
-*finished* - that a required quantity wasn't silently skipped. Quantities
-like net debt BLOCK until an analyst records a policy and a reason in
-[data/overrides.json](data/overrides.json); there is no default.
+The model copies one figure at a time out of one located region; everything
+after that is deterministic Python. Six gates in
+[gates.py](src/aleph/extraction/gates.py) check the copy: a source, a real
+quote, the value inside it, the filing's own unit scale, rows that cross-foot,
+columns on the right period. A seventh, separate gate checks that copying
+*finished*, so a required quantity cannot be silently skipped.
 
-Six rules that looked like general "10-K facts" turned out to be "Uber
-facts." Five broke the first time a second or third filer was added - a
-table-of-contents format, a note-heading style, a statement title, a page
-offset, where geography sits in the segment note. The sixth broke without a
-second filer at all: all three FY2025 filings adopted ASU 2023-09 and now
-print TWO tax-rate reconciliation tables where the code expected one, so it
-broke across two fiscal years of the same registrant. Every extraction
-target is now resolved by section title, never by number or position,
-because of exactly those six failures. The full list is in
-[CLAUDE.md](CLAUDE.md#six-10-k-facts-that-were-actually-uber-facts).
+Net debt BLOCKS until an analyst records a policy and a reason in
+[data/overrides.json](data/overrides.json). A judgement the pipeline cannot
+derive is one it refuses to invent.
+
+Six rules that looked like general "10-K facts" turned out to be "Uber facts"
+- a table-of-contents format, a note heading, a statement title, a page
+offset, where geography sits, a tax table that changed shape between two years
+of one filer. Every target is now resolved by section title, because of
+exactly those six failures
+([CLAUDE.md](CLAUDE.md#six-10-k-facts-that-were-actually-uber-facts)).
+
+## What it found
+
+**One analyst decision, worth $25.32 a share.** Whether stock-based
+compensation is a cash cost is a judgement, not a fact in the filing. Before
+it, UBER_FY2024 valued at $102.40 against a $76.95 price. Subtracting SBC
+from FCFF at full value brought it to $77.08 - effectively at market, nothing
+in the filing changed.
+
+**Language no financial statement carries.** Year-over-year, Uber's
+FY2024→FY2025 Item 1A drops its 2025 climate and EV goals in seven places:
+three full sentences and four phrases inside sentences that survive as
+rewrites. A null control, a filing diffed against itself, reads zero on every
+bucket first.
 
 ## Diagnostic layers (not in the base DCF)
 
 Most of this repository is not the valuation. Measured on
 `src/aleph/valuation/`, 12,346 lines across 20 modules: **2,786 lines are
-code a valuation number depends on** - extraction bridge, assumptions, the
-data contract, the bottom-up WACC, the DCF engine, the orchestrator. The
-other 9,560 are diagnostic layers that read a finished valuation, re-run the
-*pure* engine on copies, and report what the answer rests on. None of them
-adjusts FCFF, WACC, a discount rate, an anchor or a share count. That is
-enforced, not promised: regression tests replace each layer's report with
-garbage and assert the per-share value is byte-identical.
-
-Each answers one question:
+code a valuation number depends on**; the other 9,560 are diagnostic layers
+that read a finished valuation, re-run the *pure* engine on copies, and report
+what the answer rests on. Enforced, not promised: regression tests feed a
+layer garbage and assert the per-share value is byte-identical.
 
 | module | lines | the question it answers |
 |---|---|---|
@@ -194,78 +111,32 @@ Each answers one question:
 | `sensitivity.py` | 211 | What does the answer look like across a WACC × growth grid? |
 | `driver_based_dcf.py` | 97 | Can a driver-built FCFF path be expressed as growth the existing engine accepts? |
 
-Run them with
-
-```
-python scripts/diagnose_valuation.py UBER_FY2024 76.95
-```
-
-the same arguments `run_valuation.py` takes. They printed underneath the
-valuation until 2026-09-10; splitting them out is what let each layer's bare
-`except Exception` in the CLI be replaced by the two exception types the
-package actually raises, because a bug in a diagnostic can no longer take
-down a valuation.
-
-**Be precise about how far that split goes: it is the PRINTING that moved,
-not the computation.** Two of these layers, `accounting_quality` and
-`robustness` - 3,191 of the 9,560 diagnostic lines - still run inside
-`value_filing`, so `run_valuation.py` still executes them on every run and
-`diagnose_valuation.py` re-runs the pipeline to print what they produced.
-They sit behind **2** deliberate `except Exception` handlers in
-[pipeline.py](src/aleph/valuation/pipeline.py), and those two stay: a
-diagnostic that fails must become a NOT_ASSESSED report with its exception
-named, never a failed valuation. That is the P4.7 contract, and a regression
-test replaces each layer with a raising stub and asserts the per-share value
-is unchanged. The strict handling described above applies to
-`diagnose_valuation.py`, which owns no valuation to protect.
+Run: `python scripts/diagnose_valuation.py UBER_FY2024 76.95`.
 
 **None of these changes a number, and none was promoted, deliberately.** The
-one with the strongest case - P6, which produces an evidence-based sustainable
-FCFF range instead of one disclosed year - was considered as the base anchor
-and rejected; the reasoning and what would change the decision are in
-[docs/adr/0009](docs/adr/0009-diagnostic-layers-not-promoted.md). Four of the
-modules above (`cfo_normalization`, `historical_fcff`, `normalization`,
-`sensitivity`, 1,407 lines) are wired to nothing at all and are exercised only
-by their tests; they say so in their own docstrings.
+strongest candidate - P6, a sustainable FCFF range instead of one disclosed
+year - was rejected as the base anchor because its central case rests on a
+historical median, a convention chosen inside this repository
+([docs/adr/0009](docs/adr/0009-diagnostic-layers-not-promoted.md)).
 
-## Accounting normalisation is not economic normalisation
+Note how far the split goes: **it is the PRINTING that moved, not the
+computation.** `accounting_quality` and `robustness` still run inside
+`value_filing`, behind **2** deliberate `except Exception` handlers in
+[pipeline.py](src/aleph/valuation/pipeline.py) that stay: a failed diagnostic
+must become a NOT_ASSESSED report, never a failed valuation.
 
-`valuation/cfo_normalization.py` asks two different questions and keeps them
-apart, because conflating them produced two directional bugs in this module's
-own history.
-
-ACCOUNTING normalisation asks whether a line is non-cash or unusual as the
-statement presents it. The cash flow statement answers that itself: the
-reconciliation from net income to CFO exists to strip non-cash items out, so
-by the time you are reading CFO, this has already happened. ECONOMIC
-normalisation asks whether the amount represents the recurring cash-generating
-power of the business. The statement does not answer that and cannot - nothing
-in it is labelled "one-time".
-
-**A reported CFO can equal normalised CFO even when the latest fiscal year is
-economically unusual.** The system therefore reports normalisation COVERAGE
-(how much of CFO's composition it could account for) and historical
-ABNORMALITY (whether the year sits outside its own range) as separate
-measures, and neither adjusts a number on its own.
-
-Measured, and the reason coverage exists: across all six filings and 71
-distinct cash-flow captions, ZERO name a one-time cash cost. That is
-structural, not a clean bill of health - a one-time cash payment never appears
-as its own reconciliation line. It is invisible, or buried inside a caption
-that says only "Accrued expenses and other liabilities". So the engine reports
-NO_ADJUSTMENT_IDENTIFIED, never NO_ADJUSTMENT_REQUIRED, and one-time cash
-items enter only as an analyst adjustment with a written reason - the same
-shape as net debt, which blocks until a human states a policy.
+One of them explains why the live path does the *less* clever thing: across
+six filings and 71 cash-flow captions, zero name a one-time cash cost, so the
+statement alone cannot separate a representative year from an unusual one
+([cfo_normalization.py](src/aleph/valuation/cfo_normalization.py)).
 
 ## What is broken
 
 [ISSUES.md](ISSUES.md) is the honest state of the project, not a changelog.
-Closed issues stay in the file rather than being deleted, because every
-closed entry still carries the measurement that closed it - exact
-before/after numbers, not "fixed." Every open issue carries a measurement
-or a concrete reproduction, not a feeling: a wrong count, a specific
-filing that breaks a rule, a swing computed from real runs. Read it before
-trusting any number this pipeline produces.
+Closed issues stay, because each carries the measurement that closed it -
+before/after numbers, not "fixed."
+
+Every open issue carries a measurement or a reproduction. Read it first.
 
 ## Repository layout
 
@@ -301,18 +172,10 @@ venv\Scripts\activate
 pip install -e .
 ```
 
-That installs four packages: `anthropic`, `pydantic`, `pypdf`,
-`python-dotenv`. Add the UI with `pip install -e .[ui]` (Streamlit), or the
-archived chapters with `pip install -e .[experiments]`.
-
-Built and verified on Python 3.14.3; `pip install -e .` needs 3.11 or
-later. Extraction needs a `.env` with `ANTHROPIC_API_KEY` - though not on a
-warm cache, since [infra/cache.py](src/aleph/infra/cache.py) is
-content-addressed and a cached target makes no call. The six filing PDFs
-are not distributed with this repository - see
-[data/README.md](data/README.md) for the source on SEC EDGAR for each one,
-and read its hash-verification section before assuming a mismatch means
-something is broken.
+Four packages, Python 3.11 or later; add the UI with `pip install -e .[ui]`.
+Extraction needs `ANTHROPIC_API_KEY` in `.env`, though not on a warm
+[cache](src/aleph/infra/cache.py). The six PDFs are not distributed here -
+[data/README.md](data/README.md) has the EDGAR source of each.
 
 Thirteen commands prove the pipeline works, verbatim from
 [CLAUDE.md](CLAUDE.md#commands-that-verify-the-system-works):
@@ -333,75 +196,31 @@ python scripts/test_market.py
 python scripts/test_docs_consistency.py
 ```
 
-Eight of those thirteen run in CI on every push
-([pipeline-tests.yml](.github/workflows/pipeline-tests.yml)) - the ones
-that need only fixtures and arithmetic. The other five need the filings,
-which this repository does not distribute, so a green badge here does not
-mean the anchor above still holds. That check is local and manual, and the
-workflow says so in its own comments rather than leaving the badge to
-imply otherwise.
+Eight run in CI
+([pipeline-tests.yml](.github/workflows/pipeline-tests.yml)); the other five
+need the filings, so the badge covers neither them nor the 77.08 anchor. It is
+the only workflow - two others were deleted rather than taught to skip
+([docs/adr/0008](docs/adr/0008-eval-gate-removed-from-ci.md)).
 
-The workflow also runs `python -m pytest tests/`, which is not one of the
-thirteen - those are standalone scripts; this is the suite over the pure
-modules (the data contract, model governance, robustness, the operating
-model, evidence resolution). Measured on 2026-09-10, on a clone without the
-filings, it was 181 failed and 628 passed - every failure a
-`FileNotFoundError` on a 10-K this repository does not distribute, which
-means it could not pass for anyone but the author. It now SKIPS those tests
-instead: [tests/conftest.py](tests/conftest.py) checks every filing
-`data/manifest.json` lists, skips the tests marked `needs_filings` when one
-is absent, and prints
+CI also runs `python -m pytest tests/`, which without the filings would fail
+rather than skip. [tests/conftest.py](tests/conftest.py) skips the marked
+tests when a filing in the manifest is absent, printing
 
 ```
 ========================== NOT VERIFIED BY THIS RUN ===========================
 SKIPPED 185 tests that need the filings; they are NOT verified by this run.
 ```
 
-at the top of the summary. Skipped is not passed, and the summary says so in
-those words rather than leaving a row of `s` characters to imply it - the
-same stance as [docs/adr/0008](docs/adr/0008-eval-gate-removed-from-ci.md),
-which deleted a workflow rather than let it report success on a run that
-evaluated nothing.
+because skipped is not passed. Today
+185 tests carry the marker, on 159 test functions - a parametrised function
+produces several tests from one decorator - and both counts are checked
+against the code. With the filings, 0 skipped.
 
-Today **185 tests carry the marker**, sitting on **159 test functions** - the
-two differ because a parametrised function carries one decorator and produces
-several tests. Both counts are checked against the code by
-`scripts/test_docs_consistency.py`, which is how they are allowed to appear
-in prose at all: the pair read 181 and 158 for two commits after a new test
-file was marked, because the check only asserted that *something* was marked.
-Which tests carry the marker was measured, not guessed - the run without the
-filings, mapped back to the functions that failed. With the filings present
-the suite must report 0 skipped; a marked test that never needed a filing
-would otherwise sit unverified in CI forever.
-
-It is the only workflow. A second one ran the ch05 retrieval evaluation
-on pull requests until 2026-09-06; it opened `data/uber_10k.pdf`, which
-this repository does not distribute, so it could only ever fail. It was
-deleted rather than taught to skip - a green "Evaluation Gate" on a run
-that evaluated nothing is the failure this project exists to avoid. See
-[docs/adr/0008](docs/adr/0008-eval-gate-removed-from-ci.md); run that
-evaluation locally with `pip install -r requirements-eval.txt`.
-
-A third file, `.github/fast-gate.yml`, made that sentence false until
-2026-09-10. It sat outside `.github/workflows/` - the only directory GitHub
-Actions reads workflow files from - while declaring `on: push` and a job, and
-it invoked a script under `experiments/`. Deleted under the same ADR: inert
-and indistinguishable from live is the same problem as green and vacuous.
-
-`streamlit run app.py` opens the same pipeline in a browser.
+`streamlit run app.py` opens the pipeline in a browser.
 
 ## Licence
 
-[MIT](LICENSE), covering the code in this repository and nothing else.
+[MIT](LICENSE), covering the code here and not the SEC filings it reads.
 
-It does not cover the SEC filings the pipeline reads. Those are not
-distributed here - see [data/README.md](data/README.md) for the EDGAR source
-of each - and nothing in this repository grants any right to them.
-
-Nothing this code prints is investment advice. The valuations are not
-recommendations; read [ISSUES.md](ISSUES.md) before trusting any number.
-
-(These three paragraphs live here rather than appended to `LICENSE`, where
-they previously sat: GitHub's licence detector matches a file that is the
-licence and nothing else, and the addendum made it report NOASSERTION
-instead of MIT.)
+Nothing here is investment advice. Read [ISSUES.md](ISSUES.md) before trusting
+a number.

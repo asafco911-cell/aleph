@@ -566,6 +566,104 @@ def test_every_command_that_opens_a_filing_reports_a_missing_one():
               "a library raises; the CLI decides the exit code")
 
 
+ISSUES = Path("ISSUES.md")
+
+
+def test_the_issues_contents_table_matches_the_file():
+    """ISSUES.md is 22 numbered sections in what used to be arrival order -
+    #31, #34-#40, then #11, #13, #19-#30. They are now sorted by number, open
+    before closed, with a contents table at the top; no anchor link anywhere
+    in the repository pointed at a heading, so reordering broke nothing.
+
+    A contents table is a count and a list stated twice, which is #30's shape.
+    This counts the '## #N' headings, classifies each from its own heading,
+    and requires the table to agree - both totals and every number."""
+    text = ISSUES.read_text(encoding="utf-8")
+    headings = re.findall(r"^## #(\d+) (.+)$", text, re.M)
+    check("ISSUES.md has numbered sections", bool(headings))
+    if not headings:
+        return
+
+    closed = [n for n, t in headings if "CLOSED" in t or "DECIDED" in t]
+    open_ = [n for n, t in headings if n not in closed]
+    contents = re.search(r"^## Contents$(.*?)(?=^## )", text, re.S | re.M)
+    check("ISSUES.md opens with a Contents section", contents is not None)
+    if not contents:
+        return
+    body = contents.group(1)
+
+    check(f"Contents says OPEN ({len(open_)})", f"OPEN ({len(open_)})" in body,
+          f"{len(open_)} headings carry no CLOSED/DECIDED marker")
+    check(f"Contents says CLOSED ({len(closed)})",
+          f"CLOSED ({len(closed)})" in body,
+          f"{len(closed)} headings are marked CLOSED or DECIDED")
+
+    listed = set(re.findall(r"^- #(\d+) ", body, re.M))
+    check(f"Contents lists all {len(headings)} numbered issues",
+          listed == {n for n, _ in headings},
+          f"missing {sorted({n for n, _ in headings} - listed)}, "
+          f"extra {sorted(listed - {n for n, _ in headings})}")
+
+    order = [int(n) for n, _ in headings]
+    opens = [int(n) for n in open_]
+    check("numbered sections are sorted, open before closed",
+          order == sorted(opens) + sorted(int(n) for n in closed),
+          f"{order}")
+
+
+def test_the_name_matches_what_the_repository_does():
+    """"Autonomous Multi-Document Financial Analyst" was the title until
+    2026-09-10, and the third paragraph of the same README explained that the
+    LLM never searches, navigates, computes or chooses a source, and that net
+    debt blocks until a human writes a policy. The title claimed the one
+    property the architecture is built to refuse.
+
+    The subtitle now names the method, and it lives in three files. A count
+    that drifts is #30's shape; a NAME that drifts between the README, the
+    working agreement and the package metadata is the same shape with a wider
+    audience."""
+    readme = README.read_text(encoding="utf-8")
+    claude = CLAUDE.read_text(encoding="utf-8")
+    pyproject = PYPROJECT.read_text(encoding="utf-8")
+
+    title = re.search(r"^# Aleph — (.+)$", readme, re.M)
+    check("README has an 'Aleph — <subtitle>' title", title is not None)
+    if not title:
+        return
+    subtitle = title.group(1).strip()
+
+    check(f"CLAUDE.md's title is the same subtitle ({subtitle!r})",
+          f"# Aleph — {subtitle}" in claude,
+          "the working agreement names the project differently")
+    stated = re.search(r'^description = "(.+)"$', pyproject, re.M)
+    check("pyproject.toml has a description", stated is not None)
+    if stated:
+        check("pyproject description equals the README subtitle",
+              stated.group(1).strip() == subtitle,
+              f"pyproject says {stated.group(1)!r}")
+
+    for name, text in (("README.md", readme), ("CLAUDE.md", claude),
+                       ("pyproject.toml", pyproject)):
+        check(f"{name} does not call the system autonomous",
+              "utonomous" not in text,
+              "the LLM never searches, navigates, computes or chooses a "
+              "source - see the architecture section")
+
+
+def test_every_relative_link_in_the_readme_resolves():
+    """A README is mostly links, and a link to a moved file fails silently -
+    GitHub renders it, the reader clicks, 404. Anchors into CLAUDE.md are
+    checked separately; this is the file half."""
+    readme = README.read_text(encoding="utf-8")
+    links = re.findall(r"\]\(([^)#][^)]*)\)", readme)
+    check("README contains relative links", bool(links))
+    for link in links:
+        if link.startswith(("http://", "https://", "mailto:")):
+            continue
+        target = Path(link.split("#")[0])
+        check(f"README links to {target}, which exists", target.exists())
+
+
 def test_the_pipeline_still_guards_its_two_diagnostic_layers():
     """README and CLAUDE.md say the bare `except Exception` handlers were
     replaced. That is true of the CLI and NOT true of pipeline.py, which
@@ -618,6 +716,9 @@ if __name__ == "__main__":
     test_readme_links_into_claude_md_resolve()
     test_the_needs_filings_marker_is_registered_and_used()
     test_every_command_that_opens_a_filing_reports_a_missing_one()
+    test_the_issues_contents_table_matches_the_file()
+    test_the_name_matches_what_the_repository_does()
+    test_every_relative_link_in_the_readme_resolves()
     test_the_pipeline_still_guards_its_two_diagnostic_layers()
 
     if failures:

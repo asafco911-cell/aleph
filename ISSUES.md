@@ -3,6 +3,42 @@
 Closed issues are kept here, not deleted, once resolved: the reasoning that
 closed them is part of what this repository demonstrates.
 
+## Contents
+
+Numbered issues below are sorted by number, open before closed; the state
+is read from the heading. Three thematic sections keep entries that were
+never written as `## #N` headings: Decisions (#25), Quality improvements
+(#3, #4, #5) and Closed (#1, #2, #6, #7 and the rest of the early run).
+
+OPEN (7)
+
+- #11 Typographic look-alikes break raw string matching across the pipeline
+- #22 Item 1A sentence-retention rate is a cross-filer signal, not a calibrated metric
+- #29 A ten-year DCF anchored on one year's FCFF is the wrong instrument for a company mid-inflection
+- #32 Accounting-quality diagnostics (P4) - built, diagnostic only
+- #33 P4.7 + P5 - robustness and economic-correctness audit of the valuation
+- #39 Capex excludes capitalized software; DoorDash capitalises more of it than it spends on hardware
+- #40 Net debt credits all cash but omits the current portion of debt
+
+CLOSED (15)
+
+- #13 Dispersion test is scale-dependent for rate quantities — CLOSED
+- #19 A failed WACC valued the filing off the leftover integration-test discount rate — CLOSED
+- #20 Revenue has two independent sources with no cross-check between them — CLOSED
+- #21 market.json is keyed by doc_id, duplicating pure market inputs per company — CLOSED
+- #23 Three "unexplained" rejections are one fact, one cause, and three correct gates — CLOSED
+- #24 DASH_FY2024 has never been valued — CLOSED as out of scope
+- #26 Derivation queries match on wording measured against two filers only — CLOSED
+- #27 check_coverage cannot see a row the model never quoted — CLOSED
+- #30 sha256 is recorded as content identity but never used to detect a replaced document — CLOSED
+- #31 eval-gate.yml could only ever fail on a fresh clone — CLOSED
+- #34 `pytest tests/` could not pass on a fresh clone, for the same reason #31 could not — CLOSED
+- #35 The extraction prompt was outside the cache key AND outside every check — CLOSED
+- #36 Eleven places under `src/aleph/` each decided where `data/` is — CLOSED
+- #37 `data/README.md` quoted the anchor under the range's label — CLOSED
+- #38 The engine grew a negative FCFF for ten years and called it a valuation — CLOSED
+
+
 ## Decisions
 
 Decisions taken and closed - not open questions. Recorded so the reasoning
@@ -58,425 +94,6 @@ The critic kept finding medium-severity issues while the plan grew
 Fix options: constrain the mandate to available data, or accept when
 the issue count stops falling between rounds.
 
-## #31 eval-gate.yml could only ever fail on a fresh clone — CLOSED
-
-`.github/workflows/eval-gate.yml` ran `experiments/ch05_evaluation/02_ab_test.py`
-on every pull request to main. That script opens `data/uber_10k.pdf` at module
-level, line 34, unconditionally - and the filings are deliberately not
-distributed (docs/adr/0006), a decision made true of every commit when history
-was rewritten on 2026-09-06.
-
-MEASURED on a fresh `git clone` of the public repository, not on a local
-working copy: `PdfReader("data/uber_10k.pdf")` raises `FileNotFoundError`. The
-script dies before any evaluation runs and before its dependencies matter.
-
-The workflow's only successful run is `eb8940f3`, 2026-08-13. The PDF was
-untracked in `350ac47` on 2026-09-02, AFTER that run, so the green result
-predates the condition that breaks it - and neither SHA exists in this history
-any more, since the rewrite changed all of them. The sole evidence this gate
-ever worked points at a history that is gone.
-
-DELETED, not taught to skip. A conditional step would have put a green
-"Evaluation Gate" check on pull requests where nothing was evaluated, which is
-this project's own worst failure mode wearing a tick mark. `pipeline-tests.yml`
-already states the same position for the three tests it cannot run, and
-`test_manifest.py` for shallow clones. Reasoning and both rejected
-alternatives in docs/adr/0008.
-
-`experiments/ch05_evaluation/02_ab_test.py` is NOT modified: `experiments/` is
-archived course work, read-only by the working agreement, and editing an
-archived chapter to accommodate a CI decision would falsify what that chapter
-was. `requirements-eval.txt` is kept - it is how the evaluation is run locally,
-which is still supported.
-
-The gap is now checked, not just recorded.
-`test_docs_consistency.py::test_no_workflow_needs_a_file_the_repository_does_not_ship`
-walks every script any workflow runs and fails on a referenced path that exists
-locally but is untracked - the exact shape of this bug, and the exact reason it
-survived: it worked on the author's machine. Deliberately narrow: a path that
-exists nowhere is a fixture string, not this bug, and the first version of the
-check flagged `test_manifest.py`'s own `"data/does-not-exist"` before that was
-fixed. Verified by reintroducing the deleted workflow verbatim - caught, exit 1
-- and removing it again.
-
-Note for anyone reinstating this: #3, #4 and #5, the findings this gate would
-protect, are all in the retrieval layer, which README.md states is course work
-and not part of the capstone pipeline.
-
-## #34 `pytest tests/` could not pass on a fresh clone, for the same reason #31 could not — CLOSED
-
-Found in the closing pass, 2026-09-10. `pipeline-tests.yml` runs
-`python -m pytest tests/` on every push. The filings are not distributed
-(docs/adr/0006), so the runner has none of them.
-
-MEASURED, with `data/*.pdf` and `data/aleph_cache.db` moved aside:
-
-```
-python -m pytest tests/   ->  181 failed, 628 passed
-```
-
-Every one of the 181 a `FileNotFoundError` on `data/uber_10k_fy2024.pdf` or a
-sibling. No `conftest.py` existed and no test carried a skip condition, so this
-step was red on every push since the tests were added - and #31, the workflow
-that could only ever fail, was closed while a second one sat next to it doing
-the same thing at a different granularity. Deleting a whole workflow is easier
-to notice than a suite that fails 181 of 809.
-
-FIXED structurally, and NOT by making the tests pass without documents: 181 of
-them assert on real numbers from real filings, and faking the filings would
-leave 181 green checks that prove nothing.
-
-`tests/conftest.py` reads `data/manifest.json`, checks every filing it lists,
-and skips the tests marked `needs_filings` when one is absent, naming the
-missing file. The marker is registered in `pyproject.toml` so a typo is a
-warning rather than a silent no-op.
-
-Which tests carry it was MEASURED, not chosen by reading file names: the 181
-failing node ids map to 158 test functions - and to check that mapping is
-sound, every parametrised case was examined: none is mixed, each
-parametrisation fails wholly or not at all, so the marker sits on functions and
-no `pytest.param(marks=...)` is needed.
-
-The skip is LOUD, which is the whole point and the difference between this and
-the "make it skip" alternative docs/adr/0008 rejected.
-`pytest_terminal_summary` prints, above pytest's own summary line:
-
-```
-========================== NOT VERIFIED BY THIS RUN ===========================
-SKIPPED 181 tests that need the filings; they are NOT verified by this run.
-```
-
-VERIFIED both ways, which is what makes the marking falsifiable rather than
-merely plausible:
-
-```
-data/*.pdf and data/aleph_cache.db moved aside:  635 passed, 181 skipped, 0 failed
-filings present:                                 816 passed, 0 skipped
-```
-
-Zero skipped with the filings present is the load-bearing half. A marker on a
-test that never needed a filing would silently remove that test from CI
-forever, and nothing else in the mechanism would notice.
-
-## #35 The extraction prompt was outside the cache key AND outside every check — CLOSED
-
-`Cache.key` includes `PROMPT_VERSION`, a hand-maintained string, not the prompt
-itself. That is deliberate and stays: hashing the prompt into the key would
-change every key on every wording change and force a paid re-extraction of all
-six filings.
-
-The cost of that choice went unrecorded. Edit `SYSTEM_PROMPT`, forget to bump
-`PROMPT_VERSION`, and every cached answer is served against a prompt that no
-longer produced it - silently, with no red flag, which is this project's named
-worst failure mode.
-
-The second half is worse because no one edits anything: `ExtractedFacts`'
-JSON schema is pasted into the user message, so `pydantic`'s
-`model_json_schema()` rendering is part of the prompt. A pydantic upgrade
-changes what the model was asked without touching this repository at all.
-`pyproject.toml` pins `pydantic>=2.0`, so CI installs whatever is current.
-
-FIXED without touching the cache key. `extractor.py` records
-`PROMPT_FINGERPRINT`, the sha256 of `SYSTEM_PROMPT + SCHEMA_JSON`, and checks
-it at import - `raise`, not `assert`, because `python -O` strips asserts and a
-guard that disappears under a flag is not a guard. The message says which
-constant to bump. Current value:
-`2377308fe04a7392a6369a72ab5486bd728badb9ec0e35ea678c6a16de47116d`, computed
-under pydantic 2.13.4.
-
-`SCHEMA_JSON` is now a module constant used both by the fingerprint and by the
-message actually sent, so the fingerprint is provably over the bytes the model
-receives rather than over a second rendering of them.
-
-OPEN, and deliberately left open rather than papered over: the consequence in
-CI. `pyproject.toml` pins `pydantic>=2.0`, so the runner installs whatever is
-current, and the workflow's "Import the package" step imports `extractor`. If a
-future pydantic renders the schema differently, that step goes red on a
-dependency bump nobody made deliberately. That is the CORRECT signal - the
-prompt did change and the cache is stale against it - but it is a decision
-whether to keep the loose pin and accept a red badge as the notification, or
-pin pydantic exactly and make the schema move only when someone chooses it.
-Not decided here; whoever decides should record it as an ADR, because both
-options have a real cost.
-
-Also fixed alongside it: `json.loads` on the model's reply was unwrapped. A
-reply that is not JSON surfaced as a bare `JSONDecodeError` naming a character
-offset in a string the reader cannot see, and naming neither the filing nor the
-target. It now raises `ExtractionError` with `doc_id`, the target, and the
-first 200 characters of the reply - the same treatment the `max_tokens`
-truncation already had, including not caching the failure.
-
-Tests in `tests/test_extractor_prompt.py`, seven of them, none needing a
-filing: the positive control, two negative controls (the fingerprint moves when
-the system prompt moves, and when the schema moves), the import-time raise
-exercised by re-executing the module source with the recorded constant
-tampered, and three on the malformed reply - that it is named, that nothing is
-cached, and that a well-formed reply still parses. Without that last one, a
-wrapper that rejected every reply would pass the other two.
-
-## #36 Eleven places under `src/aleph/` each decided where `data/` is — CLOSED
-
-`Path("data") / record.file_name`, `Path("data/manifest.json")` and
-`Path("data/aleph_cache.db")` appeared across `extraction/extractor.py`,
-`valuation/pipeline.py`, `infra/cache.py` and `forensics/language.py`. A
-relative path is not a location; it is a location plus an assumption about the
-current working directory.
-
-The assumption held because every documented command is run from the repository
-root. Run one from anywhere else and it fails with
-`FileNotFoundError: data/manifest.json` - a path that does exist, reported from
-a directory the reader is not looking at.
-
-FIXED with `src/aleph/infra/paths.py`: `DATA_DIR`, resolved once from
-`ALEPH_DATA_DIR` if set, otherwise from the package file's own location
-(`src/aleph/infra/paths.py` -> repo root), never from the CWD. The env var
-exists because the filings are not distributed, so someone holding them
-elsewhere needs a way to say so that is not a source edit.
-
-VERIFIED by running the anchor from a different working directory:
-
-```
-cd $env:TEMP; python <abs path>\scripts\run_valuation.py UBER_FY2024 76.95
-```
-
-Same output as from the repository root, byte for byte - `Latest-period basis:
-77.08` included.
-
-The "before" is measured too, from that same directory, rather than asserted:
-
-```
-the old literal 'data\manifest.json' resolves to
-  C:\Users\asafc\AppData\Local\Temp\data\manifest.json   exists = False
-DATA_DIR now:
-  C:\Users\asafc\...\aleph\data                          exists = True
-```
-
-Note what that failure looks like to a reader: `FileNotFoundError` naming
-`data/manifest.json`, a file that is sitting right there in the repository.
-
-## #37 `data/README.md` quoted the anchor under the range's label — CLOSED
-
-Small, and the same shape as everything else in this file. It said the six
-PDFs reproduce "the `Value per share: 77.08` / `49.06` anchors". The CLI prints
-two different lines:
-
-```
-  Value per share      :  -14.13 to 77.08    (range across FY2022-FY2024 FCFF)
-  Latest-period basis  :             77.08  (FY2024 FCFF, the base case)
-```
-
-`Value per share` is the RANGE. 77.08 is the `Latest-period basis`. Quoting a
-single number under the range's label is the point-estimate reading the seventh
-settled principle exists to refuse - in the file whose job is telling a reader
-what output to expect.
-
-Fixed, and checked:
-`test_docs_consistency.py::test_the_anchor_is_quoted_under_the_label_the_cli_prints`
-requires any document that mentions 77.08 to also name `Latest-period basis`,
-and requires that label to be one `run_valuation.py` actually prints.
-
-## #38 The engine grew a negative FCFF for ten years and called it a valuation — CLOSED
-
-`run_dcf` multiplies `base_cash_flow` by (1 + g) each forecast year and
-capitalises the final year with Gordon. Guard 0c refused a ZERO base as
-NOT_SOLVABLE and said nothing about the SIGN, so a negative base went
-straight through: the loss compounded for ten years and the present value of
-a deepening loss was reported as a value per share.
-
-MEASURED. Two of the four valued filings, not one:
-
-```
-LYFT_FY2025   FY2023 FCFF  -712   ->  range low  -$39.37
-UBER_FY2024   FY2022 FCFF  -957   ->  range low  -$14.13
-UBER_FY2025   FY2023 FCFF  1,927  ->  positive, unaffected
-DASH_FY2025   FY2023 FCFF    462  ->  positive, unaffected
-```
-
-The task that opened this named only Lyft. UBER_FY2024 was found by running
-all four filings and reading the bound, and its -$14.13 was quoted in
-CLAUDE.md's SEVENTH SETTLED PRINCIPLE and in README's "the decision that
-changed a conclusion" - the number was load-bearing in the documentation
-while being a number the model should never have produced.
-
-DECIDED: option (A) of two. `validate()` gets Guard 0d - a negative
-`base_cash_flow` raises `DCFConsistencyError(... NOT_APPLICABLE)`. Rejected
-alternative: keep the arithmetic and label it loudly wherever it is printed.
-Rejected because the number stays in the file, in the app and in the README
-table, where a reader can quote it without the label - which is this
-project's own worst failure mode.
-
-No tolerance band. -0.01 is a loss; there is no amount of loss small enough
-to grow into a valuation, and a threshold would be a number nobody could
-defend.
-
-WHAT CHANGED BEYOND THE LOW, because the cascade was larger than the request
-assumed and every step of it was measured:
-
-- the tornado row for `base_cash_flow` loses its swing. `sensitivity_tornado`
-  sorts on `(swing is not None, swing or 0)`, so the row now sorts LAST.
-- `robustness._assumption_sensitivity` filtered `swing is None` rows out and
-  crowned the runner-up. Left alone it would have printed "the valuation is
-  controlled by discount_rate" for BOTH affected filings - reversing this
-  project's own central finding (#25, #29) with a sentence that is false
-  about the world and carries no red flag. FIXED in the same change: a
-  refused bound is reported as `PRIMARY VALUE DRIVER: base_cash_flow (bound
-  NOT_APPLICABLE)`, severity HIGH, with the interpretation stating that
-  unquantifiable is not small.
-- `model_governance` formatted P6's scenario values with `:.2f`. A refused
-  scenario is None, `f"{None:.2f}"` raises TypeError, and the broad
-  `except Exception` turned that into `value=error` / `NOT_SUPPORTED` -
-  discarding the two scenarios that DID value and reporting a formatting
-  failure as an evidence failure. FIXED: NOT_APPLICABLE per scenario, P6
-  stays CONDITIONAL_APPLICABILITY.
-- anchor spread narrows because the refused anchor leaves the set:
-  UBER_FY2024 290% -> 98%, LYFT_FY2025 1826% -> 117%. The spread is now
-  "across the anchors that can be valued", which is what it always measured.
-
-UNCHANGED, and checked by diffing every run against its own pre-change
-output: `Latest-period basis` 77.08 and 49.06, the high end of both ranges,
-PV explicit / PV terminal / enterprise / equity value, the reverse DCF
-(-8.5% for Lyft), and UBER_FY2025 and DASH_FY2025 byte-for-byte.
-
-Fifteen `run_dcf` call sites were read. Fourteen already caught
-`DCFConsistencyError`; ONE did not - `pipeline.py`'s range-bound re-run - and
-that one would have taken down an otherwise-valid valuation. That is now
-guarded, and `tests/test_negative_base_fcff.py` walks the AST of every module
-under `valuation/` and fails on a sixteenth unguarded re-run, with the two
-base-case sites allowlisted by name and reason.
-
-TEN EXISTING TESTS FAILED on the first full run and every one was a test
-asserting the OLD behaviour, not a defect in the change. They were rewritten
-to assert the refusal rather than deleted, because what they encode - that a
-negative anchor must not silently produce a plausible number - is the same
-property, now enforced one layer earlier:
-
-  test_p5_controls    2  the P5.7 reverse-DCF orientation proof for B < 0
-  test_market_expect. 4  sectors priced off their own negative-anchor DCF
-  test_robustness     3  a negative base listed as "finite output allowed",
-                         and two findings built on a run_dcf(-500) result
-  three more          1  see below - not about the guard at all
-
-That last one is worth its own line. `test_pipeline_has_no_*_import` in
-three files greps `pipeline.py`'s SOURCE for the names of the diagnostic
-modules, to prove they are not wired into the orchestrator. A COMMENT added
-in this change happened to list four of them by name and failed all three.
-The comment was reworded; the tests are right, and the next person to write
-a comment in that file should know they are reading it.
-
-TWO THINGS LEFT DEAD BY THIS, recorded rather than removed:
-`reverse_dcf`'s B < 0 direction branch (the window probe returns
-NOT_SOLVABLE first), and `robustness._method_limitation`'s negative-base
-finding (a filing whose LATEST FCFF is negative now stops at the pipeline's
-own `run_dcf` and the CLI exits 1). Both are kept, tested where the contract
-is observable - the second by handing robustness a CONSTRUCTED DCFResult,
-since the engine will no longer produce one - and documented in place.
-
-ONE THING DELIBERATELY NOT CHANGED: `market_expectations.implied_base_fcff`
-can still report a NEGATIVE implied base FCFF when the market price is low
-enough, and that is not a valuation - it is a statement about what the price
-implies, solved in closed form and never fed back through the engine. Its
-docstring's claim that "a re-run at B* cannot raise" is now false in
-principle (Guard 0d is a new guard keyed on base_cash_flow), but no re-run
-happens, so nothing is broken. None of the four filings produces a negative
-B* today.
-
-## #39 Capex excludes capitalized software; DoorDash capitalises more of it than it spends on hardware
-
-`derive_capex` matches on the single string `"property and equipment"`.
-DoorDash's cash-flow statement carries a SECOND investing line the pipeline
-never sees.
-
-MEASURED, from the filings themselves via `pypdf` - no API call, no new
-extraction:
-
-```
-DASH_FY2025 cash flow (columns FY2023 FY2024 FY2025, confirmed against CFO
-1,673 / 2,132 / 2,431 and the pipeline's own FY2025 FCFF of 1,123):
-
-  Purchases of property and equipment                    (123)  (104)  (257)
-  Capitalized software and website development costs     (201)  (226)  (348)
-  SBC included in capitalized software and website costs   161    165    193
-
-LYFT_FY2025 cash flow: no capitalized-software line exists.
-UBER: no capitalized-software line exists.
-```
-
-DoorDash capitalised MORE software ($348m) in FY2025 than it spent on
-property and equipment ($257m). The pipeline subtracts the 257 and not the
-348.
-
-EFFECT, measured by re-running the pure engine with only `base_cash_flow`
-changed:
-
-```
-DASH_FY2025   FCFF 1,123 -> 775      value/share 124.27 -> 87.72   -$36.55  (-29.4%)
-```
-
-That moves DoorDash from "86.6% above the top of the range" to a smaller but
-still substantial premium. It does not reverse the conclusion; it is 29% of
-the answer.
-
-THE INCONSISTENCY WITH SBC, which is the part that makes this a defect
-rather than a scope choice. `derive_stock_based_compensation` excludes
-DoorDash's "Stock-based compensation included in capitalized software and
-website development costs" with the written rationale that the amount "was
-capitalised into an asset and already leaves through capex, so subtracting
-it here too would double count it." It does not leave through capex - capex
-is `"property and equipment"` only. The $193m is excluded from SBC on the
-grounds that capex catches it, and capex does not catch it. It leaves
-through neither.
-
-Also measured: no fact whose name or quote contains "capitalized",
-"software" or "website" exists anywhere in the 99-entry cache. The
-`exclude=("capitalized",)` filter is a no-op today, guarding against a fact
-the extraction never requests - which is why the asymmetry was invisible.
-
-OPEN - out of scope for the closed version; fix requires re-running the
-anchor and restating the README table.
-
-## #40 Net debt credits all cash but omits the current portion of debt
-
-`derive_net_debt`'s policy is debt NET OF CURRENT PORTION, less cash and
-equivalents, less short-term investments. The current portion is therefore
-omitted from the debt side while 100% of cash is credited on the other -
-asymmetric by construction, and understating net debt by whatever the
-current portion is.
-
-MEASURED, from each balance sheet, with the column order resolved from the
-sheet's own header (they differ - Lyft prints 2025 then 2024; DoorDash prints
-2024 then 2025):
-
-```
-LYFT_FY2025   "Convertible senior notes, current"    FY2025: —     FY2024: 390,175 (USD thousands)
-UBER_FY2024   no separately captioned current-debt line on the face of the
-              balance sheet, although the caption "Long-term debt, net of
-              current portion" states that one exists
-DASH_FY2025   no current-debt line; "Convertible notes, net" 2,724 is
-              non-current (FY2024: —, FY2025: 2,724)
-```
-
-So the FY2025 effect is ZERO for all three filers: Lyft's current portion
-went to nil, and neither Uber nor DoorDash separately captions one. The gap
-is LATENT, not active - which is exactly why it survived review.
-
-EFFECT, measured on the engine rather than asserted:
-
-```
-LYFT_FY2025   net debt -834.8 -> -444.6 (adding back Lyft's OWN FY2024
-              current portion of 390.175)    value/share 49.06 -> 48.13   -$0.93
-UBER_FY2024   $1m of net debt = $0.000465/share, so $1bn of undisclosed
-              current debt would be $0.47/share
-```
-
-The UBER runs are the ones the question asks about and the ones where no
-figure exists to substitute: Uber discloses no current portion on the face of
-its balance sheet, so the effect there is UNKNOWN, not zero, and quantifying
-it needs a new extraction target against the debt note - an API call this
-entry deliberately does not make.
-
-OPEN - out of scope for the closed version; fix requires re-running the
-anchor and restating the README table.
-
 ## #11 Typographic look-alikes break raw string matching across the pipeline
 
 Documents printed from SEC HTML contain U+2019 (right single quotation mark),
@@ -498,227 +115,6 @@ Fix (pending measurement): route all BM25 indexing and query text through
 
 Status: open, unmeasured.
 
-## #13 Dispersion test is scale-dependent for rate quantities — CLOSED
-
-MAX_RELATIVE_SPREAD = 1.0 in valuation/assumptions.py is an invented constant,
-the same class of error as the fixed header-search window already corrected in
-gates.py. Relative spread divides by the median, so any quantity whose median
-sits near zero blows past the limit regardless of economic materiality:
-effective tax rates of 1.9 and 9.2 percent are 7.3 percentage points apart and
-were blocked at 1.3x, while 45 and 52 percent would pass comfortably.
-
-The block was correct here but for the wrong reason, so the stated rationale is
-misleading - a message that sounds right and is not.
-
-Fix direction: dispersion limits should be per-quantity and declared alongside
-the derivation, expressed in the quantity's own units (percentage points for
-rates, percent for levels), rather than one global ratio.
-
-FIXED, exactly as that direction specified. `DispersionLimit` (span, unit,
-rationale) with one entry per TREND quantity in `DISPERSION_LIMITS`, declared
-beside the derivations that use them. `_dispersion_problem` takes the
-quantity name, checks sign change first, then compares an ABSOLUTE span
-against that quantity's own limit. `MAX_RELATIVE_SPREAD` is gone, and with
-it the "median is zero; relative spread is undefined" branch, which only ever
-existed to guard the division the relative test needed.
-
-MEASURED FIRST, before choosing any number - the real spans on every filing:
-UBER_FY2025 0.3, UBER_FY2024 1.0, DASH_FY2025 3.8, DASH_FY2024 7.0,
-LYFT_FY2025 22.2, LYFT_FY2024 23.9 percentage points. Nothing lands between
-7.0 and 22.2 - a factor of three with no filing in it - so revenue_growth's
-limit of 12.0 points sits in an empty gap with 5 points of margin below and
-10 above. That is a calibration against observed data with the reasoning
-recorded, not a number chosen in the abstract; the difference from the
-constant it replaces is that nobody ever wrote down why that one was 1.0.
-
-TWO FINDINGS THE ISSUE DID NOT ANTICIPATE:
-
-Its own motivating example no longer reproduces. `effective_tax_rate` never
-reaches the span check on any filing - UBER_FY2024/FY2025, LYFT_FY2024/FY2025
-and DASH_FY2025 all block on SIGN CHANGE first (1.9/9.2/-139.6,
--2.6/10.1, -5.8/25.0/0.7). The "1.9 and 9.2 blocked at 1.3x" case described a
-two-value set that the current extraction no longer produces. A limit is
-declared for it anyway (21.0 points, anchored on the US federal statutory
-rate: periods spanning more than the entire statutory rate are not one tax
-regime), so a future filer with same-signed rates meets a stated limit rather
-than none - and it is labelled in the code as never reached.
-
-An undeclared quantity now BLOCKS rather than passing. The old global
-constant applied to everything by default, so adding a TREND quantity
-silently inherited a limit nobody chose for it. Declaring the limit is now
-part of declaring the derivation.
-
-Verified. All twelve status outcomes are unchanged across six filings and
-both TREND quantities - Uber and DoorDash derive growth, Lyft blocks in both
-years, every tax rate blocks on sign change. `capture_baseline.py` diffed
-against the pre-session baseline: identical, byte for byte. Six new tests in
-test_assumptions.py, including #13's exact example in both halves (1.9/9.2 at
-7.3 points apart and 45/52 at 7.0 points apart now get the SAME answer, which
-is the whole point), a near-zero median that no longer blocks a tenth of a
-point, a negative control requiring LYFT_FY2025's real 22.2-point spread to
-still block, and a check that every declared limit carries reviewable
-reasoning - a bare number is the old bug.
-
-## #19 A failed WACC valued the filing off the leftover integration-test discount rate — CLOSED
-
-Retitled on measurement. This was filed as a cosmetic leftover of unknown
-necessity - four market.json blocks carrying discount_rate 0.09 under source
-"integration test", each rationale reading "NOT A VALUATION INPUT",
-superseded because run_valuation.py overwrites the key with the derived
-bottom-up figure. The open question was whether any caller needed the key
-at all.
-
-It was not cosmetic. pipeline.py overwrites market["discount_rate"] only
-`if wacc:`, then calls build_dcf_inputs unconditionally. When build_wacc
-raised, the run fell through to the 0.09 sitting in the JSON.
-
-MEASURED, not inferred: removing debt_spread from UBER_FY2024's market block
-makes build_wacc fail. The pipeline printed one warning line - "WACC NOT
-BUILT" - and then a complete RESULT block valuing the filing at $73.54 per
-share against its real $77.08, on an invented rate, with every gate passed
-and every unit converted correctly. The project's own named failure mode, in
-its own pipeline: a result that sounds right and is not, carrying no red
-flag.
-
-The root cause was not the key. `_market`'s placeholder message told the
-reader, in the error text itself, to set a source to 'integration test' to
-get past the placeholder check - which is exactly what all four blocks did.
-A guard that advertises its own escape hatch is not a guard.
-
-FIXED, three parts:
-  - discount_rate deleted from all four market.json blocks (32 lines, the
-    only deletions in the file). It is derived, never authored, so its
-    absence is now what stops a run whose WACC failed.
-  - PLACEHOLDER_SOURCES gained "integration test". It appears on no other
-    input in market.json, checked before adding it.
-  - Both of `_market`'s messages rewritten. The placeholder message names no
-    bypass. The missing-key message special-cases discount_rate to say it is
-    derived and must NOT be added to market.json - the old text instructed
-    the reader to do the thing that caused this.
-
-Verified four ways: the anchor still prints 77.08 with WACC 7.87/8.72/10.26%
-at the beta bounds; the same crippled-market reproduction now raises
-BridgeError instead of valuing; `_market` blocks 'integration test', 'TODO'
-and 'placeholder' while still accepting 'NYSE close'; capture_baseline.py
-diffed against a pre-change baseline is identical byte for byte on all four
-filings.
-
-This is a fourth member of the class named in #26 and #30: a mechanism that
-looks like protection and is not. #26 was a block printing incomplete
-evidence; #30 was a documented guarantee no code enforced; this was a guard
-naming its own bypass in its error message.
-
-## #20 Revenue has two independent sources with no cross-check between them — CLOSED
-
-Total revenue is available from two places: the statement:operations target
-(the income statement total) and the Total row in the segment and geography
-notes. derive_growth excludes the note targets to avoid a collision with the
-statement total rather than reconciling them, so nothing compared the two.
-
-MEASURED FIRST, across all six filings and every period: they agree
-everywhere. UBER_FY2024 across four targets (operations, segments,
-geography_n2, geography_n13), UBER_FY2025 across three, LYFT_FY2025 across
-two, DASH_FY2025 and DASH_FY2024 across three each. LYFT_FY2024 has one
-source only - no geography note resolves for it, pre-existing and unrelated,
-noted in #28.
-
-FIXED. `_revenue_source_disagreements` (assumptions.py) groups every
-'total revenue' fact by period and target and blocks revenue_growth on a
-mismatch, naming each source and what it stated. It excludes nothing
-deliberately: it wants exactly the restatements derive_growth filters out.
-
-The tolerance is not an invented constant - the failure #13 names in
-MAX_RELATIVE_SPREAD. Two values agree when they differ by less than one unit
-of the COARSER of the two declared scales, because a figure printed in
-millions cannot resolve anything finer than a million. The bound is the
-filing's own reported precision.
-
-So this check is a no-op today, which is the point: it costs nothing while
-the sources agree and is the only thing that would see the day they do not.
-
-Four tests in test_assumptions.py, one a negative control
-(test_agreeing_sources_report_nothing, on the real UBER_FY2025 figures)
-requiring silence - without it the other three would pass equally against a
-function that flagged everything. The tolerance test checks both directions:
-millions against thousands differing by 400 thousand passes, the same pair
-differing by a full million is caught.
-
-Does not close the geography-note case, which #28 already closed by a
-different mechanism (reconciling components against the stated total).
-
-## #21 market.json is keyed by doc_id, duplicating pure market inputs per company — CLOSED
-
-risk_free_rate and equity_risk_premium are properties of the market on a
-given date, not of the company being valued, but market.json's schema keys
-every input under doc_id. UBER_FY2024 and LYFT_FY2025 currently carry
-identical values for both by discipline, not by structure - nothing stops
-the two from drifting apart silently if one block is edited and the other is
-not. This nearly happened this session in a different field: a full-file
-paste to add the LYFT_FY2025 block dropped a required source field from the
-UBER_FY2024 block sitting right next to it (see #15).
-
-Fix direction: split market.json into market-level inputs (risk_free_rate,
-equity_risk_premium - dated, not company-keyed) and company-level inputs
-(unlevered_industry_beta, debt_spread, country_risk_premium, share_price -
-each its own judgement per company).
-
-FIXED - but the split is drawn in a different place than that direction
-proposed, and the direction was wrong on one input. It put
-`unlevered_industry_beta` in the company-level group, "each its own
-judgement per company". ADR 0001 and #25 say the opposite: the beta is held
-identical across every filer ON PURPOSE, and a per-company block for it
-would reintroduce exactly the drift this issue is about.
-
-The line that actually matters is not "market data vs company data" but
-"held identical by policy vs legitimately different", which is what
-CLAUDE.md's Cross-company comparability section already says:
-
-  shared      risk_free_rate, equity_risk_premium, terminal_growth,
-              unlevered_industry_beta
-  per_filing  country_risk_premium, debt_spread, share_price
-
-`debt_spread` is per-filing even though all four currently carry 0.0111: it
-is a company's own credit spread and is not on CLAUDE.md's held-identical
-list, so making it shared would be a policy change, not a refactor.
-
-`load_market` merges shared into per_filing and RAISES `MarketDriftError`
-if a per-filing block redefines a shared key. The structure now enforces
-what discipline used to.
-
-THE DRIFT THIS ISSUE PREDICTED HAD ALREADY HAPPENED, and the migration's
-own assertion found it rather than a person looking for it. LYFT_FY2025's
-`unlevered_industry_beta` cited "Aswath Damodaran - Betas by Sector (US),
-Business and Consumer Services" while the other three cited the same table's
-"unlevered beta corrected for cash" column. All four carry 0.81 - which IS
-the cash-corrected figure; Damodaran's plain unlevered beta is 0.77, as
-UBER_FY2024's own rationale states. Lyft's citation, read literally, pointed
-at the column that gives the other number. The value was never wrong; the
-provenance was, silently, in a committed file.
-
-Migrated programmatically, never by hand: this issue itself records that a
-full-file paste dropped a required source field once already (#15). The
-script asserted every shared input identical on name/value/unit/source/as_of
-before moving anything, and asserted afterwards that merging reproduces each
-original block field for field. The four shared rationales are MERGED from
-the four originals - every clause is from one of them - minus the sentence
-saying the value is "duplicated here only because market.json is keyed by
-doc_id, which is a known structural gap", which this change makes false.
-
-Verified. All eleven test scripts pass. Both anchors hold. app.py runs
-through AppTest and reproduces README's UBER_FY2025 row. `capture_baseline.py`
-against the pre-session baseline differs on exactly FOUR lines out of four
-files - the terminal_growth rationale text, in the ASSUMPTIONS block - and
-the RESULT, TORNADO, REVERSE DCF and WACC blocks are byte-identical on all
-four filings. No number moved.
-
-`scripts/test_market.py` (7 tests, in CI) holds the structure, including a
-negative control that writes a redefinition into the file and requires
-`load_market` to raise - without it every other assertion would pass against
-a loader that merged a collision silently, which is the behaviour this issue
-exists to remove.
-
-Status: CLOSED.
-
 ## #22 Item 1A sentence-retention rate is a cross-filer signal, not a calibrated metric
 
 Language forensics measured LYFT_FY2024->FY2025 Item 1A (Risk Factors)
@@ -736,274 +132,6 @@ caution for the analyst using its output ("forensic tools always return
 numbers... validity of the comparison is the analyst's responsibility, not
 the tool's"); this issue makes that caution concrete for this specific
 number.
-
-## #23 Three "unexplained" rejections are one fact, one cause, and three correct gates — CLOSED
-
-`test_multicompany.py` passes overall but three targets carry a rejection
-nobody has investigated, none of them unit-related:
-  - UBER_FY2025 taxes note:11: `columns_undetermined`, "row has 2 cells;
-    nearest header gave unknown=none; mapping cannot be verified"
-  - LYFT_FY2025 taxes note:13: `columns_undetermined`, "row has 2 cells;
-    nearest header gave years=['FY2025', 'FY2024', 'FY2023']; mapping cannot
-    be verified"
-  - DASH_FY2025 taxes note:12: `column_alignment`, "name matches 0 of the
-    column labels ['Amount', 'Percent']"
-
-All three are on tax-reconciliation tables and all three ultimately pass
-their target's minimum threshold, so they have never blocked a run - which
-is exactly how a real problem could sit unexamined.
-
-CLOSED, measured. The three are not three problems. They are one fact -
-`Effective income tax rate FY2025` - rejected in three filings for one
-reason, and the gates are RIGHT in all three cases.
-
-All three FY2025 filers adopted ASU 2023-09, which changed the tax-rate
-reconciliation disclosure. Each FY2025 note therefore contains TWO tables:
-a new-format one for FY2025 alone, and a legacy one for the earlier years,
-introduced verbatim as "in accordance with the guidance prior to the
-adoption of ASU 2023-09". Read directly from the note text:
-
-  UBER_FY2025  "...for the years ended December 31, 2023 and 2024:"
-               row: 'Effective income tax rate 9.2 % (139.6)%'   (2 cells)
-               "...for the years ended December 31, 2025 (in millions):"
-               row: 'Effective income tax rate $ (4,346) (74.8)%'
-  LYFT_FY2025  same shape, legacy table for 2024 and 2023
-  DASH_FY2025  new format only, columns literally ['Amount', 'Percent']
-
-The FY2025 row is not two years. It is an amount and a percentage, which is
-why DASH_FY2025 rejects on `column_alignment` against ['Amount', 'Percent']
-and the other two on `columns_undetermined` for a 2-cell row. Compare
-UBER_FY2024, one filing year earlier, whose single table gives a clean
-3-cell row and three accepted facts.
-
-LYFT_FY2025's is the informative one: the nearest header above the row
-reported `years=['FY2025', 'FY2024', 'FY2023']` while the row held two
-cells. A laxer gate would have mapped 10.1% to FY2025 when the filing means
-FY2024 - a year-shifted tax rate, with nothing downstream able to see it.
-The gate prevented a wrong number, not a cosmetic one.
-
-Measured downstream effect: none. effective_tax_rate blocks for every filing
-regardless, on sign change across periods (UBER_FY2024 1.9/9.2/-139.6,
-LYFT_FY2025 -2.6/10.1, DASH_FY2025 -5.8/25.0/0.7), and is supplied by
-override as 21% statutory by cross-company policy. Confirmed by running
-derive_all with NO overrides on all five filings: every one blocks.
-CLAUDE.md's residual-risk note that derive_tax_rate's computed branch never
-runs still holds.
-
-Deliberately NOT fixed. Teaching extraction the Amount/Percent format would
-change no valuation, since the quantity is overridden by policy in every
-filing. Per #26's own reasoning, the fix applies where harm was measured,
-not to every latent risk of the same shape. What this issue produced instead
-is a sixth entry for CLAUDE.md's "10-K facts that were actually Uber facts"
-list: one reconciliation table per note, with columns that are years. An
-accounting standard adoption broke it, mid-filer, between two years of the
-same company.
-
-## #24 DASH_FY2024 has never been valued — CLOSED as out of scope
-
-DASH_FY2025 is resolved: it has a `market.json` block and `overrides.json`
-entries (`effective_tax_rate`, `net_debt`, `interest_expense`), has been
-run end to end repeatedly (`python scripts\run_valuation.py DASH_FY2025
-231.89`), and appears in `README.md`'s own three-company table alongside
-UBER_FY2025 and LYFT_FY2025. The cross-company comparison this project
-argues for (see CLAUDE.md, "Cross-company comparability") now has all
-three FY2025 data points the manifest suggests.
-
-DASH_FY2024 does not. It has no `market.json` block and no
-`overrides.json` entries (`net_debt`, `effective_tax_rate` would both
-block), and `run_valuation.py` has never been run against it end to end.
-Extraction and gates do pass for it (`test_multicompany.py` exercises it
-alongside the other five filings), so the remaining gap is entirely in
-the judgement layer - market inputs and override policy - not extraction.
-
-CLOSED as out of scope, not as done. DASH_FY2024 is deliberately not valued.
-
-The comparison this project argues for is three companies at ONE market
-date on ONE method - UBER_FY2025, LYFT_FY2025, DASH_FY2025, all priced at
-the 2026-08-27 close. UBER_FY2024 exists alongside them for a different and
-stated reason: it is the evidence against the model, the same company one
-filing year apart producing $77.08 against $119.95 (#29). DASH_FY2024 serves
-neither purpose, and valuing it would require two new analyst judgements -
-a share price at a date nobody has chosen, and a country risk premium
-weighted on its own geographic mix - manufactured to fill a gap in a table
-rather than to answer a question.
-
-What was never in doubt: extraction and gates pass for DASH_FY2024, and
-test_multicompany.py exercises it alongside the other five on every run. The
-gap was only ever in the judgement layer, and the judgement is to leave it.
-
-Decided by Asi, 2026-09-06. Retitled from "DoorDash has never been valued" -
-found stale while checking a README claim about ISSUES.md's own honesty,
-not while looking for it.
-
-## #26 Derivation queries match on wording measured against two filers only — CLOSED
-
-`derive_net_debt` (assumptions.py) looked for the substring
-"short-term investments". DoorDash's FY2024 10-K prints "Short-term
-marketable securities" for the same account - a fully extracted,
-gate-verified fact, invisible to the derivation purely because its name
-does not contain the query's substring. Uber and Lyft each use stable
-wording across both of their own filed years; DoorDash does not, which
-makes this worse than the five cross-filer assumptions already documented
-in CLAUDE.md - wording is not even stable within one company over time,
-let alone across companies.
-
-net_debt still blocked correctly (it always blocks pending an override),
-so the pipeline never valued DoorDash on a wrong number. The danger was the
-component list PRINTED under that block, which an analyst reads to set the
-override: it showed "none extracted" for short-term investments and
-implied net_debt was Cash (4,019) less Restricted cash (190) = roughly
--4,019, when the true figure, including the security that was extracted
-all along under its other name, is -5,341. Both filings agree the FY2024
-short-term balance is 1,322. A block correctly stopped the run and still
-handed the analyst an incomplete evidentiary basis, with nothing to flag
-that the list was short - a new failure class for this project:
-**a block is not protection if the evidence it prints is incomplete.**
-
-FIXED for net_debt specifically: its blocked rationale now lists every
-fact extracted from the balance_sheet target that none of the four
-component queries matched, by name and value. Verified on DASH_FY2024, the
-block now prints, directly under the existing components list: "Extracted
-from the balance sheet but matched by none of the queries above:
-Short-term marketable securities FY2023=1,422; Short-term marketable
-securities FY2024=1,322". Verified on UBER_FY2024 and LYFT_FY2025 (forced
-through the blocked path with no override to see it): the extra line is
-absent when nothing is unmatched - no change to either's behavior.
-
-The substring query "short-term investments" is DELIBERATELY NOT patched
-to also match "marketable securities". A wider substring list only
-relocates this exact bug to the next filer that phrases it a third way.
-The mechanism that surfaces the miss - printing what the queries did not
-match - is the fix; the query stays exactly as narrow, and exactly as
-fallible, as it always was, by design.
-
-NOT fixed - a second, live instance of the same bug class, in a different
-derivation, found by the same unconsumed-facts measurement that found the
-net_debt instance: DoorDash's own income-tax-provision caption is "Total
-provision for (benefit from) income taxes" - the inserted "(benefit from)"
-breaks derive_tax_rate's computed-fallback substring query "provision for
-income taxes" (confirmed: the substring does not match), which is why
-DASH_FY2024's effective_tax_rate blocks as "no facts extracted" rather than
-computing a rate from real, extracted, gate-verified components.
-derive_tax_rate has no equivalent unmatched-evidence line. Deliberately not
-fixed here - Task 1c decided against a repo-wide gate, so the fix applies
-only where it was measured to have caused real harm (a wrong number an
-analyst could have acted on), not to every derivation with the same shape
-of latent risk.
-
-THE derive_tax_rate INSTANCE IS NOW FIXED TOO, 2026-09-06, and the harm was
-worse than "no unmatched-evidence line". Reproduced on DASH_FY2024: three
-`Total provision for (benefit from) income taxes` facts (FY2022=-31,
-FY2023=31, FY2024=39) are extracted and pass every gate, and none of
-derive_tax_rate's three queries sees them. The rate then blocked through
-build_trend's generic path with the message **"no facts extracted for this
-quantity; check extraction gates"** - which is false twice over: facts WERE
-extracted, and the gates are exactly where the problem is not. It sent the
-analyst to audit a component that had worked perfectly.
-
-derive_tax_rate now blocks on its own when nothing resolves, naming the
-queries it tried, listing every fact from the taxes target that none of them
-matched, and saying in words that this is not an extraction failure.
-
-The query is still NOT widened to match "(benefit from)", for the same
-reason net_debt's was not: a longer substring list only relocates the bug to
-the next filer that phrases it a third way. A test asserts the block, so
-"fixing" it by broadening the query fails the suite.
-
-The mechanism is now shared rather than copied. `_unmatched_note(facts,
-target_key, matched, where)` is used by both derivations; the second
-instance would otherwise have been a second inline implementation that could
-drift from the first. net_debt's output was captured before the refactor and
-compared after: byte-for-byte identical on DASH_FY2024, UBER_FY2024 and
-LYFT_FY2025.
-
-Status: CLOSED for both measured instances. The general pattern - a
-derivation query written against wording measured on too few filers -
-remains a real risk in any derive_* function not yet audited this way, and
-is deliberately not swept: per this issue's own rule, the fix applies where
-harm was measured. `_unmatched_note` exists to make that fix cheap the next
-time harm IS measured.
-
-Six tests in test_assumptions.py, including a negative control
-(test_matching_wording_still_computes_a_rate) that requires a derivation to
-SUCCEED on ordinary wording - every other assertion here demands a block,
-and without it they would all pass against a derivation that never works.
-
-## #27 check_coverage cannot see a row the model never quoted — CLOSED
-
-Confirmed by a direct synthetic test, not inferred from reading the code: a
-fixture with one row fully quoted and extracted across both periods,
-alongside a second row never referenced in any Fact's quote at all, run
-through the real `validate()`, produces zero coverage rejections for the
-second row. `check_coverage` groups facts by `fact.quote` and only ever
-examines rows that appear in at least one quote; a row absent from every
-quote produces no group, so there is nothing for the gate to iterate over.
-This is a structural limitation of the gate as designed, not a bug in one
-run of it.
-
-No concrete instance found across the six filings tested tonight.
-DASH_FY2024's short-term-securities row (see #26) looked like a candidate
-but was not one: the model quoted and extracted that row completely: the
-loss happened one layer downstream, in derivation, not here.
-
-RESOLVED by the required-data contract (`src/aleph/valuation/contract.py`,
-`contract_adapter.py`), which does not extend the gate - it moves the
-question upstream of it. `REQUIREMENTS` is a static list read off the real
-code path (`bridge.require`, `wacc.REQUIRED_MARKET`, the substring each
-`derive_*` queries). `evaluate()` compares it against what the run holds:
-a field the contract declares and the run never produced is `MISSING`,
-which is a state the system carries whether or not extraction ever
-mentioned it. That is the structural fix - the omission cannot vanish
-because the requirement existed before extraction ran.
-
-`value_filing` calls `evaluate()` after derivation and before `build_wacc`,
-the bridge and the engine, and raises `ContractBlockedError` on
-`Status.BLOCKED`. The gate order is asserted against the source by
-`tests/test_contract_hardening.py::TestGateOrder` (spies on all three
-downstream functions, plus a negative control proving the spies fire on a
-clean run).
-
-HARDENING PASS, 2026-09-07:
-- Period integrity is wired INTO the gate: `_period_problems` delegates to
-  `extraction.identities.check_period_alignment` (one definition of "these
-  periods do not line up", shared with the cross-statement checks) and adds
-  an annual-vs-quarterly frequency check. CFO FY2025 against capex FY2024,
-  and an annual figure against a quarterly one, both block with
-  `Reason.PERIOD_MISMATCH`; two annual figures on one period pass.
-- The failure CAUSE survives the aggregate `BLOCKED`. `Reason` is a typed
-  enum (`MISSING`, `AMBIGUOUS`, `PERIOD_MISMATCH`, `INVALID_UNIT`,
-  `DEPENDENCY_UNMET`, `INSUFFICIENT_HISTORY`, `DERIVATION_BLOCKED`) carried
-  on every `Observed`. The pre-gate `BlockedError` (a blocked derivation
-  never reaches `evaluate()`) now carries a structured `.reasons`
-  `{field: Reason}`, classified by the same `row_for_range` the gate uses,
-  so an ambiguous collision reads as `AMBIGUOUS` on that path too, not as
-  prose in a rationale string.
-- `State.LOCATED` and `State.EXTRACTED` were removed. The adapter reads
-  post-gate state; nothing in this pipeline observes region resolution or a
-  pre-gate return, so they were documented lifecycle stages no code could
-  reach. `tests/test_contract_adversarial.py::TestLifecycleStates` locks
-  the enum to the seven reachable states. They return only with a real
-  transition that reaches them.
-- `tests/test_contract_adversarial.py` runs the eight adversarial cases
-  through `pipeline.value_filing` on the cached UBER_FY2024 extraction:
-  missing field -> BLOCKED/MISSING; conflicting observations -> the final
-  error names AMBIGUOUS; wrong unit -> BLOCKED/INVALID_UNIT; wrong period ->
-  BLOCKED/PERIOD_MISMATCH; valid zero -> PASS; analyst override -> PASS,
-  labelled, reaches the 77.08 anchor; missing WACC input -> PATH_WACC
-  blocked and `discount_rate` BLOCKED/DEPENDENCY_UNMET. Every blocked case
-  also asserts `build_wacc`, `build_dcf_inputs` and `run_dcf` never ran.
-  Insufficient history is exercised at the gate directly: `value_filing`
-  fixes its path set to (DCF, PER_SHARE, WACC) and does not select
-  PATH_HISTORICAL, and wiring it in would be a contract redesign this pass
-  did not undertake.
-
-Test count: 166 -> 179. All anchors hold (UBER_FY2024 77.08, LYFT_FY2025
-49.06). #14 (coverage gate returned the wrong type) and #15 (1000x unit
-bug) stay covered - the contract adds INVALID_UNIT as a second line of
-defence on the latter.
-
-Status: CLOSED. The structural completeness gap is fixed; the residual
-economic weakness in the base FCFF itself is #29, a separate issue.
 
 ## #29 A ten-year DCF anchored on one year's FCFF is the wrong instrument for a company mid-inflection
 
@@ -2180,6 +1308,592 @@ P10.5 left open: a ~20-line reason branch in arbitrate() (commit 7dd54fd).
   guard weakened to "is not None", and the "does NOT establish 21%" caveat
   dropped from the reason text).
 
+## #39 Capex excludes capitalized software; DoorDash capitalises more of it than it spends on hardware
+
+`derive_capex` matches on the single string `"property and equipment"`.
+DoorDash's cash-flow statement carries a SECOND investing line the pipeline
+never sees.
+
+MEASURED, from the filings themselves via `pypdf` - no API call, no new
+extraction:
+
+```
+DASH_FY2025 cash flow (columns FY2023 FY2024 FY2025, confirmed against CFO
+1,673 / 2,132 / 2,431 and the pipeline's own FY2025 FCFF of 1,123):
+
+  Purchases of property and equipment                    (123)  (104)  (257)
+  Capitalized software and website development costs     (201)  (226)  (348)
+  SBC included in capitalized software and website costs   161    165    193
+
+LYFT_FY2025 cash flow: no capitalized-software line exists.
+UBER: no capitalized-software line exists.
+```
+
+DoorDash capitalised MORE software ($348m) in FY2025 than it spent on
+property and equipment ($257m). The pipeline subtracts the 257 and not the
+348.
+
+EFFECT, measured by re-running the pure engine with only `base_cash_flow`
+changed:
+
+```
+DASH_FY2025   FCFF 1,123 -> 775      value/share 124.27 -> 87.72   -$36.55  (-29.4%)
+```
+
+That moves DoorDash from "86.6% above the top of the range" to a smaller but
+still substantial premium. It does not reverse the conclusion; it is 29% of
+the answer.
+
+THE INCONSISTENCY WITH SBC, which is the part that makes this a defect
+rather than a scope choice. `derive_stock_based_compensation` excludes
+DoorDash's "Stock-based compensation included in capitalized software and
+website development costs" with the written rationale that the amount "was
+capitalised into an asset and already leaves through capex, so subtracting
+it here too would double count it." It does not leave through capex - capex
+is `"property and equipment"` only. The $193m is excluded from SBC on the
+grounds that capex catches it, and capex does not catch it. It leaves
+through neither.
+
+Also measured: no fact whose name or quote contains "capitalized",
+"software" or "website" exists anywhere in the 99-entry cache. The
+`exclude=("capitalized",)` filter is a no-op today, guarding against a fact
+the extraction never requests - which is why the asymmetry was invisible.
+
+OPEN - out of scope for the closed version; fix requires re-running the
+anchor and restating the README table.
+
+## #40 Net debt credits all cash but omits the current portion of debt
+
+`derive_net_debt`'s policy is debt NET OF CURRENT PORTION, less cash and
+equivalents, less short-term investments. The current portion is therefore
+omitted from the debt side while 100% of cash is credited on the other -
+asymmetric by construction, and understating net debt by whatever the
+current portion is.
+
+MEASURED, from each balance sheet, with the column order resolved from the
+sheet's own header (they differ - Lyft prints 2025 then 2024; DoorDash prints
+2024 then 2025):
+
+```
+LYFT_FY2025   "Convertible senior notes, current"    FY2025: —     FY2024: 390,175 (USD thousands)
+UBER_FY2024   no separately captioned current-debt line on the face of the
+              balance sheet, although the caption "Long-term debt, net of
+              current portion" states that one exists
+DASH_FY2025   no current-debt line; "Convertible notes, net" 2,724 is
+              non-current (FY2024: —, FY2025: 2,724)
+```
+
+So the FY2025 effect is ZERO for all three filers: Lyft's current portion
+went to nil, and neither Uber nor DoorDash separately captions one. The gap
+is LATENT, not active - which is exactly why it survived review.
+
+EFFECT, measured on the engine rather than asserted:
+
+```
+LYFT_FY2025   net debt -834.8 -> -444.6 (adding back Lyft's OWN FY2024
+              current portion of 390.175)    value/share 49.06 -> 48.13   -$0.93
+UBER_FY2024   $1m of net debt = $0.000465/share, so $1bn of undisclosed
+              current debt would be $0.47/share
+```
+
+The UBER runs are the ones the question asks about and the ones where no
+figure exists to substitute: Uber discloses no current portion on the face of
+its balance sheet, so the effect there is UNKNOWN, not zero, and quantifying
+it needs a new extraction target against the debt note - an API call this
+entry deliberately does not make.
+
+OPEN - out of scope for the closed version; fix requires re-running the
+anchor and restating the README table.
+
+## #13 Dispersion test is scale-dependent for rate quantities — CLOSED
+
+MAX_RELATIVE_SPREAD = 1.0 in valuation/assumptions.py is an invented constant,
+the same class of error as the fixed header-search window already corrected in
+gates.py. Relative spread divides by the median, so any quantity whose median
+sits near zero blows past the limit regardless of economic materiality:
+effective tax rates of 1.9 and 9.2 percent are 7.3 percentage points apart and
+were blocked at 1.3x, while 45 and 52 percent would pass comfortably.
+
+The block was correct here but for the wrong reason, so the stated rationale is
+misleading - a message that sounds right and is not.
+
+Fix direction: dispersion limits should be per-quantity and declared alongside
+the derivation, expressed in the quantity's own units (percentage points for
+rates, percent for levels), rather than one global ratio.
+
+FIXED, exactly as that direction specified. `DispersionLimit` (span, unit,
+rationale) with one entry per TREND quantity in `DISPERSION_LIMITS`, declared
+beside the derivations that use them. `_dispersion_problem` takes the
+quantity name, checks sign change first, then compares an ABSOLUTE span
+against that quantity's own limit. `MAX_RELATIVE_SPREAD` is gone, and with
+it the "median is zero; relative spread is undefined" branch, which only ever
+existed to guard the division the relative test needed.
+
+MEASURED FIRST, before choosing any number - the real spans on every filing:
+UBER_FY2025 0.3, UBER_FY2024 1.0, DASH_FY2025 3.8, DASH_FY2024 7.0,
+LYFT_FY2025 22.2, LYFT_FY2024 23.9 percentage points. Nothing lands between
+7.0 and 22.2 - a factor of three with no filing in it - so revenue_growth's
+limit of 12.0 points sits in an empty gap with 5 points of margin below and
+10 above. That is a calibration against observed data with the reasoning
+recorded, not a number chosen in the abstract; the difference from the
+constant it replaces is that nobody ever wrote down why that one was 1.0.
+
+TWO FINDINGS THE ISSUE DID NOT ANTICIPATE:
+
+Its own motivating example no longer reproduces. `effective_tax_rate` never
+reaches the span check on any filing - UBER_FY2024/FY2025, LYFT_FY2024/FY2025
+and DASH_FY2025 all block on SIGN CHANGE first (1.9/9.2/-139.6,
+-2.6/10.1, -5.8/25.0/0.7). The "1.9 and 9.2 blocked at 1.3x" case described a
+two-value set that the current extraction no longer produces. A limit is
+declared for it anyway (21.0 points, anchored on the US federal statutory
+rate: periods spanning more than the entire statutory rate are not one tax
+regime), so a future filer with same-signed rates meets a stated limit rather
+than none - and it is labelled in the code as never reached.
+
+An undeclared quantity now BLOCKS rather than passing. The old global
+constant applied to everything by default, so adding a TREND quantity
+silently inherited a limit nobody chose for it. Declaring the limit is now
+part of declaring the derivation.
+
+Verified. All twelve status outcomes are unchanged across six filings and
+both TREND quantities - Uber and DoorDash derive growth, Lyft blocks in both
+years, every tax rate blocks on sign change. `capture_baseline.py` diffed
+against the pre-session baseline: identical, byte for byte. Six new tests in
+test_assumptions.py, including #13's exact example in both halves (1.9/9.2 at
+7.3 points apart and 45/52 at 7.0 points apart now get the SAME answer, which
+is the whole point), a near-zero median that no longer blocks a tenth of a
+point, a negative control requiring LYFT_FY2025's real 22.2-point spread to
+still block, and a check that every declared limit carries reviewable
+reasoning - a bare number is the old bug.
+
+## #19 A failed WACC valued the filing off the leftover integration-test discount rate — CLOSED
+
+Retitled on measurement. This was filed as a cosmetic leftover of unknown
+necessity - four market.json blocks carrying discount_rate 0.09 under source
+"integration test", each rationale reading "NOT A VALUATION INPUT",
+superseded because run_valuation.py overwrites the key with the derived
+bottom-up figure. The open question was whether any caller needed the key
+at all.
+
+It was not cosmetic. pipeline.py overwrites market["discount_rate"] only
+`if wacc:`, then calls build_dcf_inputs unconditionally. When build_wacc
+raised, the run fell through to the 0.09 sitting in the JSON.
+
+MEASURED, not inferred: removing debt_spread from UBER_FY2024's market block
+makes build_wacc fail. The pipeline printed one warning line - "WACC NOT
+BUILT" - and then a complete RESULT block valuing the filing at $73.54 per
+share against its real $77.08, on an invented rate, with every gate passed
+and every unit converted correctly. The project's own named failure mode, in
+its own pipeline: a result that sounds right and is not, carrying no red
+flag.
+
+The root cause was not the key. `_market`'s placeholder message told the
+reader, in the error text itself, to set a source to 'integration test' to
+get past the placeholder check - which is exactly what all four blocks did.
+A guard that advertises its own escape hatch is not a guard.
+
+FIXED, three parts:
+  - discount_rate deleted from all four market.json blocks (32 lines, the
+    only deletions in the file). It is derived, never authored, so its
+    absence is now what stops a run whose WACC failed.
+  - PLACEHOLDER_SOURCES gained "integration test". It appears on no other
+    input in market.json, checked before adding it.
+  - Both of `_market`'s messages rewritten. The placeholder message names no
+    bypass. The missing-key message special-cases discount_rate to say it is
+    derived and must NOT be added to market.json - the old text instructed
+    the reader to do the thing that caused this.
+
+Verified four ways: the anchor still prints 77.08 with WACC 7.87/8.72/10.26%
+at the beta bounds; the same crippled-market reproduction now raises
+BridgeError instead of valuing; `_market` blocks 'integration test', 'TODO'
+and 'placeholder' while still accepting 'NYSE close'; capture_baseline.py
+diffed against a pre-change baseline is identical byte for byte on all four
+filings.
+
+This is a fourth member of the class named in #26 and #30: a mechanism that
+looks like protection and is not. #26 was a block printing incomplete
+evidence; #30 was a documented guarantee no code enforced; this was a guard
+naming its own bypass in its error message.
+
+## #20 Revenue has two independent sources with no cross-check between them — CLOSED
+
+Total revenue is available from two places: the statement:operations target
+(the income statement total) and the Total row in the segment and geography
+notes. derive_growth excludes the note targets to avoid a collision with the
+statement total rather than reconciling them, so nothing compared the two.
+
+MEASURED FIRST, across all six filings and every period: they agree
+everywhere. UBER_FY2024 across four targets (operations, segments,
+geography_n2, geography_n13), UBER_FY2025 across three, LYFT_FY2025 across
+two, DASH_FY2025 and DASH_FY2024 across three each. LYFT_FY2024 has one
+source only - no geography note resolves for it, pre-existing and unrelated,
+noted in #28.
+
+FIXED. `_revenue_source_disagreements` (assumptions.py) groups every
+'total revenue' fact by period and target and blocks revenue_growth on a
+mismatch, naming each source and what it stated. It excludes nothing
+deliberately: it wants exactly the restatements derive_growth filters out.
+
+The tolerance is not an invented constant - the failure #13 names in
+MAX_RELATIVE_SPREAD. Two values agree when they differ by less than one unit
+of the COARSER of the two declared scales, because a figure printed in
+millions cannot resolve anything finer than a million. The bound is the
+filing's own reported precision.
+
+So this check is a no-op today, which is the point: it costs nothing while
+the sources agree and is the only thing that would see the day they do not.
+
+Four tests in test_assumptions.py, one a negative control
+(test_agreeing_sources_report_nothing, on the real UBER_FY2025 figures)
+requiring silence - without it the other three would pass equally against a
+function that flagged everything. The tolerance test checks both directions:
+millions against thousands differing by 400 thousand passes, the same pair
+differing by a full million is caught.
+
+Does not close the geography-note case, which #28 already closed by a
+different mechanism (reconciling components against the stated total).
+
+## #21 market.json is keyed by doc_id, duplicating pure market inputs per company — CLOSED
+
+risk_free_rate and equity_risk_premium are properties of the market on a
+given date, not of the company being valued, but market.json's schema keys
+every input under doc_id. UBER_FY2024 and LYFT_FY2025 currently carry
+identical values for both by discipline, not by structure - nothing stops
+the two from drifting apart silently if one block is edited and the other is
+not. This nearly happened this session in a different field: a full-file
+paste to add the LYFT_FY2025 block dropped a required source field from the
+UBER_FY2024 block sitting right next to it (see #15).
+
+Fix direction: split market.json into market-level inputs (risk_free_rate,
+equity_risk_premium - dated, not company-keyed) and company-level inputs
+(unlevered_industry_beta, debt_spread, country_risk_premium, share_price -
+each its own judgement per company).
+
+FIXED - but the split is drawn in a different place than that direction
+proposed, and the direction was wrong on one input. It put
+`unlevered_industry_beta` in the company-level group, "each its own
+judgement per company". ADR 0001 and #25 say the opposite: the beta is held
+identical across every filer ON PURPOSE, and a per-company block for it
+would reintroduce exactly the drift this issue is about.
+
+The line that actually matters is not "market data vs company data" but
+"held identical by policy vs legitimately different", which is what
+CLAUDE.md's Cross-company comparability section already says:
+
+  shared      risk_free_rate, equity_risk_premium, terminal_growth,
+              unlevered_industry_beta
+  per_filing  country_risk_premium, debt_spread, share_price
+
+`debt_spread` is per-filing even though all four currently carry 0.0111: it
+is a company's own credit spread and is not on CLAUDE.md's held-identical
+list, so making it shared would be a policy change, not a refactor.
+
+`load_market` merges shared into per_filing and RAISES `MarketDriftError`
+if a per-filing block redefines a shared key. The structure now enforces
+what discipline used to.
+
+THE DRIFT THIS ISSUE PREDICTED HAD ALREADY HAPPENED, and the migration's
+own assertion found it rather than a person looking for it. LYFT_FY2025's
+`unlevered_industry_beta` cited "Aswath Damodaran - Betas by Sector (US),
+Business and Consumer Services" while the other three cited the same table's
+"unlevered beta corrected for cash" column. All four carry 0.81 - which IS
+the cash-corrected figure; Damodaran's plain unlevered beta is 0.77, as
+UBER_FY2024's own rationale states. Lyft's citation, read literally, pointed
+at the column that gives the other number. The value was never wrong; the
+provenance was, silently, in a committed file.
+
+Migrated programmatically, never by hand: this issue itself records that a
+full-file paste dropped a required source field once already (#15). The
+script asserted every shared input identical on name/value/unit/source/as_of
+before moving anything, and asserted afterwards that merging reproduces each
+original block field for field. The four shared rationales are MERGED from
+the four originals - every clause is from one of them - minus the sentence
+saying the value is "duplicated here only because market.json is keyed by
+doc_id, which is a known structural gap", which this change makes false.
+
+Verified. All eleven test scripts pass. Both anchors hold. app.py runs
+through AppTest and reproduces README's UBER_FY2025 row. `capture_baseline.py`
+against the pre-session baseline differs on exactly FOUR lines out of four
+files - the terminal_growth rationale text, in the ASSUMPTIONS block - and
+the RESULT, TORNADO, REVERSE DCF and WACC blocks are byte-identical on all
+four filings. No number moved.
+
+`scripts/test_market.py` (7 tests, in CI) holds the structure, including a
+negative control that writes a redefinition into the file and requires
+`load_market` to raise - without it every other assertion would pass against
+a loader that merged a collision silently, which is the behaviour this issue
+exists to remove.
+
+Status: CLOSED.
+
+## #23 Three "unexplained" rejections are one fact, one cause, and three correct gates — CLOSED
+
+`test_multicompany.py` passes overall but three targets carry a rejection
+nobody has investigated, none of them unit-related:
+  - UBER_FY2025 taxes note:11: `columns_undetermined`, "row has 2 cells;
+    nearest header gave unknown=none; mapping cannot be verified"
+  - LYFT_FY2025 taxes note:13: `columns_undetermined`, "row has 2 cells;
+    nearest header gave years=['FY2025', 'FY2024', 'FY2023']; mapping cannot
+    be verified"
+  - DASH_FY2025 taxes note:12: `column_alignment`, "name matches 0 of the
+    column labels ['Amount', 'Percent']"
+
+All three are on tax-reconciliation tables and all three ultimately pass
+their target's minimum threshold, so they have never blocked a run - which
+is exactly how a real problem could sit unexamined.
+
+CLOSED, measured. The three are not three problems. They are one fact -
+`Effective income tax rate FY2025` - rejected in three filings for one
+reason, and the gates are RIGHT in all three cases.
+
+All three FY2025 filers adopted ASU 2023-09, which changed the tax-rate
+reconciliation disclosure. Each FY2025 note therefore contains TWO tables:
+a new-format one for FY2025 alone, and a legacy one for the earlier years,
+introduced verbatim as "in accordance with the guidance prior to the
+adoption of ASU 2023-09". Read directly from the note text:
+
+  UBER_FY2025  "...for the years ended December 31, 2023 and 2024:"
+               row: 'Effective income tax rate 9.2 % (139.6)%'   (2 cells)
+               "...for the years ended December 31, 2025 (in millions):"
+               row: 'Effective income tax rate $ (4,346) (74.8)%'
+  LYFT_FY2025  same shape, legacy table for 2024 and 2023
+  DASH_FY2025  new format only, columns literally ['Amount', 'Percent']
+
+The FY2025 row is not two years. It is an amount and a percentage, which is
+why DASH_FY2025 rejects on `column_alignment` against ['Amount', 'Percent']
+and the other two on `columns_undetermined` for a 2-cell row. Compare
+UBER_FY2024, one filing year earlier, whose single table gives a clean
+3-cell row and three accepted facts.
+
+LYFT_FY2025's is the informative one: the nearest header above the row
+reported `years=['FY2025', 'FY2024', 'FY2023']` while the row held two
+cells. A laxer gate would have mapped 10.1% to FY2025 when the filing means
+FY2024 - a year-shifted tax rate, with nothing downstream able to see it.
+The gate prevented a wrong number, not a cosmetic one.
+
+Measured downstream effect: none. effective_tax_rate blocks for every filing
+regardless, on sign change across periods (UBER_FY2024 1.9/9.2/-139.6,
+LYFT_FY2025 -2.6/10.1, DASH_FY2025 -5.8/25.0/0.7), and is supplied by
+override as 21% statutory by cross-company policy. Confirmed by running
+derive_all with NO overrides on all five filings: every one blocks.
+CLAUDE.md's residual-risk note that derive_tax_rate's computed branch never
+runs still holds.
+
+Deliberately NOT fixed. Teaching extraction the Amount/Percent format would
+change no valuation, since the quantity is overridden by policy in every
+filing. Per #26's own reasoning, the fix applies where harm was measured,
+not to every latent risk of the same shape. What this issue produced instead
+is a sixth entry for CLAUDE.md's "10-K facts that were actually Uber facts"
+list: one reconciliation table per note, with columns that are years. An
+accounting standard adoption broke it, mid-filer, between two years of the
+same company.
+
+## #24 DASH_FY2024 has never been valued — CLOSED as out of scope
+
+DASH_FY2025 is resolved: it has a `market.json` block and `overrides.json`
+entries (`effective_tax_rate`, `net_debt`, `interest_expense`), has been
+run end to end repeatedly (`python scripts\run_valuation.py DASH_FY2025
+231.89`), and appears in `README.md`'s own three-company table alongside
+UBER_FY2025 and LYFT_FY2025. The cross-company comparison this project
+argues for (see CLAUDE.md, "Cross-company comparability") now has all
+three FY2025 data points the manifest suggests.
+
+DASH_FY2024 does not. It has no `market.json` block and no
+`overrides.json` entries (`net_debt`, `effective_tax_rate` would both
+block), and `run_valuation.py` has never been run against it end to end.
+Extraction and gates do pass for it (`test_multicompany.py` exercises it
+alongside the other five filings), so the remaining gap is entirely in
+the judgement layer - market inputs and override policy - not extraction.
+
+CLOSED as out of scope, not as done. DASH_FY2024 is deliberately not valued.
+
+The comparison this project argues for is three companies at ONE market
+date on ONE method - UBER_FY2025, LYFT_FY2025, DASH_FY2025, all priced at
+the 2026-08-27 close. UBER_FY2024 exists alongside them for a different and
+stated reason: it is the evidence against the model, the same company one
+filing year apart producing $77.08 against $119.95 (#29). DASH_FY2024 serves
+neither purpose, and valuing it would require two new analyst judgements -
+a share price at a date nobody has chosen, and a country risk premium
+weighted on its own geographic mix - manufactured to fill a gap in a table
+rather than to answer a question.
+
+What was never in doubt: extraction and gates pass for DASH_FY2024, and
+test_multicompany.py exercises it alongside the other five on every run. The
+gap was only ever in the judgement layer, and the judgement is to leave it.
+
+Decided by Asi, 2026-09-06. Retitled from "DoorDash has never been valued" -
+found stale while checking a README claim about ISSUES.md's own honesty,
+not while looking for it.
+
+## #26 Derivation queries match on wording measured against two filers only — CLOSED
+
+`derive_net_debt` (assumptions.py) looked for the substring
+"short-term investments". DoorDash's FY2024 10-K prints "Short-term
+marketable securities" for the same account - a fully extracted,
+gate-verified fact, invisible to the derivation purely because its name
+does not contain the query's substring. Uber and Lyft each use stable
+wording across both of their own filed years; DoorDash does not, which
+makes this worse than the five cross-filer assumptions already documented
+in CLAUDE.md - wording is not even stable within one company over time,
+let alone across companies.
+
+net_debt still blocked correctly (it always blocks pending an override),
+so the pipeline never valued DoorDash on a wrong number. The danger was the
+component list PRINTED under that block, which an analyst reads to set the
+override: it showed "none extracted" for short-term investments and
+implied net_debt was Cash (4,019) less Restricted cash (190) = roughly
+-4,019, when the true figure, including the security that was extracted
+all along under its other name, is -5,341. Both filings agree the FY2024
+short-term balance is 1,322. A block correctly stopped the run and still
+handed the analyst an incomplete evidentiary basis, with nothing to flag
+that the list was short - a new failure class for this project:
+**a block is not protection if the evidence it prints is incomplete.**
+
+FIXED for net_debt specifically: its blocked rationale now lists every
+fact extracted from the balance_sheet target that none of the four
+component queries matched, by name and value. Verified on DASH_FY2024, the
+block now prints, directly under the existing components list: "Extracted
+from the balance sheet but matched by none of the queries above:
+Short-term marketable securities FY2023=1,422; Short-term marketable
+securities FY2024=1,322". Verified on UBER_FY2024 and LYFT_FY2025 (forced
+through the blocked path with no override to see it): the extra line is
+absent when nothing is unmatched - no change to either's behavior.
+
+The substring query "short-term investments" is DELIBERATELY NOT patched
+to also match "marketable securities". A wider substring list only
+relocates this exact bug to the next filer that phrases it a third way.
+The mechanism that surfaces the miss - printing what the queries did not
+match - is the fix; the query stays exactly as narrow, and exactly as
+fallible, as it always was, by design.
+
+NOT fixed - a second, live instance of the same bug class, in a different
+derivation, found by the same unconsumed-facts measurement that found the
+net_debt instance: DoorDash's own income-tax-provision caption is "Total
+provision for (benefit from) income taxes" - the inserted "(benefit from)"
+breaks derive_tax_rate's computed-fallback substring query "provision for
+income taxes" (confirmed: the substring does not match), which is why
+DASH_FY2024's effective_tax_rate blocks as "no facts extracted" rather than
+computing a rate from real, extracted, gate-verified components.
+derive_tax_rate has no equivalent unmatched-evidence line. Deliberately not
+fixed here - Task 1c decided against a repo-wide gate, so the fix applies
+only where it was measured to have caused real harm (a wrong number an
+analyst could have acted on), not to every derivation with the same shape
+of latent risk.
+
+THE derive_tax_rate INSTANCE IS NOW FIXED TOO, 2026-09-06, and the harm was
+worse than "no unmatched-evidence line". Reproduced on DASH_FY2024: three
+`Total provision for (benefit from) income taxes` facts (FY2022=-31,
+FY2023=31, FY2024=39) are extracted and pass every gate, and none of
+derive_tax_rate's three queries sees them. The rate then blocked through
+build_trend's generic path with the message **"no facts extracted for this
+quantity; check extraction gates"** - which is false twice over: facts WERE
+extracted, and the gates are exactly where the problem is not. It sent the
+analyst to audit a component that had worked perfectly.
+
+derive_tax_rate now blocks on its own when nothing resolves, naming the
+queries it tried, listing every fact from the taxes target that none of them
+matched, and saying in words that this is not an extraction failure.
+
+The query is still NOT widened to match "(benefit from)", for the same
+reason net_debt's was not: a longer substring list only relocates the bug to
+the next filer that phrases it a third way. A test asserts the block, so
+"fixing" it by broadening the query fails the suite.
+
+The mechanism is now shared rather than copied. `_unmatched_note(facts,
+target_key, matched, where)` is used by both derivations; the second
+instance would otherwise have been a second inline implementation that could
+drift from the first. net_debt's output was captured before the refactor and
+compared after: byte-for-byte identical on DASH_FY2024, UBER_FY2024 and
+LYFT_FY2025.
+
+Status: CLOSED for both measured instances. The general pattern - a
+derivation query written against wording measured on too few filers -
+remains a real risk in any derive_* function not yet audited this way, and
+is deliberately not swept: per this issue's own rule, the fix applies where
+harm was measured. `_unmatched_note` exists to make that fix cheap the next
+time harm IS measured.
+
+Six tests in test_assumptions.py, including a negative control
+(test_matching_wording_still_computes_a_rate) that requires a derivation to
+SUCCEED on ordinary wording - every other assertion here demands a block,
+and without it they would all pass against a derivation that never works.
+
+## #27 check_coverage cannot see a row the model never quoted — CLOSED
+
+Confirmed by a direct synthetic test, not inferred from reading the code: a
+fixture with one row fully quoted and extracted across both periods,
+alongside a second row never referenced in any Fact's quote at all, run
+through the real `validate()`, produces zero coverage rejections for the
+second row. `check_coverage` groups facts by `fact.quote` and only ever
+examines rows that appear in at least one quote; a row absent from every
+quote produces no group, so there is nothing for the gate to iterate over.
+This is a structural limitation of the gate as designed, not a bug in one
+run of it.
+
+No concrete instance found across the six filings tested tonight.
+DASH_FY2024's short-term-securities row (see #26) looked like a candidate
+but was not one: the model quoted and extracted that row completely: the
+loss happened one layer downstream, in derivation, not here.
+
+RESOLVED by the required-data contract (`src/aleph/valuation/contract.py`,
+`contract_adapter.py`), which does not extend the gate - it moves the
+question upstream of it. `REQUIREMENTS` is a static list read off the real
+code path (`bridge.require`, `wacc.REQUIRED_MARKET`, the substring each
+`derive_*` queries). `evaluate()` compares it against what the run holds:
+a field the contract declares and the run never produced is `MISSING`,
+which is a state the system carries whether or not extraction ever
+mentioned it. That is the structural fix - the omission cannot vanish
+because the requirement existed before extraction ran.
+
+`value_filing` calls `evaluate()` after derivation and before `build_wacc`,
+the bridge and the engine, and raises `ContractBlockedError` on
+`Status.BLOCKED`. The gate order is asserted against the source by
+`tests/test_contract_hardening.py::TestGateOrder` (spies on all three
+downstream functions, plus a negative control proving the spies fire on a
+clean run).
+
+HARDENING PASS, 2026-09-07:
+- Period integrity is wired INTO the gate: `_period_problems` delegates to
+  `extraction.identities.check_period_alignment` (one definition of "these
+  periods do not line up", shared with the cross-statement checks) and adds
+  an annual-vs-quarterly frequency check. CFO FY2025 against capex FY2024,
+  and an annual figure against a quarterly one, both block with
+  `Reason.PERIOD_MISMATCH`; two annual figures on one period pass.
+- The failure CAUSE survives the aggregate `BLOCKED`. `Reason` is a typed
+  enum (`MISSING`, `AMBIGUOUS`, `PERIOD_MISMATCH`, `INVALID_UNIT`,
+  `DEPENDENCY_UNMET`, `INSUFFICIENT_HISTORY`, `DERIVATION_BLOCKED`) carried
+  on every `Observed`. The pre-gate `BlockedError` (a blocked derivation
+  never reaches `evaluate()`) now carries a structured `.reasons`
+  `{field: Reason}`, classified by the same `row_for_range` the gate uses,
+  so an ambiguous collision reads as `AMBIGUOUS` on that path too, not as
+  prose in a rationale string.
+- `State.LOCATED` and `State.EXTRACTED` were removed. The adapter reads
+  post-gate state; nothing in this pipeline observes region resolution or a
+  pre-gate return, so they were documented lifecycle stages no code could
+  reach. `tests/test_contract_adversarial.py::TestLifecycleStates` locks
+  the enum to the seven reachable states. They return only with a real
+  transition that reaches them.
+- `tests/test_contract_adversarial.py` runs the eight adversarial cases
+  through `pipeline.value_filing` on the cached UBER_FY2024 extraction:
+  missing field -> BLOCKED/MISSING; conflicting observations -> the final
+  error names AMBIGUOUS; wrong unit -> BLOCKED/INVALID_UNIT; wrong period ->
+  BLOCKED/PERIOD_MISMATCH; valid zero -> PASS; analyst override -> PASS,
+  labelled, reaches the 77.08 anchor; missing WACC input -> PATH_WACC
+  blocked and `discount_rate` BLOCKED/DEPENDENCY_UNMET. Every blocked case
+  also asserts `build_wacc`, `build_dcf_inputs` and `run_dcf` never ran.
+  Insufficient history is exercised at the gate directly: `value_filing`
+  fixes its path set to (DCF, PER_SHARE, WACC) and does not select
+  PATH_HISTORICAL, and wiring it in would be a contract redesign this pass
+  did not undertake.
+
+Test count: 166 -> 179. All anchors hold (UBER_FY2024 77.08, LYFT_FY2025
+49.06). #14 (coverage gate returned the wrong type) and #15 (1000x unit
+bug) stay covered - the contract adds INVALID_UNIT as a second line of
+defence on the latter.
+
+Status: CLOSED. The structural completeness gap is fixed; the residual
+economic weakness in the base FCFF itself is #29, a separate issue.
+
 ## #30 sha256 is recorded as content identity but never used to detect a replaced document — CLOSED
 
 `schemas/documents.py` states the principle directly: `doc_id` is a
@@ -2381,6 +2095,328 @@ Status: CLOSED. The sha256 half is enforced; the documentation half has a
 test instead of a recommendation. What remains uncovered is prose that
 states a guarantee no count can express - that class is still checked by
 reading, and the ADRs in docs/adr/ are where those guarantees now live.
+
+## #31 eval-gate.yml could only ever fail on a fresh clone — CLOSED
+
+`.github/workflows/eval-gate.yml` ran `experiments/ch05_evaluation/02_ab_test.py`
+on every pull request to main. That script opens `data/uber_10k.pdf` at module
+level, line 34, unconditionally - and the filings are deliberately not
+distributed (docs/adr/0006), a decision made true of every commit when history
+was rewritten on 2026-09-06.
+
+MEASURED on a fresh `git clone` of the public repository, not on a local
+working copy: `PdfReader("data/uber_10k.pdf")` raises `FileNotFoundError`. The
+script dies before any evaluation runs and before its dependencies matter.
+
+The workflow's only successful run is `eb8940f3`, 2026-08-13. The PDF was
+untracked in `350ac47` on 2026-09-02, AFTER that run, so the green result
+predates the condition that breaks it - and neither SHA exists in this history
+any more, since the rewrite changed all of them. The sole evidence this gate
+ever worked points at a history that is gone.
+
+DELETED, not taught to skip. A conditional step would have put a green
+"Evaluation Gate" check on pull requests where nothing was evaluated, which is
+this project's own worst failure mode wearing a tick mark. `pipeline-tests.yml`
+already states the same position for the three tests it cannot run, and
+`test_manifest.py` for shallow clones. Reasoning and both rejected
+alternatives in docs/adr/0008.
+
+`experiments/ch05_evaluation/02_ab_test.py` is NOT modified: `experiments/` is
+archived course work, read-only by the working agreement, and editing an
+archived chapter to accommodate a CI decision would falsify what that chapter
+was. `requirements-eval.txt` is kept - it is how the evaluation is run locally,
+which is still supported.
+
+The gap is now checked, not just recorded.
+`test_docs_consistency.py::test_no_workflow_needs_a_file_the_repository_does_not_ship`
+walks every script any workflow runs and fails on a referenced path that exists
+locally but is untracked - the exact shape of this bug, and the exact reason it
+survived: it worked on the author's machine. Deliberately narrow: a path that
+exists nowhere is a fixture string, not this bug, and the first version of the
+check flagged `test_manifest.py`'s own `"data/does-not-exist"` before that was
+fixed. Verified by reintroducing the deleted workflow verbatim - caught, exit 1
+- and removing it again.
+
+Note for anyone reinstating this: #3, #4 and #5, the findings this gate would
+protect, are all in the retrieval layer, which README.md states is course work
+and not part of the capstone pipeline.
+
+## #34 `pytest tests/` could not pass on a fresh clone, for the same reason #31 could not — CLOSED
+
+Found in the closing pass, 2026-09-10. `pipeline-tests.yml` runs
+`python -m pytest tests/` on every push. The filings are not distributed
+(docs/adr/0006), so the runner has none of them.
+
+MEASURED, with `data/*.pdf` and `data/aleph_cache.db` moved aside:
+
+```
+python -m pytest tests/   ->  181 failed, 628 passed
+```
+
+Every one of the 181 a `FileNotFoundError` on `data/uber_10k_fy2024.pdf` or a
+sibling. No `conftest.py` existed and no test carried a skip condition, so this
+step was red on every push since the tests were added - and #31, the workflow
+that could only ever fail, was closed while a second one sat next to it doing
+the same thing at a different granularity. Deleting a whole workflow is easier
+to notice than a suite that fails 181 of 809.
+
+FIXED structurally, and NOT by making the tests pass without documents: 181 of
+them assert on real numbers from real filings, and faking the filings would
+leave 181 green checks that prove nothing.
+
+`tests/conftest.py` reads `data/manifest.json`, checks every filing it lists,
+and skips the tests marked `needs_filings` when one is absent, naming the
+missing file. The marker is registered in `pyproject.toml` so a typo is a
+warning rather than a silent no-op.
+
+Which tests carry it was MEASURED, not chosen by reading file names: the 181
+failing node ids map to 158 test functions - and to check that mapping is
+sound, every parametrised case was examined: none is mixed, each
+parametrisation fails wholly or not at all, so the marker sits on functions and
+no `pytest.param(marks=...)` is needed.
+
+The skip is LOUD, which is the whole point and the difference between this and
+the "make it skip" alternative docs/adr/0008 rejected.
+`pytest_terminal_summary` prints, above pytest's own summary line:
+
+```
+========================== NOT VERIFIED BY THIS RUN ===========================
+SKIPPED 181 tests that need the filings; they are NOT verified by this run.
+```
+
+VERIFIED both ways, which is what makes the marking falsifiable rather than
+merely plausible:
+
+```
+data/*.pdf and data/aleph_cache.db moved aside:  635 passed, 181 skipped, 0 failed
+filings present:                                 816 passed, 0 skipped
+```
+
+Zero skipped with the filings present is the load-bearing half. A marker on a
+test that never needed a filing would silently remove that test from CI
+forever, and nothing else in the mechanism would notice.
+
+## #35 The extraction prompt was outside the cache key AND outside every check — CLOSED
+
+`Cache.key` includes `PROMPT_VERSION`, a hand-maintained string, not the prompt
+itself. That is deliberate and stays: hashing the prompt into the key would
+change every key on every wording change and force a paid re-extraction of all
+six filings.
+
+The cost of that choice went unrecorded. Edit `SYSTEM_PROMPT`, forget to bump
+`PROMPT_VERSION`, and every cached answer is served against a prompt that no
+longer produced it - silently, with no red flag, which is this project's named
+worst failure mode.
+
+The second half is worse because no one edits anything: `ExtractedFacts`'
+JSON schema is pasted into the user message, so `pydantic`'s
+`model_json_schema()` rendering is part of the prompt. A pydantic upgrade
+changes what the model was asked without touching this repository at all.
+`pyproject.toml` pins `pydantic>=2.0`, so CI installs whatever is current.
+
+FIXED without touching the cache key. `extractor.py` records
+`PROMPT_FINGERPRINT`, the sha256 of `SYSTEM_PROMPT + SCHEMA_JSON`, and checks
+it at import - `raise`, not `assert`, because `python -O` strips asserts and a
+guard that disappears under a flag is not a guard. The message says which
+constant to bump. Current value:
+`2377308fe04a7392a6369a72ab5486bd728badb9ec0e35ea678c6a16de47116d`, computed
+under pydantic 2.13.4.
+
+`SCHEMA_JSON` is now a module constant used both by the fingerprint and by the
+message actually sent, so the fingerprint is provably over the bytes the model
+receives rather than over a second rendering of them.
+
+OPEN, and deliberately left open rather than papered over: the consequence in
+CI. `pyproject.toml` pins `pydantic>=2.0`, so the runner installs whatever is
+current, and the workflow's "Import the package" step imports `extractor`. If a
+future pydantic renders the schema differently, that step goes red on a
+dependency bump nobody made deliberately. That is the CORRECT signal - the
+prompt did change and the cache is stale against it - but it is a decision
+whether to keep the loose pin and accept a red badge as the notification, or
+pin pydantic exactly and make the schema move only when someone chooses it.
+Not decided here; whoever decides should record it as an ADR, because both
+options have a real cost.
+
+Also fixed alongside it: `json.loads` on the model's reply was unwrapped. A
+reply that is not JSON surfaced as a bare `JSONDecodeError` naming a character
+offset in a string the reader cannot see, and naming neither the filing nor the
+target. It now raises `ExtractionError` with `doc_id`, the target, and the
+first 200 characters of the reply - the same treatment the `max_tokens`
+truncation already had, including not caching the failure.
+
+Tests in `tests/test_extractor_prompt.py`, seven of them, none needing a
+filing: the positive control, two negative controls (the fingerprint moves when
+the system prompt moves, and when the schema moves), the import-time raise
+exercised by re-executing the module source with the recorded constant
+tampered, and three on the malformed reply - that it is named, that nothing is
+cached, and that a well-formed reply still parses. Without that last one, a
+wrapper that rejected every reply would pass the other two.
+
+## #36 Eleven places under `src/aleph/` each decided where `data/` is — CLOSED
+
+`Path("data") / record.file_name`, `Path("data/manifest.json")` and
+`Path("data/aleph_cache.db")` appeared across `extraction/extractor.py`,
+`valuation/pipeline.py`, `infra/cache.py` and `forensics/language.py`. A
+relative path is not a location; it is a location plus an assumption about the
+current working directory.
+
+The assumption held because every documented command is run from the repository
+root. Run one from anywhere else and it fails with
+`FileNotFoundError: data/manifest.json` - a path that does exist, reported from
+a directory the reader is not looking at.
+
+FIXED with `src/aleph/infra/paths.py`: `DATA_DIR`, resolved once from
+`ALEPH_DATA_DIR` if set, otherwise from the package file's own location
+(`src/aleph/infra/paths.py` -> repo root), never from the CWD. The env var
+exists because the filings are not distributed, so someone holding them
+elsewhere needs a way to say so that is not a source edit.
+
+VERIFIED by running the anchor from a different working directory:
+
+```
+cd $env:TEMP; python <abs path>\scripts\run_valuation.py UBER_FY2024 76.95
+```
+
+Same output as from the repository root, byte for byte - `Latest-period basis:
+77.08` included.
+
+The "before" is measured too, from that same directory, rather than asserted:
+
+```
+the old literal 'data\manifest.json' resolves to
+  C:\Users\asafc\AppData\Local\Temp\data\manifest.json   exists = False
+DATA_DIR now:
+  C:\Users\asafc\...\aleph\data                          exists = True
+```
+
+Note what that failure looks like to a reader: `FileNotFoundError` naming
+`data/manifest.json`, a file that is sitting right there in the repository.
+
+## #37 `data/README.md` quoted the anchor under the range's label — CLOSED
+
+Small, and the same shape as everything else in this file. It said the six
+PDFs reproduce "the `Value per share: 77.08` / `49.06` anchors". The CLI prints
+two different lines:
+
+```
+  Value per share      :  -14.13 to 77.08    (range across FY2022-FY2024 FCFF)
+  Latest-period basis  :             77.08  (FY2024 FCFF, the base case)
+```
+
+`Value per share` is the RANGE. 77.08 is the `Latest-period basis`. Quoting a
+single number under the range's label is the point-estimate reading the seventh
+settled principle exists to refuse - in the file whose job is telling a reader
+what output to expect.
+
+Fixed, and checked:
+`test_docs_consistency.py::test_the_anchor_is_quoted_under_the_label_the_cli_prints`
+requires any document that mentions 77.08 to also name `Latest-period basis`,
+and requires that label to be one `run_valuation.py` actually prints.
+
+## #38 The engine grew a negative FCFF for ten years and called it a valuation — CLOSED
+
+`run_dcf` multiplies `base_cash_flow` by (1 + g) each forecast year and
+capitalises the final year with Gordon. Guard 0c refused a ZERO base as
+NOT_SOLVABLE and said nothing about the SIGN, so a negative base went
+straight through: the loss compounded for ten years and the present value of
+a deepening loss was reported as a value per share.
+
+MEASURED. Two of the four valued filings, not one:
+
+```
+LYFT_FY2025   FY2023 FCFF  -712   ->  range low  -$39.37
+UBER_FY2024   FY2022 FCFF  -957   ->  range low  -$14.13
+UBER_FY2025   FY2023 FCFF  1,927  ->  positive, unaffected
+DASH_FY2025   FY2023 FCFF    462  ->  positive, unaffected
+```
+
+The task that opened this named only Lyft. UBER_FY2024 was found by running
+all four filings and reading the bound, and its -$14.13 was quoted in
+CLAUDE.md's SEVENTH SETTLED PRINCIPLE and in README's "the decision that
+changed a conclusion" - the number was load-bearing in the documentation
+while being a number the model should never have produced.
+
+DECIDED: option (A) of two. `validate()` gets Guard 0d - a negative
+`base_cash_flow` raises `DCFConsistencyError(... NOT_APPLICABLE)`. Rejected
+alternative: keep the arithmetic and label it loudly wherever it is printed.
+Rejected because the number stays in the file, in the app and in the README
+table, where a reader can quote it without the label - which is this
+project's own worst failure mode.
+
+No tolerance band. -0.01 is a loss; there is no amount of loss small enough
+to grow into a valuation, and a threshold would be a number nobody could
+defend.
+
+WHAT CHANGED BEYOND THE LOW, because the cascade was larger than the request
+assumed and every step of it was measured:
+
+- the tornado row for `base_cash_flow` loses its swing. `sensitivity_tornado`
+  sorts on `(swing is not None, swing or 0)`, so the row now sorts LAST.
+- `robustness._assumption_sensitivity` filtered `swing is None` rows out and
+  crowned the runner-up. Left alone it would have printed "the valuation is
+  controlled by discount_rate" for BOTH affected filings - reversing this
+  project's own central finding (#25, #29) with a sentence that is false
+  about the world and carries no red flag. FIXED in the same change: a
+  refused bound is reported as `PRIMARY VALUE DRIVER: base_cash_flow (bound
+  NOT_APPLICABLE)`, severity HIGH, with the interpretation stating that
+  unquantifiable is not small.
+- `model_governance` formatted P6's scenario values with `:.2f`. A refused
+  scenario is None, `f"{None:.2f}"` raises TypeError, and the broad
+  `except Exception` turned that into `value=error` / `NOT_SUPPORTED` -
+  discarding the two scenarios that DID value and reporting a formatting
+  failure as an evidence failure. FIXED: NOT_APPLICABLE per scenario, P6
+  stays CONDITIONAL_APPLICABILITY.
+- anchor spread narrows because the refused anchor leaves the set:
+  UBER_FY2024 290% -> 98%, LYFT_FY2025 1826% -> 117%. The spread is now
+  "across the anchors that can be valued", which is what it always measured.
+
+UNCHANGED, and checked by diffing every run against its own pre-change
+output: `Latest-period basis` 77.08 and 49.06, the high end of both ranges,
+PV explicit / PV terminal / enterprise / equity value, the reverse DCF
+(-8.5% for Lyft), and UBER_FY2025 and DASH_FY2025 byte-for-byte.
+
+Fifteen `run_dcf` call sites were read. Fourteen already caught
+`DCFConsistencyError`; ONE did not - `pipeline.py`'s range-bound re-run - and
+that one would have taken down an otherwise-valid valuation. That is now
+guarded, and `tests/test_negative_base_fcff.py` walks the AST of every module
+under `valuation/` and fails on a sixteenth unguarded re-run, with the two
+base-case sites allowlisted by name and reason.
+
+TEN EXISTING TESTS FAILED on the first full run and every one was a test
+asserting the OLD behaviour, not a defect in the change. They were rewritten
+to assert the refusal rather than deleted, because what they encode - that a
+negative anchor must not silently produce a plausible number - is the same
+property, now enforced one layer earlier:
+
+  test_p5_controls    2  the P5.7 reverse-DCF orientation proof for B < 0
+  test_market_expect. 4  sectors priced off their own negative-anchor DCF
+  test_robustness     3  a negative base listed as "finite output allowed",
+                         and two findings built on a run_dcf(-500) result
+  three more          1  see below - not about the guard at all
+
+That last one is worth its own line. `test_pipeline_has_no_*_import` in
+three files greps `pipeline.py`'s SOURCE for the names of the diagnostic
+modules, to prove they are not wired into the orchestrator. A COMMENT added
+in this change happened to list four of them by name and failed all three.
+The comment was reworded; the tests are right, and the next person to write
+a comment in that file should know they are reading it.
+
+TWO THINGS LEFT DEAD BY THIS, recorded rather than removed:
+`reverse_dcf`'s B < 0 direction branch (the window probe returns
+NOT_SOLVABLE first), and `robustness._method_limitation`'s negative-base
+finding (a filing whose LATEST FCFF is negative now stops at the pipeline's
+own `run_dcf` and the CLI exits 1). Both are kept, tested where the contract
+is observable - the second by handing robustness a CONSTRUCTED DCFResult,
+since the engine will no longer produce one - and documented in place.
+
+ONE THING DELIBERATELY NOT CHANGED: `market_expectations.implied_base_fcff`
+can still report a NEGATIVE implied base FCFF when the market price is low
+enough, and that is not a valuation - it is a statement about what the price
+implies, solved in closed form and never fed back through the engine. Its
+docstring's claim that "a re-run at B* cannot raise" is now false in
+principle (Guard 0d is a new guard keyed on base_cash_flow), but no re-run
+happens, so nothing is broken. None of the four filings produces a negative
+B* today.
 
 ## Closed
 
