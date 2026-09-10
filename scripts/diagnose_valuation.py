@@ -33,6 +33,7 @@ valuation, and now it cannot, because the valuation is a different command.
 """
 import sys
 
+from _filings import exit_on_missing_filing
 from aleph.valuation.bridge import BridgeError
 from aleph.valuation.pipeline import (
     BlockedError,
@@ -63,6 +64,8 @@ except BlockedError as exc:
 except (BridgeError, DCFConsistencyError) as exc:
     print(f"{type(exc).__name__}: {exc}")
     sys.exit(1)
+except FileNotFoundError as exc:
+    exit_on_missing_filing(exc)
 
 bridged = run.bridged
 result = run.result

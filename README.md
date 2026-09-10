@@ -59,7 +59,7 @@ bottom-up WACC, rebuild FCFF from CFO, discount.
 | LYFT_FY2025 | NOT_APPLICABLE – $49.06 (FY2023–FY2025) | $49.06 | $17.35 | no range to place it in | -8.5%/yr for 10 years |
 | DASH_FY2025 | $54.85 – $124.27 (FY2023–FY2025) | $124.27 | $231.89 | 86.6% above the top | 23.5%/yr for 10 years |
 
-Reproduce any row with `python scripts\run_valuation.py <doc_id> <price>`.
+Reproduce any row with `python scripts/run_valuation.py <doc_id> <price>`.
 
 Be precise about what that table's middle columns are: the tool prints
 "inside the range, 53.8% of the way up" or "86.6% ABOVE the top of the
@@ -136,7 +136,7 @@ originally anticipated."* Lyft's driver-classification risk factor loses
 the phrase *"and we may incur significant expenses to resolve the matters
 at issue in the litigation"* from an otherwise-surviving sentence about
 that same litigation. Neither shows up in a cash flow number. Reproduce
-with `python scripts\probe_forensics.py UBER_FY2024 UBER_FY2025 1A` and
+with `python scripts/probe_forensics.py UBER_FY2024 UBER_FY2025 1A` and
 the Lyft equivalent; a null control (a filing diffed against itself) reads
 zero on every bucket before either result means anything.
 
@@ -197,14 +197,27 @@ Each answers one question:
 Run them with
 
 ```
-python scripts\diagnose_valuation.py UBER_FY2024 76.95
+python scripts/diagnose_valuation.py UBER_FY2024 76.95
 ```
 
 the same arguments `run_valuation.py` takes. They printed underneath the
 valuation until 2026-09-10; splitting them out is what let each layer's bare
-`except Exception` be replaced by the two exception types the package
-actually raises, because a bug in a diagnostic can no longer take down a
-valuation.
+`except Exception` in the CLI be replaced by the two exception types the
+package actually raises, because a bug in a diagnostic can no longer take
+down a valuation.
+
+**Be precise about how far that split goes: it is the PRINTING that moved,
+not the computation.** Two of these layers, `accounting_quality` and
+`robustness` - 3,191 of the 9,560 diagnostic lines - still run inside
+`value_filing`, so `run_valuation.py` still executes them on every run and
+`diagnose_valuation.py` re-runs the pipeline to print what they produced.
+They sit behind **2** deliberate `except Exception` handlers in
+[pipeline.py](src/aleph/valuation/pipeline.py), and those two stay: a
+diagnostic that fails must become a NOT_ASSESSED report with its exception
+named, never a failed valuation. That is the P4.7 contract, and a regression
+test replaces each layer with a raising stub and asserts the per-share value
+is unchanged. The strict handling described above applies to
+`diagnose_valuation.py`, which owns no valuation to protect.
 
 **None of these changes a number, and none was promoted, deliberately.** The
 one with the strongest case - P6, which produces an evidence-based sustainable
@@ -305,19 +318,19 @@ Thirteen commands prove the pipeline works, verbatim from
 [CLAUDE.md](CLAUDE.md#commands-that-verify-the-system-works):
 
 ```
-python scripts\run_valuation.py UBER_FY2024 76.95   # must print Latest-period basis: 77.08 (was 102.40 pre-SBC, see #16)
-python scripts\run_valuation.py LYFT_FY2025 17.35   # must print Latest-period basis: 49.06 (was 67.79 pre-SBC, see #16)
-python scripts\test_regression.py                    # gate over cached extraction targets, exit(1) on shortfall
-python scripts\test_gates.py
-python scripts\test_dcf_engine.py
-python scripts\test_schemas.py
-python scripts\test_sections.py
-python scripts\test_multicompany.py
-python scripts\test_assumptions.py
-python scripts\test_pipeline_callback.py
-python scripts\test_manifest.py
-python scripts\test_market.py
-python scripts\test_docs_consistency.py
+python scripts/run_valuation.py UBER_FY2024 76.95   # must print Latest-period basis: 77.08 (was 102.40 pre-SBC, see #16)
+python scripts/run_valuation.py LYFT_FY2025 17.35   # must print Latest-period basis: 49.06 (was 67.79 pre-SBC, see #16)
+python scripts/test_regression.py                    # gate over cached extraction targets, exit(1) on shortfall
+python scripts/test_gates.py
+python scripts/test_dcf_engine.py
+python scripts/test_schemas.py
+python scripts/test_sections.py
+python scripts/test_multicompany.py
+python scripts/test_assumptions.py
+python scripts/test_pipeline_callback.py
+python scripts/test_manifest.py
+python scripts/test_market.py
+python scripts/test_docs_consistency.py
 ```
 
 Eight of those thirteen run in CI on every push
@@ -331,27 +344,35 @@ imply otherwise.
 The workflow also runs `python -m pytest tests/`, which is not one of the
 thirteen - those are standalone scripts; this is the suite over the pure
 modules (the data contract, model governance, robustness, the operating
-model, evidence resolution). On a clone without the filings it was 181
-failed, 628 passed, every failure a `FileNotFoundError` on a 10-K this
-repository does not distribute, which means it could not pass for anyone but
-the author. It now SKIPS those tests instead:
-[tests/conftest.py](tests/conftest.py) checks every filing
+model, evidence resolution). Measured on 2026-09-10, on a clone without the
+filings, it was 181 failed and 628 passed - every failure a
+`FileNotFoundError` on a 10-K this repository does not distribute, which
+means it could not pass for anyone but the author. It now SKIPS those tests
+instead: [tests/conftest.py](tests/conftest.py) checks every filing
 `data/manifest.json` lists, skips the tests marked `needs_filings` when one
 is absent, and prints
 
 ```
 ========================== NOT VERIFIED BY THIS RUN ===========================
-SKIPPED 181 tests that need the filings; they are NOT verified by this run.
+SKIPPED 185 tests that need the filings; they are NOT verified by this run.
 ```
 
 at the top of the summary. Skipped is not passed, and the summary says so in
 those words rather than leaving a row of `s` characters to imply it - the
 same stance as [docs/adr/0008](docs/adr/0008-eval-gate-removed-from-ci.md),
 which deleted a workflow rather than let it report success on a run that
-evaluated nothing. Which tests carry the marker was measured, not guessed:
-those 181 failures map to 158 test functions, and exactly those are marked.
-With the filings present the suite must report 0 skipped - a marked test
-that never needed a filing would otherwise sit unverified in CI forever.
+evaluated nothing.
+
+Today **185 tests carry the marker**, sitting on **159 test functions** - the
+two differ because a parametrised function carries one decorator and produces
+several tests. Both counts are checked against the code by
+`scripts/test_docs_consistency.py`, which is how they are allowed to appear
+in prose at all: the pair read 181 and 158 for two commits after a new test
+file was marked, because the check only asserted that *something* was marked.
+Which tests carry the marker was measured, not guessed - the run without the
+filings, mapped back to the functions that failed. With the filings present
+the suite must report 0 skipped; a marked test that never needed a filing
+would otherwise sit unverified in CI forever.
 
 It is the only workflow. A second one ran the ch05 retrieval evaluation
 on pull requests until 2026-09-06; it opened `data/uber_10k.pdf`, which

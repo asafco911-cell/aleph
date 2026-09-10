@@ -31,6 +31,34 @@ GATES = Path("src/aleph/extraction/gates.py")
 OPERATING_MODEL = Path("src/aleph/valuation/operating_model.py")
 PYPROJECT = Path("pyproject.toml")
 CONFTEST = Path("tests/conftest.py")
+PIPELINE = Path("src/aleph/valuation/pipeline.py")
+
+
+def needs_filings_counts() -> tuple[int, int | None]:
+    """(functions carrying the marker, tests the marker selects).
+
+    The first is a grep. The second is pytest's own collection, because the
+    two are NOT the same number - a parametrised function carries one
+    decorator and produces several tests - and the documentation states both.
+    Collection is deterministic and needs no filings: it imports the test
+    modules, it does not run them.
+
+    Verified equal to the number actually skipped: with data/*.pdf moved
+    aside, `pytest tests/` reports the same count as `--collect-only -q -m
+    needs_filings` selects. Measured 2026-09-10, both 185.
+    """
+    marked = sum(
+        len(re.findall(r"@pytest\.mark\.needs_filings",
+                       p.read_text(encoding="utf-8")))
+        for p in sorted(Path("tests").glob("test_*.py")))
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests/", "--collect-only", "-q",
+         "-o", "addopts=", "-m", "needs_filings"],
+        capture_output=True, text=True)
+    # "185/832 tests collected (647 deselected)" or "832 tests collected"
+    match = (re.search(r"(\d+)/\d+ tests collected", result.stdout)
+             or re.search(r"^(\d+) tests collected", result.stdout, re.M))
+    return marked, int(match.group(1)) if match else None
 
 failures: list[str] = []
 
@@ -66,13 +94,25 @@ def test_command_lists_are_identical():
 
 
 def test_every_documented_script_exists(commands: list[str]):
-    """A documented command that cannot run was #30's instance 4."""
+    """A documented command that cannot run was #30's instance 4.
+
+    The path separator is matched BOTH ways. This check read only
+    `scripts\\name.py`, so when the documents moved to forward slashes it
+    matched nothing, skipped every line and passed - a checker that silently
+    stops checking is worse than no checker, so the count of paths it found
+    is asserted too.
+    """
+    found = 0
     for line in commands:
-        match = re.search(r"(scripts\\[\w.]+\.py)", line)
+        match = re.search(r"(scripts[\\/][\w.]+\.py)", line)
         if not match:
             continue
+        found += 1
         path = Path(match.group(1).replace("\\", "/"))
         check(f"{path} exists", path.exists())
+    check(f"found a script path in {found} of {len(commands)} documented commands",
+          found == len(commands),
+          "a command line with no recognisable scripts/ path is not checked")
 
 
 WORDS = {
@@ -453,10 +493,105 @@ def test_the_needs_filings_marker_is_registered_and_used():
     check("the workflow comment names the marker",
           "needs_filings" in workflow)
 
-    marked = sum(len(re.findall(r"@pytest\.mark\.needs_filings", p.read_text(encoding="utf-8")))
-                 for p in sorted(Path("tests").glob("test_*.py")))
-    check(f"{marked} test functions carry the marker", marked > 0,
+    marked, selected = needs_filings_counts()
+    check("the marker is on at least one test", marked > 0,
           "conftest.py's mechanism guards nothing if nothing is marked")
+    check("pytest can report how many tests the marker selects",
+          selected is not None, "--collect-only -m needs_filings gave no count")
+    if selected is None:
+        return
+
+    # THE ENFORCEMENT. `marked > 0` was the whole check here until now, so
+    # commit 568739e added tests/test_negative_base_fcff.py with the marker
+    # and every count in the documentation went stale - 181/158 against a
+    # real 185/159 - without a single check failing. Counts stated in prose
+    # are checked against the thing they count, the same way the diagnostic
+    # line-count table is.
+    phrase_tests = f"{selected} tests carry the marker"
+    phrase_funcs = f"{marked} test functions"
+    sample_line = f"SKIPPED {selected} tests that need the filings"
+
+    readme = README.read_text(encoding="utf-8")
+    for name, text in (("README.md", readme), ("tests/conftest.py", conftest),
+                       ("pipeline-tests.yml", workflow)):
+        check(f"{name} says '{phrase_tests}'", phrase_tests in text,
+              f"{selected} tests are selected by -m needs_filings today")
+        check(f"{name} says '{phrase_funcs}'", phrase_funcs in text,
+              f"{marked} functions carry the decorator today")
+
+    # the sample output block in README must be what the code prints, not
+    # what it printed once
+    check(f"README's sample summary says '{sample_line}'",
+          sample_line in readme,
+          "conftest.py's terminal summary prints the live count")
+    check("conftest.py builds that line from the live count, not a literal",
+          'f"SKIPPED {_skipped_count} tests that need the filings; "' in conftest)
+
+
+def test_every_command_that_opens_a_filing_reports_a_missing_one():
+    """The filings are not distributed, so "not present" is the EXPECTED
+    state of a fresh clone - and it arrived as a pypdf traceback from the
+    first command README lists (39 lines), from test_sections (26), from
+    test_regression (32), and as 97 lines of repeated FAIL rows from
+    test_multicompany.
+
+    Each now catches FileNotFoundError at the CLI boundary and prints one
+    line. Structural, not discipline: a sixth script that opens a filing and
+    forgets fails here."""
+    helper = Path("scripts/_filings.py")
+    check("scripts/_filings.py exists", helper.is_file())
+    if not helper.is_file():
+        return
+    check("the helper still exits 1", "sys.exit(1)" in
+          helper.read_text(encoding="utf-8"))
+
+    opens_a_filing = (
+        "run_valuation.py", "diagnose_valuation.py", "test_sections.py",
+        "test_multicompany.py", "test_regression.py",
+    )
+    for name in opens_a_filing:
+        path = Path("scripts") / name
+        check(f"scripts/{name} exists", path.is_file())
+        if not path.is_file():
+            continue
+        source = path.read_text(encoding="utf-8")
+        check(f"scripts/{name} handles a missing filing",
+              "exit_on_missing_filing" in source,
+              "opens a filing but would print a pypdf traceback")
+
+    # and the library must NOT be the one catching it (principle 5)
+    for module in sorted(Path("src/aleph").rglob("*.py")):
+        check(f"{module.as_posix()} does not catch FileNotFoundError",
+              "except FileNotFoundError" not in module.read_text(encoding="utf-8"),
+              "a library raises; the CLI decides the exit code")
+
+
+def test_the_pipeline_still_guards_its_two_diagnostic_layers():
+    """README and CLAUDE.md say the bare `except Exception` handlers were
+    replaced. That is true of the CLI and NOT true of pipeline.py, which
+    keeps two on purpose: accounting_quality and robustness run inside
+    value_filing, and a diagnostic that fails must become a NOT_ASSESSED
+    report, never a failed valuation (the P4.7 contract).
+
+    Both directions are checked. If the two guards are ever removed the
+    documents become wrong in one direction; if a third appears they become
+    wrong in the other."""
+    source = PIPELINE.read_text(encoding="utf-8")
+    handlers = [l for l in source.splitlines()
+                if l.lstrip().startswith("except Exception")]
+    readme = README.read_text(encoding="utf-8")
+    claude = CLAUDE.read_text(encoding="utf-8")
+
+    check(f"pipeline.py has {len(handlers)} `except Exception` handlers",
+          len(handlers) == 2, f"{handlers}")
+    check(f"README states the count as {len(handlers)}",
+          f"**{len(handlers)}** deliberate `except Exception` handlers" in readme,
+          "README's Diagnostic-layers section must name the number")
+    check("README says the computation did not move, only the printing",
+          "it is the PRINTING that moved" in readme)
+    check("CLAUDE.md says run_valuation.py still RUNS them",
+          "it still\n                 RUNS accounting_quality and robustness" in claude
+          or "RUNS accounting_quality and robustness" in claude)
 
 
 if __name__ == "__main__":
@@ -482,6 +617,8 @@ if __name__ == "__main__":
     test_the_diagnostic_line_counts_in_the_readme_are_real()
     test_readme_links_into_claude_md_resolve()
     test_the_needs_filings_marker_is_registered_and_used()
+    test_every_command_that_opens_a_filing_reports_a_missing_one()
+    test_the_pipeline_still_guards_its_two_diagnostic_layers()
 
     if failures:
         print(f"\n{len(failures)} documentation claim(s) no longer match the code:")

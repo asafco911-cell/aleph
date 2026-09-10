@@ -37,7 +37,7 @@ paragraph is exactly what ISSUES.md #30 counted nine instances of.
   it happened. Only `git ls-tree HEAD` proves the path actually left the
   tree.
 - A fix is not finished until a command proves it. Every change reports the
-  command run and its output. `python scripts\run_valuation.py UBER_FY2024
+  command run and its output. `python scripts/run_valuation.py UBER_FY2024
   76.95` must still print `Latest-period basis: 77.08` after any change to
   extraction, assumptions, bridge, wacc, or dcf_engine. This anchor was
   102.40 before the SBC decision (ISSUES.md #16); it moved deliberately,
@@ -180,10 +180,12 @@ data/            manifest.json (6 filings: UBER/LYFT/DASH x FY2024/FY2025),
                  anchors.json, aleph_cache.db (gitignored), *.pdf (gitignored)
 
 scripts/         run_valuation.py (the valuation CLI: contract, WACC, bridge,
-                 assumptions, result, tornado, reverse DCF — and nothing a
-                 valuation number does not depend on), diagnose_valuation.py
-                 (same argv; accounting quality, robustness and the five
-                 EXPERIMENTAL layers — 77% of valuation/ by line count,
+                 assumptions, result, tornado, reverse DCF — it PRINTS
+                 nothing a valuation number does not depend on, but it still
+                 RUNS accounting_quality and robustness, which value_filing
+                 computes behind two deliberate `except Exception` guards),
+                 diagnose_valuation.py (same argv; prints those two plus the
+                 five EXPERIMENTAL layers — 77% of valuation/ by line count,
                  changing no number; docs/adr/0009), test_*.py (one script
                  per pipeline stage or module, independently runnable),
                  probe_*.py (ad hoc measurement scripts — the "measure,
@@ -236,19 +238,19 @@ ISSUES.md        open and closed issues, each with the measurement behind
 ## Commands that verify the system works
 
 ```
-python scripts\run_valuation.py UBER_FY2024 76.95   # must print Latest-period basis: 77.08 (was 102.40 pre-SBC, see #16)
-python scripts\run_valuation.py LYFT_FY2025 17.35   # must print Latest-period basis: 49.06 (was 67.79 pre-SBC, see #16)
-python scripts\test_regression.py                    # gate over cached extraction targets, exit(1) on shortfall
-python scripts\test_gates.py
-python scripts\test_dcf_engine.py
-python scripts\test_schemas.py
-python scripts\test_sections.py
-python scripts\test_multicompany.py
-python scripts\test_assumptions.py
-python scripts\test_pipeline_callback.py
-python scripts\test_manifest.py
-python scripts\test_market.py
-python scripts\test_docs_consistency.py
+python scripts/run_valuation.py UBER_FY2024 76.95   # must print Latest-period basis: 77.08 (was 102.40 pre-SBC, see #16)
+python scripts/run_valuation.py LYFT_FY2025 17.35   # must print Latest-period basis: 49.06 (was 67.79 pre-SBC, see #16)
+python scripts/test_regression.py                    # gate over cached extraction targets, exit(1) on shortfall
+python scripts/test_gates.py
+python scripts/test_dcf_engine.py
+python scripts/test_schemas.py
+python scripts/test_sections.py
+python scripts/test_multicompany.py
+python scripts/test_assumptions.py
+python scripts/test_pipeline_callback.py
+python scripts/test_manifest.py
+python scripts/test_market.py
+python scripts/test_docs_consistency.py
 ```
 
 Eight of these run in CI on every push (`.github/workflows/pipeline-tests.yml`):

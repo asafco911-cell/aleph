@@ -23,6 +23,7 @@ README.md, "Diagnostic layers (not in the base DCF)", and docs/adr/0009.
 """
 import sys
 
+from _filings import exit_on_missing_filing
 from aleph.valuation.bridge import BridgeError
 from aleph.valuation.pipeline import (
     BlockedError,
@@ -65,6 +66,11 @@ except BridgeError as exc:
 except DCFConsistencyError as exc:
     print(f"\nENGINE GUARD FIRED: {exc}")
     sys.exit(1)
+except FileNotFoundError as exc:
+    # The filings are deliberately not distributed. That is a documented,
+    # expected state of a fresh clone, and it used to arrive here as a
+    # 39-line pypdf traceback from the first command README lists.
+    exit_on_missing_filing(exc)
 
 bridged = run.bridged
 result = run.result

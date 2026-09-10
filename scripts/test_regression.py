@@ -5,9 +5,10 @@ target instead of all of them. Gate, not report - exit(1) on any shortfall.
 """
 import json
 import sys
-from pathlib import Path
 
+from _filings import exit_on_missing_filing
 from aleph.extraction import extract
+from aleph.infra.paths import DATA_DIR
 from aleph.schemas import DocumentRecord
 
 # doc_id, target, question, minimum accepted facts
@@ -27,19 +28,24 @@ EXPECTED = [
 
 records = {
     r["doc_id"]: DocumentRecord(**r)
-    for r in json.loads(Path("data/manifest.json").read_text(encoding="utf-8"))
+    for r in json.loads((DATA_DIR / "manifest.json").read_text(encoding="utf-8"))
 }
 
 failures = 0
-for doc_id, target, question, minimum in EXPECTED:
-    accepted, rejected, cache_hit = extract(records[doc_id], target, question)
-    ok = len(accepted) >= minimum
-    failures += not ok
-    print(f"  {'ok  ' if ok else 'FAIL'} {doc_id} {target:<22} "
-          f"accepted={len(accepted):>2} (min {minimum})  "
-          f"rejected={len(rejected):>2}  cache_hit={cache_hit}")
-    if not ok:
-        for failure in rejected[:3]:
-            print(f"         [{failure.gate}] {failure.detail[:110]}")
+# Runs from cache, but resolve_target still opens the PDF to bound the region.
+# Without the filings that surfaced as a 32-line pypdf traceback.
+try:
+    for doc_id, target, question, minimum in EXPECTED:
+        accepted, rejected, cache_hit = extract(records[doc_id], target, question)
+        ok = len(accepted) >= minimum
+        failures += not ok
+        print(f"  {'ok  ' if ok else 'FAIL'} {doc_id} {target:<22} "
+              f"accepted={len(accepted):>2} (min {minimum})  "
+              f"rejected={len(rejected):>2}  cache_hit={cache_hit}")
+        if not ok:
+            for failure in rejected[:3]:
+                print(f"         [{failure.gate}] {failure.detail[:110]}")
+except FileNotFoundError as exc:
+    exit_on_missing_filing(exc)
 
 sys.exit(1 if failures else 0)

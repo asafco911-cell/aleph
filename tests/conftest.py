@@ -1,15 +1,16 @@
 """Skip the tests that need the six 10-K PDFs, loudly, when they are absent.
 
-Measured, on a checkout with `data/*.pdf` moved away: `python -m pytest tests/`
-was 181 failed, 628 passed - every failure a FileNotFoundError on a filing the
-repository deliberately does not distribute (docs/adr/0006). That is what a
-fresh clone looks like, and CI runs `python -m pytest tests/` on every push, so
-the workflow could not pass for anyone but the author.
+Measured 2026-09-10, on a checkout with `data/*.pdf` moved away:
+`python -m pytest tests/` was 181 failed, 628 passed - every failure a
+FileNotFoundError on a filing the repository deliberately does not distribute
+(docs/adr/0006). That is what a fresh clone looks like, and CI runs
+`python -m pytest tests/` on every push, so the workflow could not pass for
+anyone but the author.
 
 Two ways to fix that, and only one of them is honest:
 
-  - Make the tests pass without the filings. They cannot: 181 of them assert
-    on real numbers from real documents. Faking the documents would leave 181
+  - Make the tests pass without the filings. They cannot: they assert on real
+    numbers from real documents. Faking the documents would leave a screen of
     green checks that prove nothing about the pipeline.
   - Skip them, and say so at the top of the summary, every time.
 
@@ -20,11 +21,18 @@ difference is that here the skip is REPORTED - pytest_terminal_summary prints
 the count and the missing file, so a reader of a CI log cannot mistake the pass
 line for a whole-suite pass.
 
-Which tests carry the marker was measured, not guessed: the 181 failures above
-were mapped back to 158 test functions (no parametrised case was mixed - every
-parametrisation failed wholly or not at all), and exactly those functions were
-marked. `python -m pytest tests/` with the filings present must report 0
-skipped; if it does not, a test that never needed a filing has been marked.
+Which tests carry the marker was measured, not guessed: the failures above were
+mapped back to the functions that produced them (no parametrised case was mixed
+- every parametrisation failed wholly or not at all), and exactly those
+functions were marked. `python -m pytest tests/` with the filings present must
+report 0 skipped; if it does not, a test that never needed a filing has been
+marked.
+
+Today 185 tests carry the marker, on 159 test functions. Those two numbers are
+stated here, in README.md and in the workflow, and all three are checked
+against the code by scripts/test_docs_consistency.py - they had drifted to
+181/158 within two commits of being written, because the check only asserted
+that something, anything, was marked.
 """
 import functools
 import json
@@ -50,7 +58,7 @@ def missing_filings() -> tuple[str, ...]:
     file exists to prevent.
 
     Cached: the answer cannot change during a run, and asking the filesystem
-    once per marked test would be 181 answers to one question.
+    once per marked test would be one question asked 185 times.
     """
     if not MANIFEST.is_file():
         return (str(MANIFEST),)

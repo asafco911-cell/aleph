@@ -60,7 +60,7 @@ nothing to do with getting the wrong document.
 So: get the filing from the EDGAR link above, render it to PDF however you
 choose, and expect its hash to differ from the table. That is not a sign
 of a broken pipeline or the wrong filing - it is a rendering artifact.
-`python scripts\build_manifest.py` does not compare against the committed
+`python scripts/build_manifest.py` does not compare against the committed
 hash at all; it computes whatever hash your PDF happens to have and writes
 it straight into `data/manifest.json`, overwriting the recorded one,
 without warning. Confirmed by reading `_sha256` and `build_manifest` in

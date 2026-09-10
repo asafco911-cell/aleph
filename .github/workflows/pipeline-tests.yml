@@ -68,10 +68,14 @@ jobs:
       #
       # tests/conftest.py now checks every filing data/manifest.json lists and
       # SKIPS the tests carrying the `needs_filings` marker when one is absent.
-      # Which tests carry it was measured, not guessed: those 181 failures map
-      # to 158 test functions, and exactly those were marked. With the filings
-      # present the suite must report 0 skipped - a marked test that never
-      # needed a filing would be silently unverified here forever.
+      # Which tests carry it was measured, not guessed: the failing tests were
+      # mapped back to the functions that produced them, and exactly those were
+      # marked. Today 185 tests carry the marker, on 159 test functions; both
+      # counts are asserted against the code by test_docs_consistency.py in a
+      # later step, because these two numbers had already gone stale once.
+      # With the filings present the suite must report 0 skipped - a marked
+      # test that never needed a filing would be silently unverified here
+      # forever.
       #
       # The skip is not silent, which is the whole point (same stance as
       # docs/adr/0008): pytest_terminal_summary prints "SKIPPED N tests that

@@ -12,17 +12,18 @@ is asked of several candidate notes of which most will not hold it.
 """
 import json
 import sys
-from pathlib import Path
 
+from _filings import exit_on_missing_filing
 from aleph.extraction import extract
 from aleph.extraction.targets import resolve_targets
+from aleph.infra.paths import DATA_DIR
 from aleph.schemas import DocumentRecord
 
 MIN_ACCEPTED = 3
 
 records = [
     DocumentRecord(**r)
-    for r in json.loads(Path("data/manifest.json").read_text(encoding="utf-8"))
+    for r in json.loads((DATA_DIR / "manifest.json").read_text(encoding="utf-8"))
 ]
 only = sys.argv[1:] or None
 
@@ -49,6 +50,13 @@ for record in records:
 
         try:
             accepted, rejected, cache_hit = extract(record, target, question)
+        except FileNotFoundError as exc:
+            # NOT a per-target failure, so it does not go in `failures`.
+            # Without the filings the broad handler below turned one missing
+            # file into 97 lines of identical FAIL rows, one per target per
+            # filing - loud, but it buried the single fact that matters.
+            # This is the CLI boundary: one line, exit 1.
+            exit_on_missing_filing(exc)
         except Exception as exc:
             failures.append(f"{record.doc_id}/{key}: {type(exc).__name__}: {exc}")
             print(f"  FAIL   {key:<14} {target:<12} "

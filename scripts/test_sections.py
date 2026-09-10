@@ -1,18 +1,19 @@
 """Validate section extraction boundaries against contamination and truncation."""
 import json
 import sys
-from pathlib import Path
 
+from _filings import exit_on_missing_filing
 from aleph.documents import extract_section
+from aleph.infra.paths import DATA_DIR
 from aleph.schemas import DocumentRecord
 
 MANIFEST = [DocumentRecord(**r) for r in json.loads(
-    Path("data/manifest.json").read_text(encoding="utf-8"))]
+    (DATA_DIR / "manifest.json").read_text(encoding="utf-8"))]
 
 
 def check(doc_id: str, item: str) -> None:
     record = next(r for r in MANIFEST if r.doc_id == doc_id)
-    path = Path("data") / record.file_name
+    path = DATA_DIR / record.file_name
     text = extract_section(path, record.sections, item)
 
     head = text[:70].replace("\n", " ")
@@ -29,6 +30,11 @@ def check(doc_id: str, item: str) -> None:
     print("   ok")
 
 
-for doc in ("UBER_FY2024", "UBER_FY2025"):
-    check(doc, "7")
-    check(doc, "9A")
+# The filings are not distributed; without them this printed a 26-line pypdf
+# traceback. Caught here, at the CLI boundary, never inside src/aleph/.
+try:
+    for doc in ("UBER_FY2024", "UBER_FY2025"):
+        check(doc, "7")
+        check(doc, "9A")
+except FileNotFoundError as exc:
+    exit_on_missing_filing(exc)

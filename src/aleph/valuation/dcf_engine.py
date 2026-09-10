@@ -1,5 +1,6 @@
 """Deterministic DCF engine. No LLM anywhere in this file - pure arithmetic."""
 import math
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import List, Literal, Optional
 
@@ -173,7 +174,6 @@ def run_dcf(inputs: DCFInputs) -> DCFResult:
         terminal_pct=pv_terminal / total,
         yearly=yearly,
     )
-from copy import deepcopy
 
 
 def sensitivity_tornado(inputs: DCFInputs, ranges: dict) -> List[dict]:
