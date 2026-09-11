@@ -347,8 +347,9 @@ CLI = Path("scripts/run_valuation.py")
 
 def test_the_anchor_is_quoted_under_the_label_the_cli_prints():
     """`data/README.md` wrote the 77.08 anchor as `Value per share: 77.08`.
-    The CLI's `Value per share` line prints a RANGE (-14.13 to 77.08 for
-    UBER_FY2024); 77.08 comes from the separate `Latest-period basis` line.
+    The CLI's `Value per share` line prints a RANGE (NOT_APPLICABLE to 77.08
+    for UBER_FY2024, -14.13 to 77.08 before ISSUES.md #38); 77.08 comes from
+    the separate `Latest-period basis` line.
     Quoting a range's label around a single number is the point-estimate
     reading CLAUDE.md's seventh settled principle refuses, and it drifted into
     a file whose whole job is telling a reader what to expect."""
@@ -726,6 +727,26 @@ def test_every_relative_link_in_the_readme_resolves():
         check(f"README links to {target}, which exists", target.exists())
 
 
+INSTALL = re.compile(r"pip install -e \.(\[[A-Za-z0-9,._-]*\])?")
+
+
+def test_workflow_comments_quote_the_install_they_run():
+    """The comment above the install step said `pip install -e .` and nothing
+    else, two lines above `run: pip install -e .[dev]`. Same shape as every
+    #30 instance: a claim and the thing it claims about, side by side,
+    disagreeing. The workflow is one job, so set equality is enough; a second
+    job with a different extra would have to make this per-job."""
+    lines = WORKFLOW.read_text(encoding="utf-8").splitlines()
+    quoted = {m.group(0) for line in lines if line.lstrip().startswith("#")
+              if (m := INSTALL.search(line))}
+    runs = {m.group(0) for line in lines if "run:" in line
+            if (m := INSTALL.search(line))}
+    check(f"the workflow installs with {sorted(runs)}", len(runs) == 1,
+          f"expected exactly one install step, found {sorted(runs)}")
+    check("its comments quote the install it runs", quoted == runs,
+          f"comments say {sorted(quoted)}, the step runs {sorted(runs)}")
+
+
 def test_the_pipeline_still_guards_its_two_diagnostic_layers():
     """README and CLAUDE.md say the bare `except Exception` handlers were
     replaced. That is true of the CLI and NOT true of pipeline.py, which
@@ -781,6 +802,7 @@ if __name__ == "__main__":
     test_the_issues_contents_table_matches_the_file()
     test_the_name_matches_what_the_repository_does()
     test_every_relative_link_in_the_readme_resolves()
+    test_workflow_comments_quote_the_install_they_run()
     test_the_pipeline_still_guards_its_two_diagnostic_layers()
 
     if failures:

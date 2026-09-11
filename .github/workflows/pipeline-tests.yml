@@ -22,9 +22,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      # `pip install -e .` and nothing else. If pyproject.toml's dependency
-      # list is wrong, this step or the next one fails - which is the point
-      # of installing from it rather than from a frozen environment.
+      # `pip install -e .[dev]` - the dev extra, not the bare package: two
+      # later steps need pytest, and test_docs_consistency shells out to it.
+      # Nothing is pinned. If pyproject.toml's dependency list is wrong, this
+      # step or the next one fails - which is the point of installing from it
+      # rather than from a frozen environment.
       - name: Install the package from pyproject.toml
         run: pip install -e .[dev]
 
