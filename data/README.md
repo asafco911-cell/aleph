@@ -60,14 +60,24 @@ nothing to do with getting the wrong document.
 So: get the filing from the EDGAR link above, render it to PDF however you
 choose, and expect its hash to differ from the table. That is not a sign
 of a broken pipeline or the wrong filing - it is a rendering artifact.
-`python scripts/build_manifest.py` does not compare against the committed
-hash at all; it computes whatever hash your PDF happens to have and writes
-it straight into `data/manifest.json`, overwriting the recorded one,
-without warning. Confirmed by reading `_sha256` and `build_manifest` in
-`src/aleph/documents/manifest.py`: nothing there reads the old value before
-writing the new one. A hash "mismatch" is not a failure state this pipeline
-detects or blocks on - it is simply what a fresh `data/manifest.json` will
-say after you build it locally.
+`python scripts/build_manifest.py` will stop on it anyway. This paragraph
+said the opposite until 2026-09-11, and was true when it was written:
+build_manifest computed whatever hash your PDF happened to have and wrote it
+straight into `data/manifest.json`, overwriting the recorded one without
+warning. ISSUES.md #30 closed exactly that. It now reads the committed hash
+first - `committed_hashes` and `replaced_documents` in
+`src/aleph/documents/manifest.py` - and raises `DocumentError` when a doc_id's
+content changed, which the CLI turns into `MANIFEST FAILED` and exit 1. So a
+first build from your own re-render is expected to fail, once, and the way
+through is:
+
+```
+python scripts/build_manifest.py --allow-replacement
+```
+
+which prints `REPLACED <doc_id>` with the old and new hash for every
+overwrite before writing it: the flag is a decision to overwrite, not a
+reason to stop saying what was overwritten.
 
 What the hash is actually good for: if you are handed the six PDFs
 directly (rather than rendering your own), verifying against this table
@@ -76,8 +86,10 @@ including the `Latest-period basis: 77.08` / `49.06` anchors - were run
 against.
 
 That line name matters and this file had it wrong until 2026-09-10: the CLI's
-`Value per share` line prints a RANGE (`-14.13 to 77.08` for UBER_FY2024), and
-77.08 is what the separate `Latest-period basis` line reports. Quoting the
+`Value per share` line prints a RANGE (`NOT_APPLICABLE to 77.08` for
+UBER_FY2024 - the low end read `-14.13` until ISSUES.md #38 closed later the
+same day, because growing a negative FCFF for ten years is not a valuation),
+and 77.08 is what the separate `Latest-period basis` line reports. Quoting the
 anchor under the range's label is the point-estimate reading that CLAUDE.md's
 seventh settled principle exists to refuse.
 
@@ -105,10 +117,12 @@ not distributed here. Pushing with the PDF in history would have made all
 three false on the day they became public.
 
 `git filter-repo` removed every `data/*.pdf` and every `aleph_cache.db`
-blob from all 84 commits. One commit disappeared - the one whose entire
-content was untracking those two files, which became empty. The tracked
-file list at HEAD was identical before and after, and `.git` went from
-4.2 MB to 674 KB.
+blob from all 84 commits the history held on 2026-09-06. One commit
+disappeared - the one whose entire content was untracking those two files,
+which became empty. The tracked file list at HEAD was identical before and
+after, and `.git` went from 4.2 MB to 674 KB that day. All three numbers
+measure that rewrite, not this repository now: commits have been added since,
+and filter-repo did not touch them.
 
 Verified from a fresh `git clone` of the public repository, not from the
 local copy: `git rev-list --objects --all` matches no `.pdf`, no
